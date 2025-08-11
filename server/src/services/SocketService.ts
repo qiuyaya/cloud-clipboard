@@ -1,0 +1,251 @@
+import { Server as SocketIOServer } from 'socket.io';
+import type { Server } from 'http';
+import { RoomService } from './RoomService';
+import {
+  WebSocketMessageSchema,
+  JoinRoomRequestSchema,
+  LeaveRoomRequestSchema,
+  TextMessageSchema,
+  FileMessageSchema,
+  generateUserId,
+  detectDeviceType,
+} from '@cloud-clipboard/shared';
+import type {
+  ServerToClientEvents,
+  ClientToServerEvents,
+  User,
+  JoinRoomRequest,
+  LeaveRoomRequest,
+  TextMessage,
+  FileMessage,
+} from '@cloud-clipboard/shared';
+
+export class SocketService {
+  private io: SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
+  private userSockets: Map<string, string> = new Map(); // userId -> socketId
+  private socketUsers: Map<string, User> = new Map(); // socketId -> user
+
+  constructor(server: Server, private roomService: RoomService) {
+    this.io = new SocketIOServer(server, {
+      cors: {
+        origin: process.env.CLIENT_URL || '*',
+        methods: ['GET', 'POST'],
+      },
+      pingTimeout: 60000,
+      pingInterval: 25000,
+    });
+
+    this.setupSocketHandlers();
+  }
+
+  private setupSocketHandlers(): void {
+    this.io.on('connection', (socket) => {
+      console.log(`Client connected: ${socket.id}`);
+
+      socket.on('joinRoom', (data: JoinRoomRequest) => {
+        this.handleJoinRoom(socket, data);
+      });
+
+      socket.on('leaveRoom', (data: LeaveRoomRequest) => {
+        this.handleLeaveRoom(socket, data);
+      });
+
+      socket.on('sendMessage', (message: TextMessage | FileMessage) => {
+        this.handleSendMessage(socket, message);
+      });
+
+      socket.on('requestUserList', (roomKey: string) => {
+        this.handleRequestUserList(socket, roomKey);
+      });
+
+      socket.on('p2pOffer', (data: { to: string; offer: string }) => {
+        this.handleP2POffer(socket, data);
+      });
+
+      socket.on('p2pAnswer', (data: { to: string; answer: string }) => {
+        this.handleP2PAnswer(socket, data);
+      });
+
+      socket.on('p2pIceCandidate', (data: { to: string; candidate: string }) => {
+        this.handleP2PIceCandidate(socket, data);
+      });
+
+      socket.on('disconnect', () => {
+        this.handleDisconnect(socket);
+      });
+    });
+  }
+
+  private handleJoinRoom(socket: any, data: JoinRoomRequest): void {
+    try {
+      const validatedData = JoinRoomRequestSchema.parse(data);
+      
+      const user: User = {
+        id: generateUserId(),
+        name: validatedData.user.name,
+        deviceType: validatedData.user.deviceType || detectDeviceType(socket.handshake.headers['user-agent'] || ''),
+        isOnline: true,
+        lastSeen: new Date(),
+      };
+
+      const room = this.roomService.joinRoom(validatedData.roomKey, user);
+      
+      socket.join(validatedData.roomKey);
+      this.userSockets.set(user.id, socket.id);
+      this.socketUsers.set(socket.id, user);
+      
+
+      // Send the user their own info first
+      socket.emit('userJoined', user);
+      socket.emit('userList', room.getUserList());
+      
+      // Notify others in the room
+      socket.to(validatedData.roomKey).emit('userJoined', user);
+      socket.to(validatedData.roomKey).emit('userList', room.getUserList());
+
+      console.log(`User ${user.name} joined room ${validatedData.roomKey}`);
+    } catch (error) {
+      console.error('Join room error:', error);
+      socket.emit('error', 'Failed to join room');
+    }
+  }
+
+  private handleLeaveRoom(socket: any, data: LeaveRoomRequest): void {
+    try {
+      const validatedData = LeaveRoomRequestSchema.parse(data);
+      
+      const user = this.socketUsers.get(socket.id);
+      if (!user) return;
+
+      socket.leave(validatedData.roomKey);
+      this.roomService.leaveRoom(validatedData.roomKey, validatedData.userId);
+      
+      socket.to(validatedData.roomKey).emit('userLeft', validatedData.userId);
+
+      console.log(`User ${user.name} left room ${validatedData.roomKey}`);
+    } catch (error) {
+      console.error('Leave room error:', error);
+      socket.emit('error', 'Failed to leave room');
+    }
+  }
+
+  private handleSendMessage(socket: any, message: TextMessage | FileMessage): void {
+    try {
+      const user = this.socketUsers.get(socket.id);
+      if (!user) {
+        socket.emit('error', 'User not found');
+        return;
+      }
+
+      let validatedMessage: TextMessage | FileMessage;
+      
+      if (message.type === 'text') {
+        validatedMessage = TextMessageSchema.parse({
+          ...message,
+          id: generateUserId(),
+          sender: user,
+          timestamp: new Date(),
+        });
+      } else {
+        validatedMessage = FileMessageSchema.parse({
+          ...message,
+          id: generateUserId(),
+          sender: user,
+          timestamp: new Date(),
+        });
+      }
+
+      this.roomService.addMessage(message.roomKey, validatedMessage);
+      
+      socket.to(message.roomKey).emit('message', validatedMessage);
+      socket.emit('message', validatedMessage);
+
+      console.log(`Message sent in room ${message.roomKey} by ${user.name}`);
+    } catch (error) {
+      console.error('Send message error:', error);
+      socket.emit('error', 'Failed to send message');
+    }
+  }
+
+  private handleRequestUserList(socket: any, roomKey: string): void {
+    try {
+      const users = this.roomService.getUsersInRoom(roomKey);
+      socket.emit('userList', users);
+    } catch (error) {
+      console.error('Request user list error:', error);
+      socket.emit('error', 'Failed to get user list');
+    }
+  }
+
+  private handleP2POffer(socket: any, data: { to: string; offer: string }): void {
+    try {
+      const fromUser = this.socketUsers.get(socket.id);
+      if (!fromUser) return;
+
+      const toSocketId = this.userSockets.get(data.to);
+      if (toSocketId) {
+        this.io.to(toSocketId).emit('p2pOffer', {
+          from: fromUser.id,
+          offer: data.offer,
+        });
+      }
+    } catch (error) {
+      console.error('P2P offer error:', error);
+    }
+  }
+
+  private handleP2PAnswer(socket: any, data: { to: string; answer: string }): void {
+    try {
+      const fromUser = this.socketUsers.get(socket.id);
+      if (!fromUser) return;
+
+      const toSocketId = this.userSockets.get(data.to);
+      if (toSocketId) {
+        this.io.to(toSocketId).emit('p2pAnswer', {
+          from: fromUser.id,
+          answer: data.answer,
+        });
+      }
+    } catch (error) {
+      console.error('P2P answer error:', error);
+    }
+  }
+
+  private handleP2PIceCandidate(socket: any, data: { to: string; candidate: string }): void {
+    try {
+      const fromUser = this.socketUsers.get(socket.id);
+      if (!fromUser) return;
+
+      const toSocketId = this.userSockets.get(data.to);
+      if (toSocketId) {
+        this.io.to(toSocketId).emit('p2pIceCandidate', {
+          from: fromUser.id,
+          candidate: data.candidate,
+        });
+      }
+    } catch (error) {
+      console.error('P2P ICE candidate error:', error);
+    }
+  }
+
+  private handleDisconnect(socket: any): void {
+    const user = this.socketUsers.get(socket.id);
+    if (user) {
+      this.userSockets.delete(user.id);
+      this.socketUsers.delete(socket.id);
+      
+      const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+      
+      rooms.forEach(roomKey => {
+        this.roomService.updateUserStatus(roomKey, user.id, false);
+        socket.to(roomKey).emit('userLeft', user.id);
+      });
+
+      console.log(`Client disconnected: ${socket.id}`);
+    }
+  }
+
+  getIO(): SocketIOServer<ClientToServerEvents, ServerToClientEvents> {
+    return this.io;
+  }
+}

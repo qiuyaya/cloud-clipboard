@@ -1,0 +1,29 @@
+{
+  "name": "cloud-clipboard",
+  "version": "1.0.0",
+  "description": "A cloud clipboard application for sharing text and files across devices",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"bun run server:dev\" \"bun run client:dev\"",
+    "build": "bun run shared:build && bun run server:build && bun run client:build",
+    "server:dev": "cd server && bun run dev",
+    "server:build": "cd server && bun run build",
+    "client:dev": "cd client && bun run dev",
+    "client:build": "cd client && bun run build",
+    "shared:build": "cd shared && bun run build",
+    "lint": "eslint . --ext .ts,.tsx",
+    "type-check": "tsc --noEmit"
+  },
+  "workspaces": ["server", "client", "shared"],
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "concurrently": "^8.0.0"
+  }
+}

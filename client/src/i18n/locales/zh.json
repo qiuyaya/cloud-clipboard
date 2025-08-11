@@ -1,0 +1,76 @@
+{
+  "app": {
+    "title": "云剪切板",
+    "description": "输入房间密钥，在不同设备间分享文本和文件"
+  },
+  "roomJoin": {
+    "title": "云剪切板",
+    "description": "输入房间密钥，在不同设备间分享文本和文件",
+    "roomKey": "房间密钥",
+    "roomKeyPlaceholder": "输入房间密钥（如：my-room-123）",
+    "username": "您的姓名",
+    "usernamePlaceholder": "输入您的姓名",
+    "joinButton": "加入房间",
+    "joining": "加入中...",
+    "shareHint": "与他人分享相同的房间密钥即可协作",
+    "errors": {
+      "required": "请输入房间密钥和用户名",
+      "invalidKey": "房间密钥只能包含字母、数字、连字符和下划线"
+    }
+  },
+  "room": {
+    "title": "房间：{{roomKey}}",
+    "usersOnline": "{{count}} 名用户在线",
+    "usersOnline_other": "{{count}} 名用户在线",
+    "leave": "离开",
+    "usersInRoom": "房间用户",
+    "you": "（您）",
+    "online": "在线",
+    "lastSeen": "最后见于 {{time}}",
+    "noMessages": "暂无消息。发送文本或文件开始使用吧！",
+    "maxLimits": "最大文本：10万字符 • 最大文件：100MB"
+  },
+  "message": {
+    "you": "（您）",
+    "copy": "复制",
+    "download": "下载",
+    "file": "文件"
+  },
+  "input": {
+    "placeholder": "在此输入您的消息或粘贴文本...",
+    "fileButton": "文件",
+    "sendButton": "发送"
+  },
+  "toast": {
+    "copied": "已复制！",
+    "copiedDesc": "文本已复制到剪贴板",
+    "failedToCopy": "复制失败",
+    "failedToCopyDesc": "无法将文本复制到剪贴板",
+    "userJoined": "用户加入",
+    "userJoinedDesc": "{{name}} 加入了房间",
+    "userLeft": "用户离开",
+    "userLeftDesc": "{{name}} 离开了房间",
+    "joinedRoom": "已加入房间",
+    "joinedRoomDesc": "已连接到房间：{{roomKey}}",
+    "leftRoom": "已离开房间",
+    "leftRoomDesc": "您已离开房间",
+    "fileUploaded": "文件已上传",
+    "fileUploadedDesc": "{{name}} 上传成功",
+    "connectionError": "连接错误",
+    "notConnected": "未连接到服务器。请重试。",
+    "error": "错误",
+    "fileTooLarge": "文件过大",
+    "fileTooLargeDesc": "最大文件大小为 100MB",
+    "uploadFailed": "上传失败",
+    "validationFailed": "消息验证失败"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色", 
+    "system": "跟随系统"
+  },
+  "language": {
+    "zh": "中文",
+    "en": "English"
+  }
+}

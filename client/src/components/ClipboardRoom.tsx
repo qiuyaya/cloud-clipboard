@@ -1,0 +1,274 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/useToast';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { useTranslation } from 'react-i18next';
+import { formatFileSize, formatTimestamp } from '@cloud-clipboard/shared';
+import type { User, TextMessage, FileMessage, RoomKey } from '@cloud-clipboard/shared';
+import { Copy, Send, Upload, Users, LogOut, File, Download } from 'lucide-react';
+
+interface ClipboardRoomProps {
+  roomKey: RoomKey;
+  currentUser: User;
+  users: User[];
+  messages: (TextMessage | FileMessage)[];
+  onSendMessage: (content: string) => void;
+  onSendFile: (file: File) => void;
+  onLeaveRoom: () => void;
+}
+
+export function ClipboardRoom({
+  roomKey,
+  currentUser,
+  users,
+  messages,
+  onSendMessage,
+  onSendFile,
+  onLeaveRoom,
+}: ClipboardRoomProps): JSX.Element {
+  const [textInput, setTextInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendText = (e: React.FormEvent): void => {
+    e.preventDefault();
+    if (!textInput.trim()) return;
+    
+    onSendMessage(textInput.trim());
+    setTextInput('');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 100 * 1024 * 1024) {
+      toast({
+        variant: 'destructive',
+        title: t('toast.fileTooLarge'),
+        description: t('toast.fileTooLargeDesc'),
+      });
+      return;
+    }
+
+    onSendFile(file);
+    e.target.value = '';
+  };
+
+  const copyToClipboard = async (text: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: t('toast.copied'),
+        description: t('toast.copiedDesc'),
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: t('toast.failedToCopy'),
+        description: t('toast.failedToCopyDesc'),
+      });
+    }
+  };
+
+  const downloadFile = (message: FileMessage): void => {
+    if (message.downloadUrl) {
+      const link = document.createElement('a');
+      link.href = message.downloadUrl;
+      link.download = message.fileInfo.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const onlineUsers = users.filter(user => user.isOnline);
+
+  return (
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Sidebar */}
+      <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">{t('room.title', { roomKey })}</h2>
+              <p className="text-sm text-muted-foreground">
+                {t('room.usersOnline', { count: onlineUsers.length })}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <LanguageToggle />
+              <ThemeToggle />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLeaveRoom}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                {t('room.leave')}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="h-4 w-4" />
+              <span className="font-medium text-sm">{t('room.usersInRoom')}</span>
+            </div>
+            {users.map((user) => (
+              <div
+                key={user.id}
+                className={`flex items-center gap-3 p-2 rounded-lg ${
+                  user.id === currentUser.id
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                    : 'bg-gray-50 dark:bg-gray-700/50'
+                }`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    user.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {user.name} {user.id === currentUser.id && t('room.you')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {user.deviceType} • {user.isOnline ? t('room.online') : t('room.lastSeen', { time: formatTimestamp(user.lastSeen) })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center text-muted-foreground py-12">
+              <p>{t('room.noMessages')}</p>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <Card
+                key={message.id}
+                className={`max-w-2xl ${
+                  message.sender.id === currentUser.id ? 'ml-auto' : 'mr-auto'
+                }`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">
+                        {message.sender.name}
+                        {message.sender.id === currentUser.id && ` ${t('message.you')}`}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTimestamp(message.timestamp)}
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {message.type === 'text' ? (
+                    <div className="space-y-2">
+                      <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                        <pre className="whitespace-pre-wrap text-sm font-mono">
+                          {message.content}
+                        </pre>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(message.content)}
+                        className="flex items-center gap-2"
+                      >
+                        <Copy className="h-3 w-3" />
+                        {t('message.copy')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <File className="h-8 w-8 text-blue-500" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {message.fileInfo.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(message.fileInfo.size)} • {message.fileInfo.type}
+                          </p>
+                        </div>
+                      </div>
+                      {message.downloadUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadFile(message)}
+                          className="flex items-center gap-2"
+                        >
+                          <Download className="h-3 w-3" />
+                          {t('message.download')}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input area */}
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+          <form onSubmit={handleSendText} className="flex gap-2">
+            <Input
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              placeholder={t('input.placeholder')}
+              className="flex-1"
+              maxLength={100000}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              {t('input.fileButton')}
+            </Button>
+            <Button type="submit" disabled={!textInput.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground mt-2">
+            {t('room.maxLimits')}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

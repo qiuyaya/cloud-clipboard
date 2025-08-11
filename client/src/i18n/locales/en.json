@@ -1,0 +1,76 @@
+{
+  "app": {
+    "title": "Cloud Clipboard",
+    "description": "Enter a room key to share text and files across your devices"
+  },
+  "roomJoin": {
+    "title": "Cloud Clipboard", 
+    "description": "Enter a room key to share text and files across your devices",
+    "roomKey": "Room Key",
+    "roomKeyPlaceholder": "Enter room key (e.g., my-room-123)",
+    "username": "Your Name",
+    "usernamePlaceholder": "Enter your name",
+    "joinButton": "Join Room",
+    "joining": "Joining...",
+    "shareHint": "Share the same room key with others to collaborate",
+    "errors": {
+      "required": "Please enter both room key and username",
+      "invalidKey": "Room key can only contain letters, numbers, hyphens, and underscores"
+    }
+  },
+  "room": {
+    "title": "Room: {{roomKey}}",
+    "usersOnline": "{{count}} user online",
+    "usersOnline_other": "{{count}} users online",
+    "leave": "Leave",
+    "usersInRoom": "Users in room",
+    "you": "(You)",
+    "online": "Online",
+    "lastSeen": "Last seen {{time}}",
+    "noMessages": "No messages yet. Send a text or file to get started!",
+    "maxLimits": "Max text: 100k chars • Max file: 100MB"
+  },
+  "message": {
+    "you": "(You)",
+    "copy": "Copy",
+    "download": "Download",
+    "file": "File"
+  },
+  "input": {
+    "placeholder": "Type your message or paste text here...",
+    "fileButton": "File",
+    "sendButton": "Send"
+  },
+  "toast": {
+    "copied": "Copied!",
+    "copiedDesc": "Text copied to clipboard",
+    "failedToCopy": "Failed to copy",
+    "failedToCopyDesc": "Could not copy text to clipboard",
+    "userJoined": "User joined",
+    "userJoinedDesc": "{{name}} joined the room",
+    "userLeft": "User left",
+    "userLeftDesc": "{{name}} left the room",
+    "joinedRoom": "Joined room",
+    "joinedRoomDesc": "Connected to room: {{roomKey}}",
+    "leftRoom": "Left room",
+    "leftRoomDesc": "You have left the room",
+    "fileUploaded": "File uploaded",
+    "fileUploadedDesc": "{{name}} uploaded successfully",
+    "connectionError": "Connection error",
+    "notConnected": "Not connected to server. Please try again.",
+    "error": "Error",
+    "fileTooLarge": "File too large",
+    "fileTooLargeDesc": "Maximum file size is 100MB",
+    "uploadFailed": "Upload failed",
+    "validationFailed": "Message validation failed"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "zh": "中文",
+    "en": "English"
+  }
+}
