@@ -67,7 +67,23 @@ function App(): JSX.Element {
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  // Browser fingerprint is now managed by RoomJoin component
+  // Clean up any invalid fingerprint cache on app load
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cloudClipboard_fingerprint');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // If it's not a valid fingerprint object (like old hash-only format), remove it
+        if (typeof parsed === 'string' || !parsed.userAgent) {
+          localStorage.removeItem('cloudClipboard_fingerprint');
+          console.log('Cleared invalid fingerprint cache');
+        }
+      }
+    } catch (error) {
+      localStorage.removeItem('cloudClipboard_fingerprint');
+      console.log('Cleared corrupted fingerprint cache');
+    }
+  }, []);
 
   // Fetch room messages from server
   const fetchRoomMessages = useCallback(async (roomKey: string) => {
@@ -161,8 +177,23 @@ function App(): JSX.Element {
         setMessages([]);
         
         // Use cached fingerprint for consistency
-        const cachedFingerprint = loadFromLocalStorage('cloudClipboard_fingerprint');
-        const fingerprint = cachedFingerprint || generateBrowserFingerprint();
+        let fingerprint;
+        try {
+          const cachedFingerprint = loadFromLocalStorage('cloudClipboard_fingerprint');
+          // Validate that we have a proper fingerprint object
+          if (cachedFingerprint && typeof cachedFingerprint === 'object' && 
+              cachedFingerprint.hash && cachedFingerprint.userAgent !== undefined) {
+            fingerprint = cachedFingerprint;
+          } else {
+            // Generate new fingerprint if cached one is invalid
+            fingerprint = generateBrowserFingerprint();
+            saveToLocalStorage('cloudClipboard_fingerprint', fingerprint);
+          }
+        } catch (error) {
+          // Fallback to generating new fingerprint
+          fingerprint = generateBrowserFingerprint();
+          saveToLocalStorage('cloudClipboard_fingerprint', fingerprint);
+        }
         
         const rejoinData: JoinRoomRequest = {
           type: 'join_room',

@@ -28,16 +28,22 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
       if (saved) {
         // Use cached fingerprint data if available
         const parsed = JSON.parse(saved);
-        setCachedFingerprint(parsed);
-      } else {
-        // Generate new fingerprint and cache it
-        const fingerprint = generateBrowserFingerprint();
-        localStorage.setItem('cloudClipboard_fingerprint', JSON.stringify(fingerprint));
-        setCachedFingerprint(fingerprint);
+        // Validate that we have a proper fingerprint object with required fields
+        if (parsed && typeof parsed === 'object' && parsed.hash && parsed.userAgent !== undefined) {
+          setCachedFingerprint(parsed);
+          return;
+        }
       }
-    } catch (error) {
-      // Fallback: generate new fingerprint
+      
+      // Generate new fingerprint and cache it (also handles invalid cached data)
       const fingerprint = generateBrowserFingerprint();
+      localStorage.setItem('cloudClipboard_fingerprint', JSON.stringify(fingerprint));
+      setCachedFingerprint(fingerprint);
+    } catch (error) {
+      // Fallback: generate new fingerprint and clear bad cache
+      localStorage.removeItem('cloudClipboard_fingerprint');
+      const fingerprint = generateBrowserFingerprint();
+      localStorage.setItem('cloudClipboard_fingerprint', JSON.stringify(fingerprint));
       setCachedFingerprint(fingerprint);
     }
   }, []);
