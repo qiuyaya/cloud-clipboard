@@ -1,11 +1,13 @@
 import { RoomModel } from '../models/Room';
 import type { RoomKey, User, TextMessage, FileMessage } from '@cloud-clipboard/shared';
+import { EventEmitter } from 'events';
 
-export class RoomService {
+export class RoomService extends EventEmitter {
   private rooms: Map<RoomKey, RoomModel> = new Map();
   private cleanupInterval: NodeJS.Timeout;
 
   constructor() {
+    super();
     this.cleanupInterval = setInterval(() => {
       this.cleanupInactiveRooms();
     }, 5 * 60 * 1000);
@@ -41,9 +43,8 @@ export class RoomService {
 
     const removed = room.removeUser(userId);
     
-    if (room.isEmpty()) {
-      this.rooms.delete(key);
-    }
+    // Check if room should be destroyed
+    this.checkRoomDestruction(key, room);
 
     return removed;
   }
@@ -70,6 +71,11 @@ export class RoomService {
     const room = this.getRoom(key);
     if (room) {
       room.updateUserStatus(userId, isOnline);
+      
+      // Check if room should be destroyed after status update
+      if (!isOnline) {
+        this.checkRoomDestruction(key, room);
+      }
     }
   }
 
@@ -86,6 +92,19 @@ export class RoomService {
     };
   }
 
+  private checkRoomDestruction(key: RoomKey, room: RoomModel): void {
+    // Check if all users are offline or room is empty
+    const onlineUsers = room.getOnlineUsers();
+    
+    if (onlineUsers.length === 0) {
+      console.log(`Room ${key} has no online users - destroying room`);
+      this.rooms.delete(key);
+      
+      // Emit event for file cleanup
+      this.emit('roomDestroyed', key);
+    }
+  }
+
   private cleanupInactiveRooms(): void {
     const now = new Date();
     const inactiveThreshold = 24 * 60 * 60 * 1000;
@@ -93,9 +112,13 @@ export class RoomService {
     for (const [key, room] of this.rooms.entries()) {
       const timeSinceLastActivity = now.getTime() - room.lastActivity.getTime();
       
-      if (timeSinceLastActivity > inactiveThreshold || room.isEmpty()) {
+      if (timeSinceLastActivity > inactiveThreshold) {
+        console.log(`Cleaned up inactive room after 24h: ${key}`);
         this.rooms.delete(key);
-        console.log(`Cleaned up inactive room: ${key}`);
+        this.emit('roomDestroyed', key);
+      } else {
+        // Also check for rooms with no online users during cleanup
+        this.checkRoomDestruction(key, room);
       }
     }
   }

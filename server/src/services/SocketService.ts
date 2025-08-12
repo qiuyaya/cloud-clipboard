@@ -8,6 +8,7 @@ import {
   TextMessageSchema,
   FileMessageSchema,
   generateUserId,
+  generateUserIdFromFingerprint,
   detectDeviceType,
 } from '@cloud-clipboard/shared';
 import type {
@@ -19,13 +20,14 @@ import type {
   TextMessage,
   FileMessage,
 } from '@cloud-clipboard/shared';
+import type { FileManager } from './FileManager';
 
 export class SocketService {
   private io: SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
   private userSockets: Map<string, string> = new Map(); // userId -> socketId
   private socketUsers: Map<string, User> = new Map(); // socketId -> user
 
-  constructor(server: Server, private roomService: RoomService) {
+  constructor(server: Server, private roomService: RoomService, private fileManager?: FileManager) {
     this.io = new SocketIOServer(server, {
       cors: {
         origin: process.env.CLIENT_URL || '*',
@@ -79,13 +81,76 @@ export class SocketService {
   private handleJoinRoom(socket: any, data: JoinRoomRequest): void {
     try {
       const validatedData = JoinRoomRequestSchema.parse(data);
+      const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
       
+      // Generate user ID based on fingerprint for consistent identity
+      let userId: string;
+      let fingerprint: string | undefined;
+      
+      if (validatedData.fingerprint) {
+        fingerprint = validatedData.fingerprint.hash;
+        userId = generateUserIdFromFingerprint(fingerprint);
+        
+        // Check if this user (fingerprint) already exists in the room
+        const existingUser = existingUsers.find(u => u.fingerprint === fingerprint);
+        if (existingUser) {
+          // User is reconnecting - reuse existing user but update online status
+          existingUser.isOnline = true;
+          existingUser.lastSeen = new Date();
+          
+          // Update socket mappings
+          this.userSockets.set(existingUser.id, socket.id);
+          this.socketUsers.set(socket.id, existingUser);
+          
+          socket.join(validatedData.roomKey);
+          
+          // Update user in room service
+          this.roomService.updateUserStatus(validatedData.roomKey, existingUser.id, true);
+          
+          // Send the user their own info
+          socket.emit('userJoined', existingUser);
+          socket.emit('userList', this.roomService.getUsersInRoom(validatedData.roomKey));
+          
+          // Notify others about the reconnection
+          socket.to(validatedData.roomKey).emit('userList', this.roomService.getUsersInRoom(validatedData.roomKey));
+          
+          console.log(`User ${existingUser.name} reconnected to room ${validatedData.roomKey}`);
+          return;
+        }
+      } else {
+        // Fallback to random ID if no fingerprint
+        userId = generateUserId();
+      }
+      
+      // Check for duplicate names and generate unique name if needed
+      let uniqueName = validatedData.user.name;
+      const existingNames = existingUsers.filter(u => u.fingerprint !== fingerprint).map(u => u.name.toLowerCase());
+      
+      // Only add suffix if name conflicts with OTHER users (different fingerprint)
+      if (existingNames.includes(uniqueName.toLowerCase())) {
+        // Generate random suffix until we find a unique name, keeping within 50 char limit
+        let attempts = 0;
+        const maxBaseLength = 44; // Leave room for "_" + 5 char suffix
+        const baseName = validatedData.user.name.slice(0, maxBaseLength);
+        
+        do {
+          const randomSuffix = Math.random().toString(36).substring(2, 7); // 5 chars
+          uniqueName = `${baseName}_${randomSuffix}`;
+          attempts++;
+        } while (existingNames.includes(uniqueName.toLowerCase()) && attempts < 10);
+      } else {
+        // Ensure name doesn't exceed 50 characters
+        uniqueName = validatedData.user.name.slice(0, 50);
+      }
+      
+      // Create new user
       const user: User = {
-        id: generateUserId(),
-        name: validatedData.user.name,
+        id: userId,
+        name: uniqueName,
         deviceType: validatedData.user.deviceType || detectDeviceType(socket.handshake.headers['user-agent'] || ''),
         isOnline: true,
         lastSeen: new Date(),
+        fingerprint,
       };
 
       const room = this.roomService.joinRoom(validatedData.roomKey, user);
@@ -247,5 +312,10 @@ export class SocketService {
 
   getIO(): SocketIOServer<ClientToServerEvents, ServerToClientEvents> {
     return this.io;
+  }
+
+  // Send system message to room about file operations
+  sendSystemMessage(roomKey: string, message: { type: 'file_deleted' | 'room_destroyed' | 'file_expired'; data: any }): void {
+    this.io.to(roomKey).emit('systemMessage', message);
   }
 }

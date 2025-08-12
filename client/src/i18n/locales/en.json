@@ -62,7 +62,15 @@
     "fileTooLarge": "File too large",
     "fileTooLargeDesc": "Maximum file size is 100MB",
     "uploadFailed": "Upload failed",
-    "validationFailed": "Message validation failed"
+    "validationFailed": "Message validation failed",
+    "autoLogout": "Auto logged out",
+    "autoLogoutDesc": "You were logged out due to 2 hours of inactivity",
+    "fileDeleted": "File deleted",
+    "fileDeletedDesc": "{{fileName}} has been automatically deleted",
+    "roomDestroyed": "Room destroyed",
+    "roomDestroyedDesc": "Room was destroyed and all files were deleted",
+    "fileRetentionExpired": "File expired",
+    "fileRetentionExpiredDesc": "{{fileName}} was deleted after 12 hours of retention"
   },
   "theme": {
     "light": "Light",

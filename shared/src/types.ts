@@ -13,6 +13,7 @@ import {
   APIResponseSchema,
   P2PConnectionSchema,
   RoomInfoSchema,
+  BrowserFingerprintSchema,
 } from './schemas';
 
 export type RoomKey = z.infer<typeof RoomKeySchema>;
@@ -25,6 +26,7 @@ export type JoinRoomRequest = z.infer<typeof JoinRoomRequestSchema>;
 export type LeaveRoomRequest = z.infer<typeof LeaveRoomRequestSchema>;
 export type UserListMessage = z.infer<typeof UserListMessageSchema>;
 export type WebSocketMessage = z.infer<typeof WebSocketMessageSchema>;
+export type BrowserFingerprint = z.infer<typeof BrowserFingerprintSchema>;
 export type APIResponse<T = unknown> = Omit<z.infer<typeof APIResponseSchema>, 'data'> & {
   data?: T;
 };
@@ -37,6 +39,8 @@ export interface ServerToClientEvents {
   userLeft: (userId: string) => void;
   userList: (users: User[]) => void;
   error: (error: string) => void;
+  systemMessage: (message: { type: 'file_deleted' | 'room_destroyed' | 'file_expired'; data: any }) => void;
+  roomDestroyed: (data: { roomKey: string; deletedFiles: string[] }) => void;
   p2pOffer: (data: { from: string; offer: string }) => void;
   p2pAnswer: (data: { from: string; answer: string }) => void;
   p2pIceCandidate: (data: { from: string; candidate: string }) => void;

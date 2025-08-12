@@ -7,6 +7,7 @@ import { sanitizeFileName } from '@cloud-clipboard/shared';
 import type { APIResponse, FileInfo } from '@cloud-clipboard/shared';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { FileManager } from '../services/FileManager';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ const FileParamsSchema = z.object({
   fileId: z.string().min(1),
 });
 
-export const createFileRoutes = (): Router => {
+export const createFileRoutes = (fileManager: FileManager): Router => {
   router.post('/upload', authenticateRoom, upload.single('file'), (req, res: any) => {
     try {
       if (!req.file) {
@@ -66,6 +67,16 @@ export const createFileRoutes = (): Router => {
         roomKey: req.roomKey,
         uploadedAt: new Date(),
       };
+      
+      // Track file in FileManager
+      fileManager.addFile({
+        id: req.file.filename,
+        filename: req.file.originalname,
+        path: req.file.path,
+        roomKey: req.roomKey,
+        uploadedAt: new Date(),
+        size: req.file.size,
+      });
 
       res.json({
         success: true,

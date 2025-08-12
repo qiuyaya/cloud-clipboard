@@ -120,6 +120,18 @@ class SocketService {
     }
   }
 
+  onSystemMessage(callback: (message: { type: 'file_deleted' | 'room_destroyed' | 'file_expired'; data: any }) => void): void {
+    if (this.socket) {
+      this.socket.on('systemMessage', callback);
+    }
+  }
+
+  onRoomDestroyed(callback: (data: { roomKey: string; deletedFiles: string[] }) => void): void {
+    if (this.socket) {
+      this.socket.on('roomDestroyed', callback);
+    }
+  }
+
   onError(callback: (error: string) => void): void {
     if (this.socket) {
       this.socket.on('error', callback);

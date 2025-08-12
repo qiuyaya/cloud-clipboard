@@ -12,12 +12,24 @@ export const MessageTypeSchema = z.enum([
   'pong',
 ]);
 
+export const BrowserFingerprintSchema = z.object({
+  userAgent: z.string(),
+  language: z.string(),
+  timezone: z.string(),
+  screen: z.string(),
+  colorDepth: z.number(),
+  cookieEnabled: z.boolean(),
+  doNotTrack: z.string().optional(),
+  hash: z.string(), // Generated hash of all fingerprint data
+});
+
 export const UserSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(50),
   isOnline: z.boolean(),
   lastSeen: z.date(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']),
+  fingerprint: z.string().optional(), // Browser fingerprint hash for user identification
 });
 
 export const TextMessageSchema = z.object({
@@ -51,6 +63,7 @@ export const JoinRoomRequestSchema = z.object({
   type: z.literal('join_room'),
   roomKey: RoomKeySchema,
   user: UserSchema.omit({ id: true, isOnline: true, lastSeen: true }),
+  fingerprint: BrowserFingerprintSchema.optional(),
 });
 
 export const LeaveRoomRequestSchema = z.object({

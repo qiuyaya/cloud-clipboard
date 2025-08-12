@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { socketService } from '@/services/socket';
 import {
   generateUserId,
-  TextMessageSchema,
   FileMessageSchema,
+  generateBrowserFingerprint,
 } from '@cloud-clipboard/shared';
 import type {
   User,
@@ -19,15 +19,132 @@ import type {
   RoomKey,
 } from '@cloud-clipboard/shared';
 
+// Utility functions for localStorage persistence
+const saveToLocalStorage = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.warn('Failed to save to localStorage:', error);
+  }
+};
+
+const loadFromLocalStorage = (key: string) => {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.warn('Failed to load from localStorage:', error);
+    return null;
+  }
+};
+
 function App(): JSX.Element {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [roomKey, setRoomKey] = useState<RoomKey | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = loadFromLocalStorage('cloudClipboard_user');
+    if (saved && saved.fingerprint) {
+      // Only use saved user if it has fingerprint (new format)
+      return {
+        ...saved,
+        lastSeen: new Date(saved.lastSeen),
+        isOnline: true
+      };
+    }
+    // Clear old format data
+    if (saved) {
+      localStorage.removeItem('cloudClipboard_user');
+      localStorage.removeItem('cloudClipboard_roomKey');
+    }
+    return null;
+  });
+  const [roomKey, setRoomKey] = useState<RoomKey | null>(() => {
+    return loadFromLocalStorage('cloudClipboard_roomKey');
+  });
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<(TextMessage | FileMessage)[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [lastActivity, setLastActivity] = useState(Date.now());
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  // Generate and cache browser fingerprint on first load
+  useState(() => {
+    const saved = loadFromLocalStorage('cloudClipboard_fingerprint');
+    if (!saved) {
+      const fingerprint = generateBrowserFingerprint();
+      saveToLocalStorage('cloudClipboard_fingerprint', fingerprint.hash);
+    }
+  });
+
+  // Fetch room messages from server
+  const fetchRoomMessages = useCallback(async (roomKey: string) => {
+    try {
+      const response = await fetch(`/api/rooms/messages?limit=50`, {
+        headers: {
+          'X-Room-Key': roomKey,
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          // Convert string dates to Date objects
+          const messagesWithDates = result.data.map((msg: any) => ({
+            ...msg,
+            timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp,
+            sender: {
+              ...msg.sender,
+              lastSeen: typeof msg.sender.lastSeen === 'string' ? new Date(msg.sender.lastSeen) : msg.sender.lastSeen,
+            },
+          }));
+          setMessages(messagesWithDates);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch room messages:', error);
+    }
+  }, []);
+
+  // Update last activity on user interaction
+  useEffect(() => {
+    const updateActivity = () => setLastActivity(Date.now());
+    
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, { passive: true });
+    });
+    
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity);
+      });
+    };
+  }, []);
+
+  // Auto-logout after 2 hours of inactivity
+  useEffect(() => {
+    const checkInactivity = () => {
+      const twoHours = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+      if (currentUser && Date.now() - lastActivity > twoHours) {
+        handleLeaveRoom();
+        toast({
+          title: t('toast.autoLogout'),
+          description: t('toast.autoLogoutDesc'),
+        });
+      }
+    };
+    
+    const interval = setInterval(checkInactivity, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [currentUser, lastActivity]);
+
+  // Try to rejoin room on app load if data exists
+  useEffect(() => {
+    if (currentUser && roomKey && !isConnected && !isConnecting) {
+      // Don't set isConnecting here - let the connection handler do it
+      console.log('Will attempt to rejoin room once connected:', roomKey);
+    }
+  }, [currentUser, roomKey, isConnected, isConnecting]);
 
   // Set up socket connection and event handlers once
   useEffect(() => {
@@ -36,6 +153,31 @@ function App(): JSX.Element {
     const handleConnect = () => {
       setIsConnected(true);
       console.log('Connected to server');
+      
+      // Auto-rejoin room if we have saved data
+      const savedUser = loadFromLocalStorage('cloudClipboard_user');
+      const savedRoomKey = loadFromLocalStorage('cloudClipboard_roomKey');
+      
+      // Always rejoin if we have saved data, regardless of currentUser state
+      if (savedUser && savedRoomKey) {
+        console.log('Auto-rejoining room:', savedRoomKey);
+        setIsConnecting(true);
+        // Reset current user to force proper reconnection flow
+        setCurrentUser(null);
+        setUsers([]);
+        setMessages([]);
+        
+        const rejoinData: JoinRoomRequest = {
+          type: 'join_room',
+          roomKey: savedRoomKey,
+          user: {
+            name: savedUser.name,
+            deviceType: savedUser.deviceType
+          },
+          fingerprint: generateBrowserFingerprint()
+        };
+        socketService.joinRoom(rejoinData);
+      }
     };
 
     const handleDisconnect = () => {
@@ -77,20 +219,33 @@ function App(): JSX.Element {
       setCurrentUser(prev => {
         if (!prev) {
           setIsConnecting(false);
-          // This is us joining, show success toast
+          // Save to localStorage
+          saveToLocalStorage('cloudClipboard_user', userWithDate);
+          
+          // This is us joining - request user list and messages for the room
+          const currentRoomKey = roomKey || loadFromLocalStorage('cloudClipboard_roomKey');
+          if (currentRoomKey) {
+            // Request fresh user list to make sure we have everyone
+            socketService.requestUserList(currentRoomKey);
+            
+            // Also fetch recent messages for the room
+            fetchRoomMessages(currentRoomKey);
+          }
+          
+          // Show success toast
           setTimeout(() => {
             toast({
-              title: 'Joined room',
-              description: `Connected to room`,
+              title: t('toast.joinedRoom'),
+              description: t('toast.joinedRoomDesc', { roomKey: currentRoomKey }),
             });
           }, 100);
-          return user;
-        } else if (prev.id !== user.id) {
+          return userWithDate;
+        } else if (prev.id !== userWithDate.id) {
           // This is another user joining, show notification
           setTimeout(() => {
             toast({
-              title: 'User joined',
-              description: `${user.name} joined the room`,
+              title: t('toast.userJoined'),
+              description: t('toast.userJoinedDesc', { name: userWithDate.name }),
             });
           }, 100);
         }
@@ -104,8 +259,8 @@ function App(): JSX.Element {
         if (user) {
           setTimeout(() => {
             toast({
-              title: 'User left',
-              description: `${user.name} left the room`,
+              title: t('toast.userLeft'),
+              description: t('toast.userLeftDesc', { name: user.name }),
             });
           }, 100);
         }
@@ -114,15 +269,67 @@ function App(): JSX.Element {
     };
 
     const handleUserList = (userList: User[]) => {
-      setUsers(userList);
+      // Convert string dates to Date objects for all users
+      const usersWithDates = userList.map(user => ({
+        ...user,
+        lastSeen: typeof user.lastSeen === 'string' ? new Date(user.lastSeen) : user.lastSeen,
+      }));
+      setUsers(usersWithDates);
+      
+      // If we don't have currentUser set yet but we're in the user list, set it
+      const savedUser = loadFromLocalStorage('cloudClipboard_user');
+      if (savedUser && !currentUser) {
+        const matchedUser = usersWithDates.find(user => 
+          user.name === savedUser.name || user.id === savedUser.id
+        );
+        if (matchedUser) {
+          setCurrentUser(matchedUser);
+          saveToLocalStorage('cloudClipboard_user', matchedUser);
+        }
+      }
     };
 
     const handleError = (error: string) => {
+      setIsConnecting(false);
       toast({
         variant: 'destructive',
-        title: 'Connection error',
+        title: t('toast.connectionError'),
         description: error,
       });
+    };
+
+    const handleSystemMessage = (message: { type: 'file_deleted' | 'room_destroyed' | 'file_expired'; data: any }) => {
+      switch (message.type) {
+        case 'file_deleted':
+          toast({
+            title: t('toast.fileDeleted'),
+            description: t('toast.fileDeletedDesc', { fileName: message.data.fileName }),
+          });
+          break;
+        case 'room_destroyed':
+          toast({
+            title: t('toast.roomDestroyed'),
+            description: t('toast.roomDestroyedDesc'),
+          });
+          break;
+        case 'file_expired':
+          toast({
+            title: t('toast.fileRetentionExpired'),
+            description: t('toast.fileRetentionExpiredDesc', { fileName: message.data.fileName }),
+          });
+          break;
+      }
+    };
+
+    const handleRoomDestroyed = (data: { roomKey: string; deletedFiles: string[] }) => {
+      if (data.deletedFiles.length > 0) {
+        toast({
+          title: t('toast.roomDestroyed'),
+          description: t('toast.roomDestroyedDesc') + ` (${data.deletedFiles.length} files deleted)`,
+        });
+      }
+      // Auto-leave the room
+      handleLeaveRoom();
     };
 
     // Attach event handlers
@@ -133,6 +340,8 @@ function App(): JSX.Element {
     socketService.onUserLeft(handleUserLeft);
     socketService.onUserList(handleUserList);
     socketService.onError(handleError);
+    socketService.onSystemMessage(handleSystemMessage);
+    socketService.onRoomDestroyed(handleRoomDestroyed);
 
     return () => {
       socketService.disconnect();
@@ -152,6 +361,9 @@ function App(): JSX.Element {
     setIsConnecting(true);
     setRoomKey(data.roomKey);
     
+    // Save to localStorage
+    saveToLocalStorage('cloudClipboard_roomKey', data.roomKey);
+    
     // Clear current user and messages when joining a new room
     setCurrentUser(null);
     setUsers([]);
@@ -159,8 +371,22 @@ function App(): JSX.Element {
     
     socketService.joinRoom(data);
     
-    // Don't show success toast here - wait for server confirmation
-  }, [isConnected, toast, t]);
+    // Set timeout to handle cases where server doesn't respond
+    const joinTimeout = setTimeout(() => {
+      if (isConnecting && !currentUser) {
+        console.warn('Join room timeout');
+        setIsConnecting(false);
+        toast({
+          variant: 'destructive',
+          title: t('toast.connectionError'),
+          description: 'Room join timeout. Please try again.',
+        });
+      }
+    }, 10000); // 10 second timeout
+    
+    // Clean up timeout when component unmounts or user joins successfully
+    return () => clearTimeout(joinTimeout);
+  }, [isConnected, isConnecting, currentUser, toast, t]);
 
   const handleLeaveRoom = useCallback(() => {
     if (currentUser && roomKey) {
@@ -178,6 +404,10 @@ function App(): JSX.Element {
     setUsers([]);
     setMessages([]);
     setIsConnecting(false);
+    
+    // Clear localStorage
+    localStorage.removeItem('cloudClipboard_user');
+    localStorage.removeItem('cloudClipboard_roomKey');
 
     toast({
       title: t('toast.leftRoom'),

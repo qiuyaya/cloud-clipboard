@@ -62,7 +62,15 @@
     "fileTooLarge": "文件过大",
     "fileTooLargeDesc": "最大文件大小为 100MB",
     "uploadFailed": "上传失败",
-    "validationFailed": "消息验证失败"
+    "validationFailed": "消息验证失败",
+    "autoLogout": "自动登出",
+    "autoLogoutDesc": "由于2小时无操作，您已被自动登出",
+    "fileDeleted": "文件已删除",
+    "fileDeletedDesc": "{{fileName}} 已被自动删除",
+    "roomDestroyed": "房间已销毁",
+    "roomDestroyedDesc": "房间已销毁，所有文件已被删除",
+    "fileRetentionExpired": "文件已过期",
+    "fileRetentionExpiredDesc": "{{fileName}} 保存12小时后已被删除"
   },
   "theme": {
     "light": "浅色",

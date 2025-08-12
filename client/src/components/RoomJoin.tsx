@@ -7,7 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useTranslation } from 'react-i18next';
 import type { JoinRoomRequest } from '@cloud-clipboard/shared';
-import { RoomKeySchema } from '@cloud-clipboard/shared';
+import { RoomKeySchema, generateBrowserFingerprint } from '@cloud-clipboard/shared';
 
 interface RoomJoinProps {
   onJoinRoom: (data: JoinRoomRequest) => void;
@@ -42,6 +42,7 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
           name: username.trim(),
           deviceType: detectDeviceType(),
         },
+        fingerprint: generateBrowserFingerprint(),
       };
 
       onJoinRoom(joinData);
