@@ -138,6 +138,14 @@ export class SocketService {
 
   private handleJoinRoom(socket: any, data: JoinRoomRequest): void {
     try {
+      console.log('Attempting to join room:', {
+        roomKey: data.roomKey,
+        userName: data.user?.name,
+        userDevice: data.user?.deviceType,
+        hasFingerprint: !!data.fingerprint,
+        fingerprintHash: data.fingerprint?.hash?.substring(0, 16) + '...'
+      });
+      
       const validatedData = JoinRoomRequestSchema.parse(data);
       const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
       
@@ -229,7 +237,19 @@ export class SocketService {
       console.log(`User ${user.name} joined room ${validatedData.roomKey}`);
     } catch (error) {
       console.error('Join room error:', error);
-      socket.emit('error', 'Failed to join room');
+      
+      // Send more specific error information
+      let errorMessage = 'Failed to join room';
+      if (error && typeof error === 'object' && 'issues' in error) {
+        const zodError = error as any;
+        if (zodError.issues && zodError.issues.length > 0) {
+          errorMessage = `Validation failed: ${zodError.issues[0].message} (${zodError.issues[0].path.join('.')})`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = `Failed to join room: ${error.message}`;
+      }
+      
+      socket.emit('error', errorMessage);
     }
   }
 

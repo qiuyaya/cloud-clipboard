@@ -160,6 +160,10 @@ function App(): JSX.Element {
         setUsers([]);
         setMessages([]);
         
+        // Use cached fingerprint for consistency
+        const cachedFingerprint = loadFromLocalStorage('cloudClipboard_fingerprint');
+        const fingerprint = cachedFingerprint || generateBrowserFingerprint();
+        
         const rejoinData: JoinRoomRequest = {
           type: 'join_room',
           roomKey: savedRoomKey,
@@ -167,7 +171,7 @@ function App(): JSX.Element {
             name: savedUser.name,
             deviceType: savedUser.deviceType
           },
-          fingerprint: generateBrowserFingerprint()
+          fingerprint: fingerprint
         };
         socketService.joinRoom(rejoinData);
       }
@@ -283,6 +287,7 @@ function App(): JSX.Element {
     };
 
     const handleError = (error: string) => {
+      console.error('Socket error:', error);
       setIsConnecting(false);
       toast({
         variant: 'destructive',
