@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/useToast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useTranslation } from 'react-i18next';
-import type { JoinRoomRequest } from '@cloud-clipboard/shared';
+import type { JoinRoomRequest, BrowserFingerprint } from '@cloud-clipboard/shared';
 import { RoomKeySchema, generateBrowserFingerprint } from '@cloud-clipboard/shared';
 
 interface RoomJoinProps {
@@ -17,8 +17,30 @@ interface RoomJoinProps {
 export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Element {
   const [roomKey, setRoomKey] = useState('');
   const [username, setUsername] = useState('');
+  const [cachedFingerprint, setCachedFingerprint] = useState<BrowserFingerprint | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  // Generate and cache fingerprint on component load
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cloudClipboard_fingerprint');
+      if (saved) {
+        // Use cached fingerprint data if available
+        const parsed = JSON.parse(saved);
+        setCachedFingerprint(parsed);
+      } else {
+        // Generate new fingerprint and cache it
+        const fingerprint = generateBrowserFingerprint();
+        localStorage.setItem('cloudClipboard_fingerprint', JSON.stringify(fingerprint));
+        setCachedFingerprint(fingerprint);
+      }
+    } catch (error) {
+      // Fallback: generate new fingerprint
+      const fingerprint = generateBrowserFingerprint();
+      setCachedFingerprint(fingerprint);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -28,6 +50,15 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
         variant: 'destructive',
         title: t('toast.error'),
         description: t('roomJoin.errors.required'),
+      });
+      return;
+    }
+
+    if (!cachedFingerprint) {
+      toast({
+        variant: 'destructive',
+        title: t('toast.error'),
+        description: t('roomJoin.errors.fingerprintNotReady'),
       });
       return;
     }
@@ -42,15 +73,38 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
           name: username.trim(),
           deviceType: detectDeviceType(),
         },
-        fingerprint: generateBrowserFingerprint(),
+        fingerprint: cachedFingerprint, // Use cached fingerprint instead of generating new one
       };
 
       onJoinRoom(joinData);
     } catch (error) {
+      let errorMessage = t('roomJoin.errors.invalidKey');
+      
+      // Handle Zod validation errors specifically and use internationalized messages
+      if (error && typeof error === 'object' && 'issues' in error) {
+        // This is a Zod error with issues array
+        const zodError = error as any;
+        if (zodError.issues && zodError.issues.length > 0) {
+          const issue = zodError.issues[0];
+          // Map specific error messages to internationalized versions
+          if (issue.message.includes('must be at least 6 characters')) {
+            errorMessage = t('roomJoin.errors.tooShort');
+          } else if (issue.message.includes('must contain both letters and numbers')) {
+            errorMessage = t('roomJoin.errors.needsBoth');
+          } else if (issue.message.includes('can only contain letters, numbers, underscores, and hyphens')) {
+            errorMessage = t('roomJoin.errors.invalidChars');
+          } else {
+            errorMessage = issue.message; // Fallback to original message
+          }
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast({
         variant: 'destructive',
         title: t('toast.error'),
-        description: t('roomJoin.errors.invalidKey'),
+        description: errorMessage,
       });
     }
   };
@@ -98,12 +152,16 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
               <Input
                 id="roomKey"
                 type="text"
-                placeholder={t('roomJoin.roomKeyPlaceholder')}
+                placeholder="e.g. room123, test_room, my-room-1"
                 value={roomKey}
-                onChange={(e) => setRoomKey(e.target.value)}
+                onChange={(e) => setRoomKey(e.target.value.slice(0, 50))}
                 disabled={isConnecting}
                 className="w-full"
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground">
+                {t('roomJoin.hints.roomKeyFormat')}
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -113,12 +171,16 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
               <Input
                 id="username"
                 type="text"
-                placeholder={t('roomJoin.usernamePlaceholder')}
+                placeholder="Your name"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9\s._-]/g, '').slice(0, 50))}
                 disabled={isConnecting}
                 className="w-full"
+                maxLength={50}
               />
+              <p className="text-xs text-muted-foreground">
+                {t('roomJoin.hints.usernameFormat')}
+              </p>
             </div>
             
             <Button 

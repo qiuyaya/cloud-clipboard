@@ -15,7 +15,15 @@
     "shareHint": "Share the same room key with others to collaborate",
     "errors": {
       "required": "Please enter both room key and username",
-      "invalidKey": "Room key can only contain letters, numbers, hyphens, and underscores"
+      "invalidKey": "Room key can only contain letters, numbers, hyphens, and underscores",
+      "tooShort": "Room key must be at least 6 characters",
+      "needsBoth": "Room key must contain both letters and numbers",
+      "invalidChars": "Room key can only contain letters, numbers, underscores (_), and hyphens (-)",
+      "fingerprintNotReady": "Fingerprint not ready. Please try again."
+    },
+    "hints": {
+      "roomKeyFormat": "Must be 6+ characters with letters and numbers (can include _ and -)",
+      "usernameFormat": "Letters, numbers, spaces, dots, underscores and hyphens only"
     }
   },
   "room": {

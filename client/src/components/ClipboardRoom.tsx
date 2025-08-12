@@ -243,7 +243,7 @@ export function ClipboardRoom({
               onChange={(e) => setTextInput(e.target.value)}
               placeholder={t('input.placeholder')}
               className="flex-1"
-              maxLength={100000}
+              maxLength={50000}
             />
             <input
               ref={fileInputRef}

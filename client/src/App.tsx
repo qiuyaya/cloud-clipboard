@@ -67,14 +67,7 @@ function App(): JSX.Element {
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  // Generate and cache browser fingerprint on first load
-  useState(() => {
-    const saved = loadFromLocalStorage('cloudClipboard_fingerprint');
-    if (!saved) {
-      const fingerprint = generateBrowserFingerprint();
-      saveToLocalStorage('cloudClipboard_fingerprint', fingerprint.hash);
-    }
-  });
+  // Browser fingerprint is now managed by RoomJoin component
 
   // Fetch room messages from server
   const fetchRoomMessages = useCallback(async (roomKey: string) => {

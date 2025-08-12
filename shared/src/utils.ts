@@ -43,7 +43,60 @@ export const isValidRoomKey = (key: string): boolean => {
 };
 
 export const sanitizeFileName = (fileName: string): string => {
-  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (!fileName || typeof fileName !== 'string') {
+    return 'unnamed_file';
+  }
+
+  // Remove any directory traversal attempts
+  let sanitized = fileName.replace(/\.\./g, '');
+  
+  // Remove path separators
+  sanitized = sanitized.replace(/[\/\\]/g, '_');
+  
+  // Remove potentially dangerous characters and control characters
+  sanitized = sanitized.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+  sanitized = sanitized.replace(/[<>:"|?*]/g, '_');
+  
+  // Replace sequences of unsafe characters with single underscore
+  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_');
+  
+  // Remove multiple consecutive underscores
+  sanitized = sanitized.replace(/_+/g, '_');
+  
+  // Remove leading/trailing underscores and dots
+  sanitized = sanitized.replace(/^[._-]+|[._-]+$/g, '');
+  
+  // Ensure we have a valid filename
+  if (!sanitized || sanitized.length === 0) {
+    sanitized = 'unnamed_file';
+  }
+  
+  // Limit filename length (keep extension if present)
+  if (sanitized.length > 100) {
+    const lastDotIndex = sanitized.lastIndexOf('.');
+    if (lastDotIndex > 0 && lastDotIndex > sanitized.length - 10) {
+      // Keep extension
+      const name = sanitized.substring(0, lastDotIndex).substring(0, 90);
+      const ext = sanitized.substring(lastDotIndex);
+      sanitized = name + ext;
+    } else {
+      sanitized = sanitized.substring(0, 100);
+    }
+  }
+  
+  // Prevent reserved Windows filenames
+  const reservedNames = [
+    'CON', 'PRN', 'AUX', 'NUL', 
+    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+  ];
+  
+  const nameWithoutExt = sanitized.replace(/\.[^.]*$/, '');
+  if (reservedNames.includes(nameWithoutExt.toUpperCase())) {
+    sanitized = '_' + sanitized;
+  }
+  
+  return sanitized;
 };
 
 export const formatTimestamp = (date: Date | string): string => {
@@ -67,7 +120,8 @@ export const formatTimestamp = (date: Date | string): string => {
 // Browser fingerprinting utilities (client-side only)
 export const generateBrowserFingerprint = (): import('./types').BrowserFingerprint => {
   if (typeof globalThis === 'undefined' || !(globalThis as any).window) {
-    // Server-side fallback
+    // Server-side fallback - generate a random hash
+    const randomHash = Math.random().toString(36).substring(2) + Date.now().toString(36);
     return {
       userAgent: '',
       language: 'en',
@@ -75,62 +129,127 @@ export const generateBrowserFingerprint = (): import('./types').BrowserFingerpri
       screen: '0x0',
       colorDepth: 24,
       cookieEnabled: false,
-      hash: 'server-side',
+      hash: secureHash('server-side-' + randomHash),
     };
   }
 
-  // Client-side implementation
+  // Client-side implementation with enhanced fingerprinting
   const win = (globalThis as any).window;
   const screen = win.screen;
   const navigator = win.navigator;
   
-  const fingerprint = {
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    screen: `${screen.width}x${screen.height}x${screen.availWidth}x${screen.availHeight}`,
-    colorDepth: screen.colorDepth,
-    cookieEnabled: navigator.cookieEnabled,
-    doNotTrack: navigator.doNotTrack || undefined,
-  };
+  try {
+    // Collect more detailed fingerprint data
+    const canvas = win.document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillText('Browser fingerprint canvas test 🔒', 2, 2);
+    const canvasFingerprint = canvas.toDataURL().substring(0, 50); // First 50 chars only
+    
+    const fingerprint = {
+      userAgent: navigator.userAgent.substring(0, 200), // Limit length
+      language: navigator.language || 'unknown',
+      languages: (navigator.languages || []).join(',').substring(0, 100),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
+      screen: `${screen.width}x${screen.height}x${screen.availWidth}x${screen.availHeight}`,
+      colorDepth: screen.colorDepth || 24,
+      pixelRatio: win.devicePixelRatio || 1,
+      cookieEnabled: navigator.cookieEnabled,
+      doNotTrack: navigator.doNotTrack || 'unknown',
+      platform: navigator.platform?.substring(0, 50) || 'unknown',
+      hardwareConcurrency: navigator.hardwareConcurrency || 0,
+      maxTouchPoints: navigator.maxTouchPoints || 0,
+      canvas: canvasFingerprint,
+      localStorage: typeof win.localStorage !== 'undefined',
+      sessionStorage: typeof win.sessionStorage !== 'undefined',
+      webGL: !!win.WebGLRenderingContext,
+      // Remove timestamp to ensure consistent fingerprints across page reloads
+    };
 
-  // Create hash from all fingerprint data
-  const fingerprintString = JSON.stringify(fingerprint);
-  const hash = simpleHash(fingerprintString);
-  
-  return {
-    ...fingerprint,
-    hash: hash.toString(),
-  };
+    // Create more secure hash from all fingerprint data
+    const fingerprintString = JSON.stringify(fingerprint);
+    const hash = secureHash(fingerprintString);
+    
+    return {
+      userAgent: fingerprint.userAgent,
+      language: fingerprint.language,
+      timezone: fingerprint.timezone,
+      screen: fingerprint.screen,
+      colorDepth: fingerprint.colorDepth,
+      cookieEnabled: fingerprint.cookieEnabled,
+      doNotTrack: fingerprint.doNotTrack,
+      hash: hash,
+    };
+  } catch (error) {
+    // Fallback in case of errors
+    const basicFingerprint = {
+      userAgent: navigator.userAgent.substring(0, 200),
+      language: navigator.language || 'unknown',
+      timezone: 'unknown',
+      screen: `${screen.width}x${screen.height}`,
+      colorDepth: screen.colorDepth || 24,
+      cookieEnabled: navigator.cookieEnabled,
+      doNotTrack: 'unknown',
+    };
+    
+    const fallbackHash = secureHash(JSON.stringify(basicFingerprint));
+    
+    return {
+      ...basicFingerprint,
+      hash: fallbackHash,
+    };
+  }
 };
 
 export const generateUserIdFromFingerprint = (fingerprint: string): string => {
-  // Generate multiple hash values to create enough entropy for UUID
-  const hash1 = simpleHash(fingerprint + 'user-salt-1');
-  const hash2 = simpleHash(fingerprint + 'user-salt-2');
-  const hash3 = simpleHash(fingerprint + 'user-salt-3');
-  const hash4 = simpleHash(fingerprint + 'user-salt-4');
+  // Use more secure hashing for user ID generation
+  const hash1 = secureHash(fingerprint + '-salt-primary');
+  const hash2 = secureHash(fingerprint + '-salt-secondary');
   
-  // Convert to hex and pad to ensure we have enough characters
-  const hex1 = Math.abs(hash1).toString(16).padStart(8, '0');
-  const hex2 = Math.abs(hash2).toString(16).padStart(8, '0');
-  const hex3 = Math.abs(hash3).toString(16).padStart(8, '0');
-  const hex4 = Math.abs(hash4).toString(16).padStart(8, '0');
+  // Create UUID from the secure hashes
+  const combined = hash1 + hash2;
   
-  // Format as proper UUID: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  // Format as proper UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
   const uuid = [
-    hex1.slice(0, 8),
-    hex2.slice(0, 4),
-    '4' + hex2.slice(1, 4), // Version 4 UUID
-    (8 | (parseInt(hex3.charAt(0), 16) & 0x3)).toString(16) + hex3.slice(1, 4), // Variant bits
-    (hex3.slice(4, 8) + hex4.slice(0, 8)).slice(0, 12)
+    combined.slice(0, 8),
+    combined.slice(8, 12),
+    '4' + combined.slice(13, 16), // Version 4 UUID
+    ((parseInt(combined.charAt(16), 16) & 0x3) | 0x8).toString(16) + combined.slice(17, 20), // Variant bits
+    combined.slice(20, 32)
   ].join('-');
   
   return uuid;
 };
 
-// Simple hash function for fingerprinting
-const simpleHash = (str: string): number => {
+// Improved cryptographic hash function for fingerprinting
+const secureHash = (str: string): string => {
+  if (str.length === 0) return '0';
+  
+  // Use a more secure hashing approach
+  let hash1 = 0x811c9dc5; // FNV-1a 32-bit offset basis
+  let hash2 = 0x1000193; // FNV-1a 32-bit prime
+  
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    // FNV-1a hash algorithm
+    hash1 ^= char;
+    hash1 = Math.imul(hash1, 0x01000193);
+    
+    // Additional mixing for better distribution
+    hash2 = Math.imul(hash2 ^ char, 0x85ebca77);
+    hash2 ^= hash2 >>> 13;
+    hash2 = Math.imul(hash2, 0xc2b2ae3d);
+    hash2 ^= hash2 >>> 16;
+  }
+  
+  // Combine both hashes and convert to hex
+  const combined = ((hash1 >>> 0) * 0x100000000) + (hash2 >>> 0);
+  return combined.toString(16).padStart(16, '0');
+};
+
+// Fallback simple hash for compatibility (exported for potential future use)
+export const simpleHash = (str: string): number => {
   let hash = 0;
   if (str.length === 0) return hash;
   for (let i = 0; i < str.length; i++) {

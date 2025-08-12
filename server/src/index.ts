@@ -8,12 +8,14 @@ import { SocketService } from './services/SocketService';
 import { FileManager } from './services/FileManager';
 import { createRoomRoutes } from './routes/rooms';
 import { createFileRoutes } from './routes/files';
+import { generalRateLimit } from './middleware/rateLimit';
 import type { APIResponse } from '@cloud-clipboard/shared';
 
 const app = express();
 const server = createServer(app);
 const port = process.env.PORT || 3001;
 
+// Security headers
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   contentSecurityPolicy: {
@@ -23,14 +25,42 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-eval'"],
       imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'", "ws:", "wss:"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
     },
   },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 
+// Restrict CORS - only allow specific origins
+const allowedOrigins = process.env.CLIENT_URL 
+  ? process.env.CLIENT_URL.split(',')
+  : ['http://localhost:3000', 'http://localhost:3002'];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
+
+// Trust proxy for rate limiting behind reverse proxy
+app.set('trust proxy', 1);
+
+// Global rate limiting
+app.use(generalRateLimit.middleware());
 
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));

@@ -3,6 +3,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { authenticateRoom } from '../middleware/auth';
 import { validateParams } from '../middleware/validation';
+import { uploadRateLimit, generalRateLimit } from '../middleware/rateLimit';
 import { sanitizeFileName } from '@cloud-clipboard/shared';
 import type { APIResponse, FileInfo } from '@cloud-clipboard/shared';
 import * as fs from 'fs';
@@ -33,17 +34,61 @@ const upload = multer({
     files: 1,
   },
   fileFilter: (req, file, cb) => {
-    // Allow all file types for now, but you can add restrictions here
+    // Security: Only allow safe file types
+    const allowedMimeTypes = [
+      'text/plain', 'text/csv', 'text/html', 'text/css', 'text/javascript',
+      'application/json', 'application/xml', 'application/pdf',
+      'application/zip', 'application/x-zip-compressed',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+      'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4',
+      'video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo', 'video/webm'
+    ];
+    
+    const dangerousExtensions = [
+      '.exe', '.bat', '.cmd', '.com', '.scr', '.pif', '.msi', '.jar',
+      '.sh', '.bash', '.ps1', '.vbs', '.js', '.php', '.asp', '.aspx', '.jsp'
+    ];
+    
+    // Check MIME type
+    if (!allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
+      cb(new Error(`File type ${file.mimetype} is not allowed`));
+      return;
+    }
+    
+    // Check file extension
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    if (dangerousExtensions.includes(fileExtension)) {
+      cb(new Error(`File extension ${fileExtension} is not allowed`));
+      return;
+    }
+    
+    // Additional filename validation
+    if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+      cb(new Error('Invalid filename'));
+      return;
+    }
+    
     cb(null, true);
   },
 });
 
 const FileParamsSchema = z.object({
-  fileId: z.string().min(1),
+  fileId: z.string()
+    .min(1)
+    .max(255)
+    .regex(/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$/, 'Invalid file ID format')
+    .refine(
+      (fileId) => !fileId.includes('..') && !fileId.includes('/') && !fileId.includes('\\'),
+      'File ID contains invalid characters'
+    ),
 });
 
 export const createFileRoutes = (fileManager: FileManager): Router => {
-  router.post('/upload', authenticateRoom, upload.single('file'), (req, res: any) => {
+  router.post('/upload', uploadRateLimit.middleware(), authenticateRoom, upload.single('file'), (req, res: any) => {
     try {
       if (!req.file) {
         res.status(400).json({
@@ -96,10 +141,22 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
     }
   });
 
-  router.get('/download/:fileId', validateParams(FileParamsSchema), (req, res: any) => {
+  router.get('/download/:fileId', generalRateLimit.middleware(), validateParams(FileParamsSchema), (req, res: any) => {
     try {
       const { fileId } = req.params;
-      const filePath = path.join(process.cwd(), 'uploads', fileId);
+      
+      // Security: Strict path validation to prevent directory traversal
+      const uploadsDir = path.resolve(process.cwd(), 'uploads');
+      const filePath = path.resolve(uploadsDir, fileId);
+      
+      // Ensure the resolved path is still within uploads directory
+      if (!filePath.startsWith(uploadsDir + path.sep)) {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied: Invalid file path',
+        });
+        return;
+      }
 
       if (!fs.existsSync(filePath)) {
         res.status(404).json({
@@ -118,31 +175,69 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
         return;
       }
 
+      // Security: Verify file is in our FileManager tracking
+      const fileInfo = fileManager?.getFile(fileId);
+      if (!fileInfo) {
+        res.status(404).json({
+          success: false,
+          message: 'File not found',
+        });
+        return;
+      }
+
       res.download(filePath, (err) => {
         if (err) {
           console.error('File download error:', err);
-          res.status(500).json({
-            success: false,
-            message: 'Failed to download file',
-          });
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              message: 'Failed to download file',
+            });
+          }
         }
       });
     } catch (error) {
       console.error('File download error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to download file',
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to download file',
+        });
+      }
     }
   });
 
-  router.delete('/:fileId', authenticateRoom, validateParams(FileParamsSchema), (req, res: any) => {
+  router.delete('/:fileId', generalRateLimit.middleware(), authenticateRoom, validateParams(FileParamsSchema), (req, res: any) => {
     try {
       const { fileId } = req.params;
-      const filePath = path.join(process.cwd(), 'uploads', fileId);
+      
+      // Security: Verify file exists in our tracking system
+      const fileInfo = fileManager?.getFile(fileId);
+      if (!fileInfo) {
+        res.status(404).json({
+          success: false,
+          message: 'File not found',
+        });
+        return;
+      }
+      
+      // Security: Verify user has access to this file's room
+      if (fileInfo.roomKey !== req.roomKey!) {
+        res.status(403).json({
+          success: false,
+          message: 'Access denied',
+        });
+        return;
+      }
 
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      // Delete file using FileManager (safer than direct file operations)
+      const result = fileManager?.deleteFile(fileId, 'manual');
+      if (!result) {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to delete file',
+        });
+        return;
       }
 
       res.json({

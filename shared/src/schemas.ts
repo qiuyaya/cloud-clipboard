@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
-export const RoomKeySchema = z.string().min(1, 'Room key is required');
+export const RoomKeySchema = z.string()
+  .min(6, 'Room key must be at least 6 characters')
+  .max(50, 'Room key must not exceed 50 characters')
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Room key can only contain letters, numbers, underscores, and hyphens')
+  .refine((key) => {
+    // Ensure some complexity: must contain both letters and numbers
+    const hasLetter = /[a-zA-Z]/.test(key);
+    const hasNumber = /[0-9]/.test(key);
+    return hasLetter && hasNumber;
+  }, 'Room key must contain both letters and numbers');
 
 export const MessageTypeSchema = z.enum([
   'text',
@@ -25,27 +34,60 @@ export const BrowserFingerprintSchema = z.object({
 
 export const UserSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1).max(50),
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(50, 'Name must not exceed 50 characters')
+    .regex(/^[a-zA-Z0-9\s._-]+$/, 'Name contains invalid characters')
+    .refine((name) => {
+      const trimmed = name.trim();
+      return trimmed.length > 0 && trimmed === name;
+    }, 'Name cannot start or end with whitespace'),
   isOnline: z.boolean(),
   lastSeen: z.date(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']),
-  fingerprint: z.string().optional(), // Browser fingerprint hash for user identification
+  fingerprint: z.string()
+    .min(8, 'Fingerprint too short')
+    .max(128, 'Fingerprint too long')
+    .optional(), // Browser fingerprint hash for user identification
 });
 
 export const TextMessageSchema = z.object({
   id: z.string().uuid(),
   type: z.literal('text'),
-  content: z.string().max(100000),
+  content: z.string()
+    .min(1, 'Message content is required')
+    .max(50000, 'Message content too long (max 50,000 characters)')
+    .refine((content) => {
+      // Prevent excessively long lines that could cause display issues
+      const lines = content.split('\n');
+      return lines.every(line => line.length <= 10000);
+    }, 'Individual lines cannot exceed 10,000 characters')
+    .refine((content) => {
+      // Prevent too many lines
+      return content.split('\n').length <= 1000;
+    }, 'Message cannot exceed 1,000 lines'),
   sender: UserSchema,
   timestamp: z.date(),
   roomKey: RoomKeySchema,
 });
 
 export const FileInfoSchema = z.object({
-  name: z.string().min(1),
-  size: z.number().min(0),
-  type: z.string(),
-  lastModified: z.number(),
+  name: z.string()
+    .min(1, 'File name is required')
+    .max(255, 'File name too long')
+    .refine((name) => {
+      return !name.includes('..') && !name.includes('/') && !name.includes('\\');
+    }, 'File name contains invalid path characters'),
+  size: z.number()
+    .min(0, 'File size cannot be negative')
+    .max(100 * 1024 * 1024, 'File size cannot exceed 100MB'),
+  type: z.string()
+    .min(1, 'File type is required')
+    .max(100, 'File type too long')
+    .regex(/^[a-zA-Z0-9\/-]+$/, 'Invalid file type format'),
+  lastModified: z.number()
+    .min(0, 'Last modified timestamp invalid')
+    .max(Date.now() + 86400000, 'Last modified timestamp cannot be in the future'), // Allow 24h clock skew
 });
 
 export const FileMessageSchema = z.object({

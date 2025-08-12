@@ -15,7 +15,15 @@
     "shareHint": "与他人分享相同的房间密钥即可协作",
     "errors": {
       "required": "请输入房间密钥和用户名",
-      "invalidKey": "房间密钥只能包含字母、数字、连字符和下划线"
+      "invalidKey": "房间密钥只能包含字母、数字、连字符和下划线",
+      "tooShort": "房间密钥至少需要6个字符",
+      "needsBoth": "房间密钥必须同时包含字母和数字",
+      "invalidChars": "房间密钥只能包含字母、数字、下划线(_)和连字符(-)",
+      "fingerprintNotReady": "指纹识别未就绪，请重试"
+    },
+    "hints": {
+      "roomKeyFormat": "需要6个以上字符，包含字母和数字（可包含_和-）",
+      "usernameFormat": "仅允许字母、数字、空格、点、下划线和连字符"
     }
   },
   "room": {

@@ -26,18 +26,60 @@ export class SocketService {
   private io: SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
   private userSockets: Map<string, string> = new Map(); // userId -> socketId
   private socketUsers: Map<string, User> = new Map(); // socketId -> user
+  private messageRateLimits: Map<string, { count: number; resetTime: number }> = new Map(); // socketId -> rate limit data
 
   constructor(server: Server, private roomService: RoomService, private fileManager?: FileManager) {
+    // Use same CORS configuration as main server
+    const allowedOrigins = process.env.CLIENT_URL 
+      ? process.env.CLIENT_URL.split(',')
+      : ['http://localhost:3000', 'http://localhost:3002'];
+
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.CLIENT_URL || '*',
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
+        credentials: true,
       },
       pingTimeout: 60000,
       pingInterval: 25000,
     });
 
     this.setupSocketHandlers();
+    
+    // Clean up rate limit data every 5 minutes
+    setInterval(() => {
+      this.cleanupRateLimits();
+    }, 5 * 60 * 1000);
+  }
+
+  private checkRateLimit(socketId: string, maxRequests: number, windowMs: number): boolean {
+    const now = Date.now();
+    const limit = this.messageRateLimits.get(socketId);
+
+    if (!limit || now > limit.resetTime) {
+      // Create new window
+      this.messageRateLimits.set(socketId, {
+        count: 1,
+        resetTime: now + windowMs,
+      });
+      return true;
+    }
+
+    if (limit.count >= maxRequests) {
+      return false; // Rate limit exceeded
+    }
+
+    limit.count++;
+    return true;
+  }
+
+  private cleanupRateLimits(): void {
+    const now = Date.now();
+    for (const [socketId, limit] of this.messageRateLimits.entries()) {
+      if (now > limit.resetTime) {
+        this.messageRateLimits.delete(socketId);
+      }
+    }
   }
 
   private setupSocketHandlers(): void {
@@ -45,19 +87,35 @@ export class SocketService {
       console.log(`Client connected: ${socket.id}`);
 
       socket.on('joinRoom', (data: JoinRoomRequest) => {
-        this.handleJoinRoom(socket, data);
+        if (this.checkRateLimit(socket.id, 5, 60000)) { // 5 joins per minute
+          this.handleJoinRoom(socket, data);
+        } else {
+          socket.emit('error', 'Too many join attempts. Please wait.');
+        }
       });
 
       socket.on('leaveRoom', (data: LeaveRoomRequest) => {
-        this.handleLeaveRoom(socket, data);
+        if (this.checkRateLimit(socket.id, 10, 60000)) { // 10 leaves per minute
+          this.handleLeaveRoom(socket, data);
+        } else {
+          socket.emit('error', 'Too many leave attempts. Please wait.');
+        }
       });
 
       socket.on('sendMessage', (message: TextMessage | FileMessage) => {
-        this.handleSendMessage(socket, message);
+        if (this.checkRateLimit(socket.id, 30, 60000)) { // 30 messages per minute
+          this.handleSendMessage(socket, message);
+        } else {
+          socket.emit('error', 'Too many messages. Please wait.');
+        }
       });
 
       socket.on('requestUserList', (roomKey: string) => {
-        this.handleRequestUserList(socket, roomKey);
+        if (this.checkRateLimit(socket.id, 20, 60000)) { // 20 user list requests per minute
+          this.handleRequestUserList(socket, roomKey);
+        } else {
+          socket.emit('error', 'Too many requests. Please wait.');
+        }
       });
 
       socket.on('p2pOffer', (data: { to: string; offer: string }) => {
