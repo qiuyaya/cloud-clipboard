@@ -8,6 +8,7 @@ import type {
   JoinRoomRequest,
   LeaveRoomRequest,
 } from '@cloud-clipboard/shared';
+import { debug } from '../utils/debug';
 
 class SocketService {
   private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
@@ -15,10 +16,15 @@ class SocketService {
 
   connect(): Socket<ServerToClientEvents, ClientToServerEvents> {
     if (this.socket && this.isConnected) {
+      debug.info('Reusing existing socket connection', {
+        connected: this.socket.connected,
+        id: this.socket.id
+      });
       return this.socket;
     }
 
-    const serverUrl = (import.meta.env as any).VITE_SERVER_URL || 'http://localhost:3001';
+    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    debug.info('Attempting to connect to server', { serverUrl });
     
     this.socket = io(serverUrl, {
       autoConnect: true,
@@ -29,18 +35,34 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('Connected to server');
+      debug.info('Connected to server', {
+        id: this.socket?.id,
+        url: serverUrl,
+        transport: this.socket?.io.engine.transport.name
+      });
       this.isConnected = true;
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Disconnected from server:', reason);
+      debug.warn('Disconnected from server', { reason });
       this.isConnected = false;
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
+      debug.error('Socket connection error', { error });
       this.isConnected = false;
+    });
+
+    // Add debugging for all outgoing events
+    const originalEmit = this.socket.emit;
+    this.socket.emit = function(event: string, ...args: any[]) {
+      debug.debug('Socket sending event', { event, args });
+      return originalEmit.call(this, event, ...args);
+    };
+
+    // Add debugging for all incoming events
+    this.socket.onAny((event: string, ...args: any[]) => {
+      debug.debug('Socket received event', { event, args });
     });
 
     return this.socket;
@@ -55,8 +77,23 @@ class SocketService {
   }
 
   joinRoom(data: JoinRoomRequest): void {
+    debug.info('Attempting to join room', {
+      hasSocket: !!this.socket,
+      isConnected: this.isConnected,
+      socketConnected: this.socket?.connected,
+      data: data
+    });
+    
     if (this.socket) {
+      if (!this.socket.connected) {
+        debug.error('Socket exists but not connected, cannot join room');
+        return;
+      }
+      
+      debug.debug('Emitting joinRoom event', { data });
       this.socket.emit('joinRoom', data);
+    } else {
+      debug.error('No socket available, cannot join room');
     }
   }
 

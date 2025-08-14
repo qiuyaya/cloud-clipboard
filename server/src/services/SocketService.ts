@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { Server } from 'http';
 import { RoomService } from './RoomService';
+import { log } from '../utils/logger';
 import {
   WebSocketMessageSchema,
   JoinRoomRequestSchema,
@@ -84,12 +85,15 @@ export class SocketService {
 
   private setupSocketHandlers(): void {
     this.io.on('connection', (socket) => {
-      console.log(`Client connected: ${socket.id}`);
+      log.info('Client connected', { socketId: socket.id, address: socket.handshake.address }, 'SocketService');
 
       socket.on('joinRoom', (data: JoinRoomRequest) => {
+        log.debug('JoinRoom event received', { socketId: socket.id, data }, 'SocketService');
         if (this.checkRateLimit(socket.id, 5, 60000)) { // 5 joins per minute
+          log.debug('Rate limit check passed for join room', { socketId: socket.id }, 'SocketService');
           this.handleJoinRoom(socket, data);
         } else {
+          log.warn('Rate limit exceeded for join room', { socketId: socket.id }, 'SocketService');
           socket.emit('error', 'Too many join attempts. Please wait.');
         }
       });
@@ -138,15 +142,18 @@ export class SocketService {
 
   private handleJoinRoom(socket: any, data: JoinRoomRequest): void {
     try {
-      console.log('Attempting to join room:', {
+      log.debug('handleJoinRoom called', {
+        socketId: socket.id,
         roomKey: data.roomKey,
         userName: data.user?.name,
         userDevice: data.user?.deviceType,
         hasFingerprint: !!data.fingerprint,
         fingerprintHash: data.fingerprint?.hash?.substring(0, 16) + '...'
-      });
+      }, 'SocketService');
       
+      log.debug('Validating join room data with schema', {}, 'SocketService');
       const validatedData = JoinRoomRequestSchema.parse(data);
+      log.debug('Join room data validation passed', {}, 'SocketService');
       const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
       
       // Generate user ID based on fingerprint for consistent identity
@@ -174,13 +181,14 @@ export class SocketService {
           this.roomService.updateUserStatus(validatedData.roomKey, existingUser.id, true);
           
           // Send the user their own info
+          console.log(`📤 [Server] Sending userJoined event to ${socket.id}:`, existingUser);
           socket.emit('userJoined', existingUser);
           socket.emit('userList', this.roomService.getUsersInRoom(validatedData.roomKey));
           
           // Notify others about the reconnection
           socket.to(validatedData.roomKey).emit('userList', this.roomService.getUsersInRoom(validatedData.roomKey));
           
-          console.log(`User ${existingUser.name} reconnected to room ${validatedData.roomKey}`);
+          console.log(`🔄 [Server] User ${existingUser.name} reconnected to room ${validatedData.roomKey}`);
           return;
         }
       } else {
@@ -219,22 +227,26 @@ export class SocketService {
         fingerprint,
       };
 
+      console.log(`🏠 [Server] Adding user to room service:`, user);
       const room = this.roomService.joinRoom(validatedData.roomKey, user);
       
+      console.log(`🔗 [Server] Adding socket ${socket.id} to room ${validatedData.roomKey}`);
       socket.join(validatedData.roomKey);
       this.userSockets.set(user.id, socket.id);
       this.socketUsers.set(socket.id, user);
       
 
       // Send the user their own info first
+      console.log(`📤 [Server] Sending userJoined event to new user ${socket.id}:`, user);
       socket.emit('userJoined', user);
       socket.emit('userList', room.getUserList());
       
       // Notify others in the room
+      console.log(`📢 [Server] Notifying other users in room about new user:`, user.name);
       socket.to(validatedData.roomKey).emit('userJoined', user);
       socket.to(validatedData.roomKey).emit('userList', room.getUserList());
 
-      console.log(`User ${user.name} joined room ${validatedData.roomKey}`);
+      console.log(`✅ [Server] User ${user.name} successfully joined room ${validatedData.roomKey}`);
     } catch (error) {
       console.error('Join room error:', error);
       

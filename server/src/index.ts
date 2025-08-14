@@ -9,6 +9,7 @@ import { FileManager } from './services/FileManager';
 import { createRoomRoutes } from './routes/rooms';
 import { createFileRoutes } from './routes/files';
 import { generalRateLimit } from './middleware/rateLimit';
+import { log } from './utils/logger';
 import type { APIResponse } from '@cloud-clipboard/shared';
 
 const app = express();
@@ -136,27 +137,30 @@ app.use((error: Error, req: express.Request, res: express.Response<APIResponse>,
 });
 
 server.listen(port, () => {
-  console.log(`🚀 Cloud Clipboard server running on port ${port}`);
-  console.log(`📡 WebSocket server ready for connections`);
-  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  log.info('Cloud Clipboard server started', {
+    port,
+    environment: process.env.NODE_ENV || 'development',
+    logLevel: log.getConfig().level
+  }, 'Server');
+  log.info('WebSocket server ready for connections', {}, 'Server');
 });
 
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  log.info('SIGTERM received. Shutting down gracefully...', {}, 'Server');
   roomService.destroy();
   fileManager.destroy();
   server.close(() => {
-    console.log('Server closed.');
+    log.info('Server closed', {}, 'Server');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
+  log.info('SIGINT received. Shutting down gracefully...', {}, 'Server');
   roomService.destroy();
   fileManager.destroy();
   server.close(() => {
-    console.log('Server closed.');
+    log.info('Server closed', {}, 'Server');
     process.exit(0);
   });
 });

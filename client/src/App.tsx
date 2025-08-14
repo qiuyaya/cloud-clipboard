@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RoomJoin } from '@/components/RoomJoin';
 import { ClipboardRoom } from '@/components/ClipboardRoom';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/useToast';
 import { useTranslation } from 'react-i18next';
 import { socketService } from '@/services/socket';
+import { debug } from '@/utils/debug';
 import {
   generateUserId,
   FileMessageSchema,
@@ -24,7 +25,7 @@ const saveToLocalStorage = (key: string, data: any) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
-    console.warn('Failed to save to localStorage:', error);
+    debug.warn('Failed to save to localStorage', { error });
   }
 };
 
@@ -33,7 +34,7 @@ const loadFromLocalStorage = (key: string) => {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : null;
   } catch (error) {
-    console.warn('Failed to load from localStorage:', error);
+    debug.warn('Failed to load from localStorage', { error });
     return null;
   }
 };
@@ -76,12 +77,12 @@ function App(): JSX.Element {
         // If it's not a valid fingerprint object (like old hash-only format), remove it
         if (typeof parsed === 'string' || !parsed.userAgent) {
           localStorage.removeItem('cloudClipboard_fingerprint');
-          console.log('Cleared invalid fingerprint cache');
+          debug.info('Cleared invalid fingerprint cache');
         }
       }
     } catch (error) {
       localStorage.removeItem('cloudClipboard_fingerprint');
-      console.log('Cleared corrupted fingerprint cache');
+      debug.info('Cleared corrupted fingerprint cache');
     }
   }, []);
 
@@ -110,7 +111,7 @@ function App(): JSX.Element {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch room messages:', error);
+      debug.error('Failed to fetch room messages', { error });
     }
   }, []);
 
@@ -151,17 +152,18 @@ function App(): JSX.Element {
   useEffect(() => {
     if (currentUser && roomKey && !isConnected && !isConnecting) {
       // Don't set isConnecting here - let the connection handler do it
-      console.log('Will attempt to rejoin room once connected:', roomKey);
+      debug.info('Will attempt to rejoin room once connected', { roomKey });
     }
   }, [currentUser, roomKey, isConnected, isConnecting]);
 
   // Set up socket connection and event handlers once
   useEffect(() => {
+    debug.info('Setting up socket connection and event handlers');
     const socket = socketService.connect();
 
     const handleConnect = () => {
+      debug.info('Socket connected successfully');
       setIsConnected(true);
-      console.log('Connected to server');
       
       // Auto-rejoin room if we have saved data
       const savedUser = loadFromLocalStorage('cloudClipboard_user');
@@ -169,7 +171,7 @@ function App(): JSX.Element {
       
       // Always rejoin if we have saved data, regardless of currentUser state
       if (savedUser && savedRoomKey) {
-        console.log('Auto-rejoining room:', savedRoomKey);
+        debug.info('Auto-rejoining room', { savedRoomKey });
         setIsConnecting(true);
         // Reset current user to force proper reconnection flow
         setCurrentUser(null);
@@ -212,7 +214,7 @@ function App(): JSX.Element {
       setIsConnected(false);
       setCurrentUser(null);
       setUsers([]);
-      console.log('Disconnected from server');
+      debug.warn('Disconnected from server');
     };
 
     const handleMessage = (message: TextMessage | FileMessage) => {
@@ -229,6 +231,8 @@ function App(): JSX.Element {
     };
 
     const handleUserJoined = (user: User) => {
+      debug.debug('User joined event received', { user });
+      
       // Ensure lastSeen is a Date object
       const userWithDate = {
         ...user,
@@ -246,14 +250,17 @@ function App(): JSX.Element {
       // Check if this is us joining (we don't have currentUser yet)
       setCurrentUser(prev => {
         if (!prev) {
+          debug.info('Setting current user - room join successful', { user: userWithDate });
           setIsConnecting(false);
           // Save to localStorage
           saveToLocalStorage('cloudClipboard_user', userWithDate);
           
           // This is us joining - request user list and messages for the room
           const currentRoomKey = roomKey || loadFromLocalStorage('cloudClipboard_roomKey');
+          debug.debug('Current room key for fetching data', { currentRoomKey });
           if (currentRoomKey) {
             // Request fresh user list to make sure we have everyone
+            debug.debug('Requesting user list and room messages');
             socketService.requestUserList(currentRoomKey);
             
             // Also fetch recent messages for the room
@@ -318,7 +325,7 @@ function App(): JSX.Element {
     };
 
     const handleError = (error: string) => {
-      console.error('Socket error:', error);
+      debug.error('Socket error', { error });
       setIsConnecting(false);
       toast({
         variant: 'destructive',
@@ -378,7 +385,15 @@ function App(): JSX.Element {
   }, []);
 
   const handleJoinRoom = useCallback((data: JoinRoomRequest) => {
+    debug.info('handleJoinRoom called', { data });
+    debug.debug('Connection state check', {
+      isConnected,
+      socketConnected: socketService.isSocketConnected(),
+      isConnecting
+    });
+    
     if (!isConnected) {
+      debug.error('Cannot join room - not connected');
       toast({
         variant: 'destructive',
         title: t('toast.connectionError'),
@@ -387,6 +402,7 @@ function App(): JSX.Element {
       return;
     }
 
+    debug.info('Starting room join process');
     setIsConnecting(true);
     setRoomKey(data.roomKey);
     
@@ -398,12 +414,13 @@ function App(): JSX.Element {
     setUsers([]);
     setMessages([]);
     
+    debug.debug('Calling socketService.joinRoom', { data });
     socketService.joinRoom(data);
     
     // Set timeout to handle cases where server doesn't respond
     const joinTimeout = setTimeout(() => {
       if (isConnecting && !currentUser) {
-        console.warn('Join room timeout');
+        debug.warn('Join room timeout');
         setIsConnecting(false);
         toast({
           variant: 'destructive',
@@ -498,7 +515,7 @@ function App(): JSX.Element {
         };
 
         // Convert relative URL to absolute URL
-        const serverUrl = (import.meta.env as any).VITE_SERVER_URL || 'http://localhost:3001';
+        const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
         const absoluteDownloadUrl = result.data.downloadUrl.startsWith('http') 
           ? result.data.downloadUrl 
           : `${serverUrl}${result.data.downloadUrl}`;
@@ -529,7 +546,7 @@ function App(): JSX.Element {
         throw new Error(result.message || 'Upload failed');
       }
     } catch (error) {
-      console.error('File upload error:', error);
+      debug.error('File upload error', { error });
       toast({
         variant: 'destructive',
         title: t('toast.uploadFailed'),

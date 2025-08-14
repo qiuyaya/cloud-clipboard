@@ -14,7 +14,7 @@ const languages = [
 ];
 
 export function LanguageToggle(): JSX.Element {
-  const { i18n, t } = useTranslation();
+  const { i18n } = useTranslation();
 
   return (
     <DropdownMenu>
