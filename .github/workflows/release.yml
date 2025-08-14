@@ -1,0 +1,320 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Build desktop applications for all platforms
+  build-desktop:
+    name: Build Desktop App
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows
+            arch: x64
+            ext: .exe
+            
+          # macOS Intel
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: macos
+            arch: x64
+            ext: ''
+            
+          # macOS Apple Silicon
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos
+            arch: arm64
+            ext: ''
+            
+          # Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+            ext: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      # Linux-specific dependencies
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      # Install dependencies for all packages
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd desktop && npm ci
+
+      # Build shared package
+      - name: Build shared package
+        run: npm run shared:build
+
+      # Build client for desktop
+      - name: Build client for desktop
+        run: |
+          cd desktop
+          npm run build-client
+
+      # Build desktop app
+      - name: Build desktop app
+        run: |
+          cd desktop
+          npm run tauri build -- --target ${{ matrix.target }}
+
+      # Prepare artifacts
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cd desktop/src-tauri/target/${{ matrix.target }}/release
+          
+          if [[ "${{ matrix.platform }}" == "windows" ]]; then
+            # Windows: .exe and .msi
+            mv "cloud-clipboard-desktop${{ matrix.ext }}" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
+            if [ -f "bundle/msi/cloud-clipboard-desktop_*.msi" ]; then
+              mv bundle/msi/cloud-clipboard-desktop_*.msi "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.msi"
+            fi
+          elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+            # macOS: .app bundle and .dmg
+            if [ -d "bundle/macos/Cloud Clipboard.app" ]; then
+              tar -czf "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz" -C bundle/macos "Cloud Clipboard.app"
+            fi
+            if [ -f "bundle/dmg/Cloud Clipboard_*.dmg" ]; then
+              mv "bundle/dmg/Cloud Clipboard_*.dmg" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.dmg"
+            fi
+          else
+            # Linux: binary and .deb/.appimage
+            mv "cloud-clipboard-desktop" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}"
+            if [ -f "bundle/deb/cloud-clipboard-desktop_*.deb" ]; then
+              mv bundle/deb/cloud-clipboard-desktop_*.deb "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.deb"
+            fi
+            if [ -f "bundle/appimage/cloud-clipboard-desktop_*.AppImage" ]; then
+              mv bundle/appimage/cloud-clipboard-desktop_*.AppImage "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.AppImage"
+            fi
+          fi
+
+      # Upload artifacts
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop/src-tauri/target/${{ matrix.target }}/release/cloud-clipboard-*
+          retention-days: 5
+
+  # Build web client
+  build-web:
+    name: Build Web Client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run shared:build
+
+      - name: Build client
+        run: npm run client:build
+
+      - name: Build server
+        run: npm run server:build
+
+      - name: Create web distribution
+        run: |
+          mkdir -p dist
+          cp -r client/dist dist/client
+          cp -r server/dist dist/server
+          cp -r server/package*.json dist/server/
+          cp package.json dist/
+          cp README.md dist/
+          
+          # Create deployment package
+          tar -czf cloud-clipboard-web.tar.gz -C dist .
+
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: cloud-clipboard-web.tar.gz
+          retention-days: 5
+
+  # Create GitHub release
+  create-release:
+    name: Create Release
+    needs: [build-desktop, build-web]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get commits since last tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            COMMITS=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" --no-merges -10)
+          fi
+          
+          # Create release notes
+          cat > release_notes.md << EOF
+          ## 🚀 Cloud Clipboard ${{ steps.get_version.outputs.version }}
+          
+          ### 📋 What's New
+          ${COMMITS}
+          
+          ### 📦 Downloads
+          
+          #### 🖥️ Desktop Applications
+          - **Windows**: Download \`cloud-clipboard-windows-x64.exe\` or \`cloud-clipboard-windows-x64.msi\`
+          - **macOS**: Download \`cloud-clipboard-macos-x64.dmg\` (Intel) or \`cloud-clipboard-macos-arm64.dmg\` (Apple Silicon)
+          - **Linux**: Download \`cloud-clipboard-linux-x64\`, \`cloud-clipboard-linux-x64.deb\`, or \`cloud-clipboard-linux-x64.AppImage\`
+          
+          #### 🌐 Web Application
+          - **Full Package**: Download \`cloud-clipboard-web.tar.gz\` for self-hosting
+          
+          ### ✨ Features
+          - 🔄 **Auto clipboard sync**: Automatically sync clipboard content across devices
+          - ⚙️ **Configurable settings**: Customize server URL, sync interval, and more
+          - 🎨 **Modern UI**: Clean interface with theme support
+          - 📱 **Cross-platform**: Windows, macOS, Linux, iOS, Android support
+          - 🔔 **Native notifications**: System notifications for clipboard changes
+          - 🏠 **Self-hosted**: Run your own cloud clipboard server
+          
+          ### 🛠️ Installation
+          
+          #### Desktop App
+          1. Download the appropriate file for your platform
+          2. Install and run the application
+          3. Configure your server URL in settings
+          4. Start syncing your clipboard!
+          
+          #### Web App (Self-hosting)
+          1. Download \`cloud-clipboard-web.tar.gz\`
+          2. Extract and follow the README for deployment instructions
+          3. Access via web browser
+          
+          ---
+          
+          **Full Changelog**: https://github.com/\${{ github.repository }}/compare/\${PREVIOUS_TAG}...${{ steps.get_version.outputs.version }}
+          EOF
+          
+          echo "Generated release notes"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release_assets
+          
+          # Copy desktop artifacts
+          find artifacts -name "cloud-clipboard-*" -type f -exec cp {} release_assets/ \;
+          
+          # List all assets
+          echo "Release assets:"
+          ls -la release_assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: ${{ steps.get_version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+          files: release_assets/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Notify on completion
+  notify:
+    name: Notify Release Complete
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.create-release.result == 'success'
+        run: |
+          echo "✅ Release completed successfully!"
+          echo "📦 Assets published to GitHub Releases"
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.version || github.ref_name }}"
+
+      - name: Notify failure
+        if: needs.create-release.result == 'failure'
+        run: |
+          echo "❌ Release failed!"
+          echo "Check the workflow logs for details."
+          exit 1

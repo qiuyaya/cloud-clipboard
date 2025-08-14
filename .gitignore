@@ -3,3 +3,4 @@ uploads/
 dist/
 .DS_Store
 .env
+desktop/src-tauri/target/
