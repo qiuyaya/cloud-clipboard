@@ -13,14 +13,14 @@ import type { FileManager } from '../services/FileManager';
 const router = Router();
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const sanitized = sanitizeFileName(file.originalname);
     const timestamp = Date.now();
     cb(null, `${timestamp}-${sanitized}`);
@@ -33,7 +33,7 @@ const upload = multer({
     fileSize: 100 * 1024 * 1024, // 100MB
     files: 1,
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     // Security: Only allow safe file types
     const allowedMimeTypes = [
       'text/plain', 'text/csv', 'text/html', 'text/css', 'text/javascript',
@@ -118,7 +118,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
         id: req.file.filename,
         filename: req.file.originalname,
         path: req.file.path,
-        roomKey: req.roomKey,
+        roomKey: req.roomKey!,
         uploadedAt: new Date(),
         size: req.file.size,
       });
@@ -143,7 +143,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
 
   router.get('/download/:fileId', generalRateLimit.middleware(), validateParams(FileParamsSchema), (req, res: any) => {
     try {
-      const { fileId } = req.params;
+      const { fileId } = req.params as { fileId: string };
       
       // Security: Strict path validation to prevent directory traversal
       const uploadsDir = path.resolve(process.cwd(), 'uploads');
@@ -185,7 +185,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
         return;
       }
 
-      res.download(filePath, (err) => {
+      res.download(filePath, (err: any) => {
         if (err) {
           console.error('File download error:', err);
           if (!res.headersSent) {
@@ -209,7 +209,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
 
   router.delete('/:fileId', generalRateLimit.middleware(), authenticateRoom, validateParams(FileParamsSchema), (req, res: any) => {
     try {
-      const { fileId } = req.params;
+      const { fileId } = req.params as { fileId: string };
       
       // Security: Verify file exists in our tracking system
       const fileInfo = fileManager?.getFile(fileId);

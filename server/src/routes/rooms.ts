@@ -96,7 +96,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
   router.get('/messages', authenticateRoom, validateQuery(z.object({ limit: z.coerce.number().optional() })), (req, res) => {
     try {
       const roomKey = req.roomKey!;
-      const { limit } = req.query;
+      const { limit } = req.query as { limit?: number };
       const messages = roomService.getMessagesInRoom(roomKey, limit);
       
       res.json({
@@ -111,7 +111,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
     }
   });
 
-  router.get('/stats', (req, res) => {
+  router.get('/stats', (_req, res) => {
     try {
       const stats = roomService.getRoomStats();
       

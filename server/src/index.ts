@@ -69,7 +69,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 const fileManager = new FileManager();
 const roomService = new RoomService();
-const socketService = new SocketService(server, roomService, fileManager);
+const socketService = new SocketService(server, roomService);
 
 // Handle room destruction events - cleanup files and notify users
 roomService.on('roomDestroyed', (roomKey: string) => {
@@ -90,7 +90,7 @@ roomService.on('roomDestroyed', (roomKey: string) => {
 app.use('/api/rooms', createRoomRoutes(roomService));
 app.use('/api/files', createFileRoutes(fileManager));
 
-app.get('/api/health', (req, res: express.Response<APIResponse>) => {
+app.get('/api/health', (_req, res: express.Response<APIResponse>) => {
   const roomStats = roomService.getRoomStats();
   const fileStats = fileManager.getStats();
   res.json({
@@ -106,7 +106,7 @@ app.get('/api/health', (req, res: express.Response<APIResponse>) => {
   });
 });
 
-app.get('/api', (req, res: express.Response<APIResponse>) => {
+app.get('/api', (_req, res: express.Response<APIResponse>) => {
   res.json({
     success: true,
     message: 'Cloud Clipboard API v1.0.0',
@@ -121,7 +121,7 @@ app.get('/api', (req, res: express.Response<APIResponse>) => {
   });
 });
 
-app.use('*', (req, res: express.Response<APIResponse>) => {
+app.use('*', (_req, res: express.Response<APIResponse>) => {
   res.status(404).json({
     success: false,
     message: 'API endpoint not found',

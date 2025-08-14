@@ -20,7 +20,6 @@ import type {
   TextMessage,
   FileMessage,
 } from '@cloud-clipboard/shared';
-import type { FileManager } from './FileManager';
 
 export class SocketService {
   private io: SocketIOServer<ClientToServerEvents, ServerToClientEvents>;
@@ -28,7 +27,7 @@ export class SocketService {
   private socketUsers: Map<string, User> = new Map(); // socketId -> user
   private messageRateLimits: Map<string, { count: number; resetTime: number }> = new Map(); // socketId -> rate limit data
 
-  constructor(server: Server, private roomService: RoomService, private fileManager?: FileManager) {
+  constructor(server: Server, private roomService: RoomService) {
     // Use same CORS configuration as main server
     const allowedOrigins = process.env.CLIENT_URL 
       ? process.env.CLIENT_URL.split(',')
@@ -390,8 +389,8 @@ export class SocketService {
       
       const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
       
-      rooms.forEach(roomKey => {
-        this.roomService.updateUserStatus(roomKey, user.id, false);
+      rooms.forEach((roomKey) => {
+        this.roomService.updateUserStatus(roomKey as string, user.id, false);
         socket.to(roomKey).emit('userLeft', user.id);
       });
 

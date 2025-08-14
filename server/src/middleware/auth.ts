@@ -33,7 +33,7 @@ export const authenticateRoom = (req: Request, res: Response<APIResponse>, next:
   }
 };
 
-export const optionalRoomAuth = (req: Request, res: Response<APIResponse>, next: NextFunction): void => {
+export const optionalRoomAuth = (req: Request, _res: Response<APIResponse>, next: NextFunction): void => {
   const roomKey = req.headers['x-room-key'] as string || req.body?.roomKey || req.query?.roomKey;
 
   if (roomKey) {

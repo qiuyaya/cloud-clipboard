@@ -23,7 +23,10 @@
     "version:report": "node scripts/version-sync.js report",
     "version:outdated": "node scripts/version-sync.js outdated",
     "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "tsc --noEmit"
+    "type-check": "cd shared && tsc --noEmit && cd ../server && tsc --noEmit",
+    "shared:type-check": "cd shared && tsc --noEmit",
+    "server:type-check": "cd server && tsc --noEmit", 
+    "client:type-check": "cd client && tsc --noEmit"
   },
   "workspaces": ["server", "client", "shared", "desktop"],
   "devDependencies": {
