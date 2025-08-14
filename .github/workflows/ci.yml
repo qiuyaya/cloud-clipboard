@@ -104,7 +104,7 @@ jobs:
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile
-          cd desktop && npm ci
+          cd desktop && npm install
 
       - name: Build shared package
         run: bun run shared:build

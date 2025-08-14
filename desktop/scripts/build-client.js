@@ -106,4 +106,4 @@ process.chdir(CLIENT_DIR);
 execSync('npx vite build --config vite.config.desktop.ts', { stdio: 'inherit' });
 
 console.log('✅ Desktop client build completed!');
-console.log(\`📂 Output: \${CLIENT_DIST}\`);
+console.log(`📂 Output: ${CLIENT_DIST}`);
