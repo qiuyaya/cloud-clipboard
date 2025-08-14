@@ -80,7 +80,7 @@ function App(): JSX.Element {
           debug.info('Cleared invalid fingerprint cache');
         }
       }
-    } catch (error) {
+    } catch {
       localStorage.removeItem('cloudClipboard_fingerprint');
       debug.info('Cleared corrupted fingerprint cache');
     }
@@ -191,7 +191,7 @@ function App(): JSX.Element {
             fingerprint = generateBrowserFingerprint();
             saveToLocalStorage('cloudClipboard_fingerprint', fingerprint);
           }
-        } catch (error) {
+        } catch {
           // Fallback to generating new fingerprint
           fingerprint = generateBrowserFingerprint();
           saveToLocalStorage('cloudClipboard_fingerprint', fingerprint);
@@ -480,7 +480,7 @@ function App(): JSX.Element {
 
     try {
       socketService.sendMessage(message as any);
-    } catch (error) {
+    } catch {
       toast({
         variant: 'destructive',
         title: t('toast.error'),

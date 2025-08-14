@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DesktopProvider, useDesktop } from './desktop-integration';
 import { DesktopSettings } from './components/DesktopSettings';
-import { ClipboardMonitor } from './clipboard-monitor';
+// import { ClipboardMonitor } from './clipboard-monitor'; // TODO: Implement clipboard monitoring
 
 // Import the original web app components
 // Note: These will need to be copied or symlinked from the client directory
@@ -10,33 +10,23 @@ interface DesktopAppProps {
 }
 
 const DesktopAppContent: React.FC<DesktopAppProps> = ({ WebApp }) => {
-  const { config, showNotification, clipboardMonitor, isDesktop } = useDesktop();
+  const { isDesktop } = useDesktop();
+  // const { config, showNotification, clipboardMonitor } = useDesktop(); // TODO: Use for desktop features
   const [showSettings, setShowSettings] = useState(false);
-  const [lastClipboardContent, setLastClipboardContent] = useState<string>('');
+  // const [lastClipboardContent, setLastClipboardContent] = useState<string>(''); // TODO: Use for clipboard monitoring
 
-  // Handle clipboard changes when running in desktop mode
-  const handleClipboardChange = async (text: string) => {
-    if (!config?.auto_clipboard || !text || text === lastClipboardContent) {
-      return;
-    }
-
-    setLastClipboardContent(text);
-    
-    // Show notification
-    await showNotification(
-      '剪切板同步',
-      `检测到新的剪切板内容：${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`
-    );
-
-    // Here you would integrate with your existing message sending logic
-    // For now, we'll just log it
-    console.log('New clipboard content:', text);
-    
-    // In a real implementation, you would:
-    // 1. Check if user is in a room
-    // 2. Send the clipboard content as a message
-    // 3. Update the UI accordingly
-  };
+  // TODO: Handle clipboard changes when running in desktop mode
+  // const handleClipboardChange = async (text: string) => {
+  //   if (!config?.auto_clipboard || !text || text === lastClipboardContent) {
+  //     return;
+  //   }
+  //   setLastClipboardContent(text);
+  //   await showNotification(
+  //     '剪切板同步',
+  //     `检测到新的剪切板内容：${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`
+  //   );
+  //   // Integration with existing message sending logic
+  // };
 
   // Keyboard shortcuts for desktop
   useEffect(() => {

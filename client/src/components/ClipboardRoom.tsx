@@ -71,7 +71,7 @@ export function ClipboardRoom({
         title: t('toast.copied'),
         description: t('toast.copiedDesc'),
       });
-    } catch (error) {
+    } catch {
       toast({
         variant: 'destructive',
         title: t('toast.failedToCopy'),

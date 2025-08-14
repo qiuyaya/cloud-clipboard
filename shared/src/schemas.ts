@@ -84,7 +84,7 @@ export const FileInfoSchema = z.object({
   type: z.string()
     .min(1, 'File type is required')
     .max(100, 'File type too long')
-    .regex(/^[a-zA-Z0-9\/-]+$/, 'Invalid file type format'),
+    .regex(/^[a-zA-Z0-9/-]+$/, 'Invalid file type format'),
   lastModified: z.number()
     .min(0, 'Last modified timestamp invalid')
     .max(Date.now() + 86400000, 'Last modified timestamp cannot be in the future'), // Allow 24h clock skew

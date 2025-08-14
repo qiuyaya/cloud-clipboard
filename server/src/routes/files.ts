@@ -5,7 +5,7 @@ import { authenticateRoom } from '../middleware/auth';
 import { validateParams } from '../middleware/validation';
 import { uploadRateLimit, generalRateLimit } from '../middleware/rateLimit';
 import { sanitizeFileName } from '@cloud-clipboard/shared';
-import type { APIResponse, FileInfo } from '@cloud-clipboard/shared';
+import type { FileInfo } from '@cloud-clipboard/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { FileManager } from '../services/FileManager';

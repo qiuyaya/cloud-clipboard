@@ -3,7 +3,6 @@ import type { Server } from 'http';
 import { RoomService } from './RoomService';
 import { log } from '../utils/logger';
 import {
-  WebSocketMessageSchema,
   JoinRoomRequestSchema,
   LeaveRoomRequestSchema,
   TextMessageSchema,

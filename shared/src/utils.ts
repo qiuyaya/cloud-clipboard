@@ -51,9 +51,10 @@ export const sanitizeFileName = (fileName: string): string => {
   let sanitized = fileName.replace(/\.\./g, '');
   
   // Remove path separators
-  sanitized = sanitized.replace(/[\/\\]/g, '_');
+  sanitized = sanitized.replace(/[/\\]/g, '_');
   
   // Remove potentially dangerous characters and control characters
+  // eslint-disable-next-line no-control-regex
   sanitized = sanitized.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
   sanitized = sanitized.replace(/[<>:"|?*]/g, '_');
   
@@ -181,7 +182,7 @@ export const generateBrowserFingerprint = (): import('./types').BrowserFingerpri
       doNotTrack: fingerprint.doNotTrack,
       hash: hash,
     };
-  } catch (error) {
+  } catch {
     // Fallback in case of errors
     const basicFingerprint = {
       userAgent: navigator.userAgent.substring(0, 200),

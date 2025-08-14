@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { RoomService } from '../services/RoomService';
-import { validateBody, validateQuery, validateParams } from '../middleware/validation';
+import { validateBody, validateQuery } from '../middleware/validation';
 import { authenticateRoom } from '../middleware/auth';
-import { RoomKeySchema, RoomInfoSchema } from '@cloud-clipboard/shared';
-import type { APIResponse, RoomInfo } from '@cloud-clipboard/shared';
+import { RoomKeySchema } from '@cloud-clipboard/shared';
+import type { RoomInfo } from '@cloud-clipboard/shared';
 
 const router = Router();
 
@@ -12,9 +12,9 @@ const CreateRoomSchema = z.object({
   roomKey: RoomKeySchema,
 });
 
-const GetRoomInfoSchema = z.object({
-  roomKey: RoomKeySchema,
-});
+// const GetRoomInfoSchema = z.object({
+//   roomKey: RoomKeySchema,
+// });
 
 export const createRoomRoutes = (roomService: RoomService): Router => {
   router.post('/create', validateBody(CreateRoomSchema), (req, res) => {
@@ -35,7 +35,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
         message: 'Room created successfully',
         data: roomInfo,
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({
         success: false,
         message: 'Failed to create room',
@@ -68,7 +68,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
         success: true,
         data: roomInfo,
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({
         success: false,
         message: 'Failed to get room info',
@@ -85,7 +85,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
         success: true,
         data: users,
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({
         success: false,
         message: 'Failed to get users',
@@ -103,7 +103,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
         success: true,
         data: messages,
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({
         success: false,
         message: 'Failed to get messages',
@@ -119,7 +119,7 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
         success: true,
         data: stats,
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({
         success: false,
         message: 'Failed to get stats',

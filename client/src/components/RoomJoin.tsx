@@ -39,7 +39,7 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
       const fingerprint = generateBrowserFingerprint();
       localStorage.setItem('cloudClipboard_fingerprint', JSON.stringify(fingerprint));
       setCachedFingerprint(fingerprint);
-    } catch (error) {
+    } catch {
       // Fallback: generate new fingerprint and clear bad cache
       localStorage.removeItem('cloudClipboard_fingerprint');
       const fingerprint = generateBrowserFingerprint();

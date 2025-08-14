@@ -15,7 +15,7 @@ class DebugLogger {
     if (savedConfig) {
       try {
         this.config = { ...this.config, ...JSON.parse(savedConfig) };
-      } catch (e) {
+      } catch {
         console.warn('Failed to parse debug config from localStorage');
       }
     }

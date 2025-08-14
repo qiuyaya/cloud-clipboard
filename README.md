@@ -1,6 +1,6 @@
 # Cloud Clipboard / 云剪贴板
 
-*[English](#english) | 中文*
+*中文 | [English](#english)*
 
 一个实时云剪贴板应用程序，允许您使用基于房间的身份验证在不同设备之间安全地共享文本和文件。
 
@@ -212,7 +212,7 @@ bun run client:dev
 
 # English
 
-*中文 | [English](#english)*
+*[中文](#cloud-clipboard--云剪贴板) | English*
 
 A real-time cloud clipboard application that allows you to share text and files across different devices securely using room-based authentication.
 
