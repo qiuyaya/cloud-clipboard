@@ -50,15 +50,17 @@ async fn set_config(
 }
 
 #[tauri::command]
-async fn get_clipboard_text() -> Result<String, String> {
-    tauri_plugin_clipboard_manager::read_text()
+async fn get_clipboard_text(app: tauri::AppHandle) -> Result<String, String> {
+    app.clipboard()
+        .read_text()
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn set_clipboard_text(text: String) -> Result<(), String> {
-    tauri_plugin_clipboard_manager::write_text(text)
+async fn set_clipboard_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    app.clipboard()
+        .write_text(text)
         .await
         .map_err(|e| e.to_string())
 }
