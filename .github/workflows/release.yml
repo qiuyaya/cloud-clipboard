@@ -19,6 +19,7 @@ jobs:
   build-desktop:
     name: Build Desktop App
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +71,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: desktop/src-tauri
+          cache-targets: true
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
 
       # Linux-specific dependencies
       - name: Install Linux dependencies

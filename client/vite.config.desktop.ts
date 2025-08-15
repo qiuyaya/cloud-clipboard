@@ -12,9 +12,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'src/main-desktop.tsx')
-      }
+      input: path.resolve(__dirname, 'index-desktop.html')
     }
   },
   define: {

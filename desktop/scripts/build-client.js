@@ -67,6 +67,27 @@ fs.writeFileSync(
   desktopMainContent.trim()
 );
 
+// Create desktop-specific HTML entry
+console.log('📝 Creating desktop HTML entry...');
+const desktopHtmlContent = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cloud Clipboard Desktop</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main-desktop.tsx"></script>
+  </body>
+</html>`;
+
+fs.writeFileSync(
+  path.join(CLIENT_DIR, 'index-desktop.html'),
+  desktopHtmlContent.trim()
+);
+
 // 4. Update vite config for desktop build
 console.log('⚙️  Updating Vite config for desktop...');
 const viteConfigDesktop = `
@@ -84,9 +105,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'src/main-desktop.tsx')
-      }
+      input: path.resolve(__dirname, 'index-desktop.html')
     }
   },
   define: {

@@ -3,10 +3,10 @@
 
 use tauri::Manager;
 use std::sync::Mutex;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use tauri_plugin_notification::NotificationExt;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AppConfig {
     server_url: String,
     auto_clipboard: bool,
@@ -35,7 +35,7 @@ type ConfigState = Mutex<AppConfig>;
 
 #[tauri::command]
 async fn get_config(state: tauri::State<'_, ConfigState>) -> Result<AppConfig, String> {
-    let config = state.lock().unwrap();
+    let config = state.lock().map_err(|e| format!("Failed to lock config: {}", e))?;
     Ok(config.clone())
 }
 
@@ -44,7 +44,7 @@ async fn set_config(
     config: AppConfig,
     state: tauri::State<'_, ConfigState>,
 ) -> Result<(), String> {
-    let mut app_config = state.lock().unwrap();
+    let mut app_config = state.lock().map_err(|e| format!("Failed to lock config: {}", e))?;
     *app_config = config;
     Ok(())
 }
@@ -64,8 +64,9 @@ async fn set_clipboard_text(text: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn show_notification(title: String, body: String) -> Result<(), String> {
-    tauri_plugin_notification::Notification::new("cloud-clipboard")
+async fn show_notification(app: tauri::AppHandle, title: String, body: String) -> Result<(), String> {
+    app.notification()
+        .builder()
         .title(&title)
         .body(&body)
         .show()
@@ -79,12 +80,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--flag1", "--flag2"]),
-        ))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
-        .manage(ConfigState::new(AppConfig::default()))
+        .manage(Mutex::new(AppConfig::default()))
         .invoke_handler(tauri::generate_handler![
             get_config,
             set_config,
@@ -95,8 +91,9 @@ fn main() {
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
-                let window = app.get_webview_window("main").unwrap();
-                window.open_devtools();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.open_devtools();
+                }
             }
             Ok(())
         })

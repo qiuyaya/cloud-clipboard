@@ -1,15 +1,16 @@
 {
-  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "Cloud Clipboard",
+  "version": "1.0.0",
+  "identifier": "com.cloudclipboard.app",
   "build": {
-    "beforeBuildCommand": "cd ../client && npm run build",
-    "beforeDevCommand": "",
+    "beforeBuildCommand": "node ../scripts/build-client.js",
     "frontendDist": "../client/dist",
     "devUrl": "http://localhost:3000"
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "identifier": "com.cloudclipboard.app",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -17,28 +18,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [],
-    "externalBin": [],
-    "copyright": "",
     "category": "DeveloperTool",
     "shortDescription": "Cloud Clipboard Desktop",
     "longDescription": "A desktop application for cloud clipboard sharing"
   },
-  "productName": "Cloud Clipboard",
-  "version": "1.0.0",
-  "identifier": "com.cloudclipboard.app",
-  "plugins": [
-    "clipboard-manager",
-    "fs",
-    "dialog", 
-    "notification",
-    "store",
-    "autostart",
-    "window-state"
-  ],
+  "plugins": {
+    "clipboard-manager": {},
+    "fs": {},
+    "dialog": {},
+    "notification": {},
+    "store": {}
+  },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Cloud Clipboard",
         "width": 1200,
         "height": 800,

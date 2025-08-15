@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DesktopProvider, useDesktop } from './desktop-integration';
 import { DesktopSettings } from './components/DesktopSettings';
+// import { ClipboardMonitor } from './clipboard-monitor'; // TODO: Implement clipboard monitoring
 
 // Import the original web app components
 // Note: These will need to be copied or symlinked from the client directory
@@ -10,12 +11,11 @@ interface DesktopAppProps {
 
 const DesktopAppContent: React.FC<DesktopAppProps> = ({ WebApp }) => {
   const { isDesktop } = useDesktop();
-  // const { config, showNotification } = useDesktop(); // TODO: Use for desktop features
+  // const { config, showNotification, clipboardMonitor } = useDesktop(); // TODO: Use for desktop features
   const [showSettings, setShowSettings] = useState(false);
   // const [lastClipboardContent, setLastClipboardContent] = useState<string>(''); // TODO: Use for clipboard monitoring
 
-  // Handle clipboard changes when running in desktop mode
-  // TODO: Implement clipboard monitoring integration
+  // TODO: Handle clipboard changes when running in desktop mode
   // const handleClipboardChange = async (text: string) => {
   //   if (!config?.auto_clipboard || !text || text === lastClipboardContent) {
   //     return;
