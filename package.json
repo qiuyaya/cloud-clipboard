@@ -16,7 +16,7 @@
     "desktop:build-client": "cd desktop && node scripts/build-client.js",
     "release": "node scripts/release.js",
     "release:patch": "node scripts/release.js patch",
-    "release:minor": "node scripts/release.js minor", 
+    "release:minor": "node scripts/release.js minor",
     "release:major": "node scripts/release.js major",
     "release:dry-run": "node scripts/release.js patch --dry-run",
     "version:check": "node scripts/version-sync.js check",
@@ -25,7 +25,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "type-check": "cd shared && tsc --noEmit && cd ../server && tsc --noEmit",
     "shared:type-check": "cd shared && tsc --noEmit",
-    "server:type-check": "cd server && tsc --noEmit", 
+    "server:type-check": "cd server && tsc --noEmit",
     "client:type-check": "cd client && tsc --noEmit"
   },
   "workspaces": ["server", "client", "shared", "desktop"],
@@ -33,8 +33,11 @@
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^8.0.0",
+    "esbuild": "^0.25.9",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0",
-    "concurrently": "^8.0.0"
+    "vite": "^7.1.2"
   }
 }

@@ -46,6 +46,7 @@ export const DesktopProvider: React.FC<DesktopProviderProps> = ({
         monitor.stop();
       };
     }
+    return undefined;
   }, [isDesktop, onClipboardChange]);
 
   useEffect(() => {

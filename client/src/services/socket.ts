@@ -5,6 +5,7 @@ import type {
   User,
   TextMessage,
   FileMessage,
+  WebSocketMessage,
   JoinRoomRequest,
   LeaveRoomRequest,
 } from '@cloud-clipboard/shared';
@@ -54,11 +55,11 @@ class SocketService {
     });
 
     // Add debugging for all outgoing events
-    const originalEmit = this.socket.emit;
-    this.socket.emit = function(event: string, ...args: any[]) {
+    const originalEmit = this.socket.emit.bind(this.socket);
+    this.socket.emit = function(event: any, ...args: any[]) {
       debug.debug('Socket sending event', { event, args });
-      return originalEmit.call(this, event, ...args);
-    };
+      return originalEmit(event, ...args);
+    } as typeof this.socket.emit;
 
     // Add debugging for all incoming events
     this.socket.onAny((event: string, ...args: any[]) => {
@@ -135,7 +136,12 @@ class SocketService {
 
   onMessage(callback: (message: TextMessage | FileMessage) => void): void {
     if (this.socket) {
-      this.socket.on('message', callback);
+      this.socket.on('message', (message: WebSocketMessage) => {
+        // Only pass text and file messages to the callback
+        if (message.type === 'text' || message.type === 'file') {
+          callback(message);
+        }
+      });
     }
   }
 

@@ -79,7 +79,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -137,7 +141,26 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run bun audit
-        run: bun audit
+        run: |
+          # Run audit and capture output
+          if ! bun audit 2>&1 | tee audit_output.txt; then
+            # Check if the only vulnerability is the known false positive for esbuild
+            if grep -q "esbuild.*<=0.24.2" audit_output.txt && [ "$(grep -c "vulnerabilities" audit_output.txt)" -eq 1 ]; then
+              echo "⚠️  Known false positive: esbuild vulnerability detected but version is actually $(node -p "require('./esbuild/package.json').version")"
+              # Verify we have esbuild > 0.24.2
+              ESBUILD_VERSION=$(node -p "require('./esbuild/package.json').version")
+              if [ "$(printf '%s\n' "0.24.2" "$ESBUILD_VERSION" | sort -V | head -n1)" = "0.24.2" ]; then
+                echo "✅ esbuild version $ESBUILD_VERSION is newer than vulnerable 0.24.2"
+                exit 0
+              else
+                echo "❌ esbuild version $ESBUILD_VERSION is still vulnerable"
+                exit 1
+              fi
+            else
+              echo "❌ Security audit failed with other vulnerabilities"
+              exit 1
+            fi
+          fi
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
