@@ -5,6 +5,7 @@ use tauri::Manager;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AppConfig {
