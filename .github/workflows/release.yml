@@ -64,18 +64,12 @@ jobs:
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-bun-
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('desktop/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -99,7 +93,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
@@ -110,7 +103,6 @@ jobs:
       - name: Install dependencies
         run: |
           bun install --frozen-lockfile
-          cd desktop && npm install
 
       # Build shared package
       - name: Build shared package
@@ -120,13 +112,13 @@ jobs:
       - name: Build client for desktop
         run: |
           cd desktop
-          npm run build-client
+          bun run build-client
 
       # Build desktop app
       - name: Build desktop app
         run: |
           cd desktop
-          npm run tauri build -- --target ${{ matrix.target }}
+          bun run tauri build -- --target ${{ matrix.target }}
 
       # Prepare artifacts
       - name: Prepare artifacts
@@ -184,8 +176,10 @@ jobs:
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-bun-
 

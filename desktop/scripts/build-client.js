@@ -14,8 +14,8 @@ console.log('🔧 Building client for desktop app...');
 
 // 1. Build shared package
 console.log('📦 Building shared package...');
-process.chdir(path.join(PROJECT_ROOT, 'shared'));
-execSync('bun run build', { stdio: 'inherit' });
+process.chdir(PROJECT_ROOT);
+execSync('bun run shared:build', { stdio: 'inherit' });
 
 // 2. Copy desktop integration files to client
 console.log('📋 Copying desktop integration files...');
