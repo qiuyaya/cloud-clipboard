@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.4] - 2025-08-16
+
+- fix: 修复Tauri构建配置问题
+
+
 ## [1.0.3] - 2025-08-16
 
 - fix: 修复GitHub Actions依赖安装和Linux包名问题
