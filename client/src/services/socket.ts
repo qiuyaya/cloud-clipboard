@@ -24,8 +24,11 @@ class SocketService {
       return this.socket;
     }
 
-    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-    debug.info('Attempting to connect to server', { serverUrl });
+    // In production, use the same origin; in development, use environment variable or default
+    const serverUrl = import.meta.env.PROD 
+      ? window.location.origin 
+      : (import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
+    debug.info('Attempting to connect to server', { serverUrl, isProd: import.meta.env.PROD });
     
     this.socket = io(serverUrl, {
       autoConnect: true,

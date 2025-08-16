@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import path from 'path';
 import { RoomService } from './services/RoomService';
 import { SocketService } from './services/SocketService';
 import { FileManager } from './services/FileManager';
@@ -15,6 +16,10 @@ import type { APIResponse } from '@cloud-clipboard/shared';
 const app = express();
 const server = createServer(app);
 const port = process.env.PORT || 3001;
+
+// Determine if we're serving static files (production mode)
+const isProduction = process.env.NODE_ENV === 'production';
+const staticPath = process.env.STATIC_PATH || path.join(__dirname, '../public');
 
 // Security headers
 app.use(helmet({
@@ -39,23 +44,36 @@ app.use(helmet({
   }
 }));
 
-// Restrict CORS - only allow specific origins
-const allowedOrigins = process.env.CLIENT_URL 
-  ? process.env.CLIENT_URL.split(',')
-  : ['http://localhost:3000', 'http://localhost:3002'];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+// CORS configuration
+if (isProduction) {
+  // In production, we serve both frontend and backend from the same origin
+  app.use(cors({
+    origin: function (origin, callback) {
+      // Allow same-origin requests (frontend served from same server)
+      // and requests with no origin (like mobile apps)
       return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-}));
+    },
+    credentials: true,
+  }));
+} else {
+  // In development, allow specific origins
+  const allowedOrigins = process.env.CLIENT_URL 
+    ? process.env.CLIENT_URL.split(',')
+    : ['http://localhost:3000', 'http://localhost:3002'];
+
+  app.use(cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }));
+}
 
 // Trust proxy for rate limiting behind reverse proxy
 app.set('trust proxy', 1);
@@ -86,6 +104,16 @@ roomService.on('roomDestroyed', (roomKey: string) => {
     console.log(`Room ${roomKey} destroyed - deleted ${deletedFiles.length} files`);
   }
 });
+
+// Serve static files in production
+if (isProduction) {
+  // Serve static files from the built client
+  app.use(express.static(staticPath, {
+    maxAge: '1d', // Cache static assets for 1 day
+    etag: true,
+    lastModified: true,
+  }));
+}
 
 app.use('/api/rooms', createRoomRoutes(roomService));
 app.use('/api/files', createFileRoutes(fileManager));
@@ -121,12 +149,20 @@ app.get('/api', (_req, res: express.Response<APIResponse>) => {
   });
 });
 
-app.use('*', (_req, res: express.Response<APIResponse>) => {
-  res.status(404).json({
-    success: false,
-    message: 'API endpoint not found',
+// Handle frontend routes in production (SPA fallback)
+if (isProduction) {
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'));
   });
-});
+} else {
+  // In development, only handle API 404s
+  app.use('*', (_req, res: express.Response<APIResponse>) => {
+    res.status(404).json({
+      success: false,
+      message: 'API endpoint not found',
+    });
+  });
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((error: Error, _req: express.Request, res: express.Response<APIResponse>, _next: express.NextFunction) => {

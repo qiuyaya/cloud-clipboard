@@ -1,6 +1,42 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [Unreleased] - 2025-08-16
+
+### Added
+- 🎨 **Modern Icon System**: Beautiful SVG-based icon design with cloud and clipboard elements
+  - Multiple favicon sizes (16x16, 32x32, 48x48, 180x180, 192x192, 512x512)
+  - PWA manifest support with proper theme colors
+  - Updated HTML files with comprehensive favicon references
+- 🏗️ **Unified Deployment Architecture**: Single-service deployment for production
+  - Server now serves static files in production mode
+  - Automatic client build integration
+  - Simplified Docker configuration as default
+- 📂 **Centralized Icon Management**: Organized icon system with automated generation
+  - Central `assets/icons/` directory for source files
+  - Automated icon generation scripts
+  - Desktop icon sync system
+  - Comprehensive icon management documentation
+- 🐳 **Simplified Docker Configuration**: Default simple deployment without Nginx
+  - `docker-compose.yml` now uses single container (port 80)
+  - `docker-compose.nginx.yml` for full deployment with reverse proxy
+  - Streamlined production deployment
+- 📚 **Updated Documentation**: Comprehensive updates to all documentation files
+  - Enhanced README.md with latest features and desktop app information
+  - Updated CLAUDE.md with icon system details
+  - Improved package.json descriptions across all packages
+  - Enhanced deployment documentation
+  - New icon management guide
+
+### Features Present (Previously Implemented)
+- 🔄 **Browser Refresh Persistence**: Users remain in rooms after browser refresh
+- ⏰ **Inactivity Management**: 2-hour automatic logout with activity tracking
+- 👤 **Username Deduplication**: Automatic random suffixes for duplicate usernames
+- 🗂️ **Smart File Management**: 12-hour retention policy with room-based cleanup
+- 🔔 **System Notifications**: Clear messages for all file operations and room events
+- 🖥️ **Desktop Application**: Cross-platform Tauri-based app with clipboard monitoring
+
 ## [1.0.12] - 2025-08-16
 
 - fix: 添加构建诊断并禁用Tauri bundle以解决二进制文件丢失问题

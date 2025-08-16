@@ -1,7 +1,7 @@
 {
   "name": "@cloud-clipboard/client",
   "version": "1.0.12",
-  "description": "Frontend client for cloud clipboard",
+  "description": "Modern React frontend with PWA support, real-time synchronization, and beautiful UI for cloud clipboard sharing",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

@@ -5,3 +5,9 @@ dist/
 .env
 desktop/src-tauri/target/
 .claude/log/
+
+# Generated icons (keep source in assets/icons)
+client/public/favicon-*.svg
+server/public/
+desktop/src-tauri/icons/app-icon.svg
+desktop/src-tauri/icons/README.md

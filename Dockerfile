@@ -73,7 +73,6 @@ COPY package.json bun.lockb ./
 
 # Build client with production environment
 ENV NODE_ENV=production
-ENV VITE_SERVER_URL=http://localhost:3001
 RUN bun run client:build
 
 # Stage 5: Production runtime
@@ -94,7 +93,7 @@ RUN npm install -g bun
 
 # Copy production files
 COPY --from=server-builder --chown=cloudclipboard:nodejs /app/server/dist ./server/dist
-COPY --from=client-builder --chown=cloudclipboard:nodejs /app/client/dist ./client/dist
+COPY --from=client-builder --chown=cloudclipboard:nodejs /app/client/dist ./server/public
 COPY --from=shared-builder --chown=cloudclipboard:nodejs /app/shared/dist ./shared/dist
 
 # Copy package files for runtime dependencies

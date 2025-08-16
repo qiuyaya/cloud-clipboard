@@ -17,7 +17,11 @@ console.log('📦 Building shared package...');
 process.chdir(PROJECT_ROOT);
 execSync('bun run shared:build', { stdio: 'inherit' });
 
-// 2. Copy desktop integration files to client
+// 2. Generate icons for web integration
+console.log('🎨 Generating icons for desktop integration...');
+execSync('bun run icons:generate', { stdio: 'inherit' });
+
+// 3. Copy desktop integration files to client
 console.log('📋 Copying desktop integration files...');
 const filesToCopy = [
   'desktop-api.ts',
@@ -45,7 +49,7 @@ filesToCopy.forEach(file => {
   }
 });
 
-// 3. Create desktop-specific main entry
+// 4. Create desktop-specific main entry
 console.log('📝 Creating desktop entry point...');
 const desktopMainContent = `
 import React from 'react';
@@ -73,9 +77,15 @@ const desktopHtmlContent = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="16x16" href="/favicon-16x16.svg" />
+    <link rel="icon" type="image/svg+xml" sizes="32x32" href="/favicon-32x32.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180x180.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#6366f1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cloud Clipboard Desktop</title>
+    <meta name="description" content="Desktop app for Cloud Clipboard - Share content seamlessly" />
   </head>
   <body>
     <div id="root"></div>
@@ -88,7 +98,9 @@ fs.writeFileSync(
   desktopHtmlContent.trim()
 );
 
-// 4. Update vite config for desktop build
+// 5. Desktop-specific HTML entry (already created above)
+
+// 6. Update vite config for desktop build
 console.log('⚙️  Updating Vite config for desktop...');
 const viteConfigDesktop = `
 import { defineConfig } from 'vite';
@@ -119,7 +131,7 @@ fs.writeFileSync(
   viteConfigDesktop.trim()
 );
 
-// 5. Build client with desktop config
+// 7. Build client with desktop config
 console.log('🏗️  Building client with desktop integration...');
 process.chdir(CLIENT_DIR);
 execSync('npx vite build --config vite.config.desktop.ts', { stdio: 'inherit' });

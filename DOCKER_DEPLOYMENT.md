@@ -8,36 +8,55 @@
 
 ## 概述
 
-本指南介绍如何使用 Docker 部署云剪贴板应用程序，采用安全最佳实践和最小镜像大小。
+本指南介绍如何使用 Docker 部署云剪贴板应用程序，采用安全最佳实践和最小镜像大小。支持现代化的PWA图标系统和增强的文件管理功能。
 
 ## 快速开始
 
 ### 生产环境部署
 
-1. **使用 docker-compose 构建和运行：**
+#### 默认部署（推荐）
+**单一容器部署，前端后端统一：**
 ```bash
 # 创建数据目录
 mkdir -p data/uploads logs
 
-# 构建并启动服务
+# 构建并启动服务（默认简单配置）
 docker-compose up -d
 
 # 查看日志
 docker-compose logs -f
+
+# 应用将在 http://localhost 可用
 ```
 
-2. **手动 Docker 构建：**
+#### 完整部署（带Nginx代理）
+**使用Nginx反向代理的完整部署：**
+```bash
+# 创建数据目录
+mkdir -p data/uploads logs
+
+# 使用Nginx配置构建并启动服务
+docker-compose -f docker-compose.nginx.yml up -d
+
+# 查看日志
+docker-compose -f docker-compose.nginx.yml logs -f
+```
+
+#### 手动 Docker 构建
+**单一容器手动部署：**
 ```bash
 # 构建镜像
 docker build -t cloud-clipboard:latest .
 
-# 运行容器
+# 运行容器（访问端口80）
 docker run -d \
   --name cloud-clipboard \
-  -p 3001:3001 \
+  -p 80:3001 \
   -v $(pwd)/data/uploads:/app/uploads \
   -e NODE_ENV=production \
   cloud-clipboard:latest
+
+# 应用将在 http://localhost 可用
 ```
 
 ### 开发环境
@@ -281,36 +300,55 @@ docker-compose exec cloud-clipboard ping nginx
 
 ## Overview
 
-This guide covers deploying the Cloud Clipboard application using Docker with security best practices and minimal image sizes.
+This guide covers deploying the Cloud Clipboard application using Docker with security best practices and minimal image sizes. Includes support for modern PWA icon system and enhanced file management features.
 
 ## Quick Start
 
 ### Production Deployment
 
-1. **Build and run with docker-compose:**
+#### Default Deployment (Recommended)
+**Single container deployment with unified frontend and backend:**
 ```bash
 # Create data directory
 mkdir -p data/uploads logs
 
-# Build and start services
+# Build and start services (default simple configuration)
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
+
+# Application will be available at http://localhost
 ```
 
-2. **Manual Docker build:**
+#### Full Deployment (with Nginx Proxy)
+**Complete deployment with Nginx reverse proxy:**
+```bash
+# Create data directory
+mkdir -p data/uploads logs
+
+# Build and start services with Nginx configuration
+docker-compose -f docker-compose.nginx.yml up -d
+
+# View logs
+docker-compose -f docker-compose.nginx.yml logs -f
+```
+
+#### Manual Docker Build
+**Single container manual deployment:**
 ```bash
 # Build the image
 docker build -t cloud-clipboard:latest .
 
-# Run the container
+# Run the container (access on port 80)
 docker run -d \
   --name cloud-clipboard \
-  -p 3001:3001 \
+  -p 80:3001 \
   -v $(pwd)/data/uploads:/app/uploads \
   -e NODE_ENV=production \
   cloud-clipboard:latest
+
+# Application will be available at http://localhost
 ```
 
 ### Development

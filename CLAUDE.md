@@ -65,6 +65,8 @@ Uses react-i18next with translations in `client/src/i18n/locales/`. All user-fac
 - Maximum file size is 100MB
 - Room keys can be any non-empty string
 - Users are automatically removed from rooms on disconnect
+- New icon system implemented with SVG favicons and PWA manifest support
+- Icons located in `client/public/` directory with multiple sizes for different use cases
 
 ### Common Issues and Fixes
 
@@ -77,3 +79,9 @@ const userWithDate = {
 ```
 
 **File Upload URLs**: Server returns absolute URLs for file downloads. The client handles both relative and absolute URL formats for backwards compatibility.\n\n### New Features Implemented\n\n**Browser Refresh Persistence**: Users remain in rooms after browser refresh through localStorage persistence. Auto-rejoin happens on reconnection.\n\n**Inactivity Management**: 2-hour inactivity timer automatically logs out inactive users. Activity is tracked through mouse, keyboard, and touch events.\n\n**Unique Usernames**: Duplicate usernames automatically get random suffixes (format: `username_abc123`) when joining rooms.\n\n**Room Auto-Destruction**: Rooms are automatically destroyed when all users go offline or after 24 hours of inactivity. Triggers file cleanup.\n\n**File Management**: \n- Files are tracked by room and upload time\n- Auto-deletion when rooms are destroyed  \n- 12-hour maximum retention policy\n- Hourly cleanup process\n- System notifications for all file operations\n\n**System Notifications**: Clear messages for file uploads, deletions, room destruction, and auto-logout events in both English and Chinese.
+
+**Icon System**: Modern SVG-based icon design featuring cloud and clipboard elements with gradients. Includes:
+- Main icon (`/client/public/icon.svg`) - 256x256 design
+- Multiple favicon sizes (16x16, 32x32, 48x48, 180x180, 192x192, 512x512)
+- PWA manifest (`/client/public/site.webmanifest`) with proper theme colors
+- HTML files updated with proper favicon references and meta tags

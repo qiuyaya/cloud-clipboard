@@ -14,16 +14,23 @@
 - 🎨 **现代UI** - 使用React、Tailwind CSS和shadcn/ui构建的精美界面
 - ⚡ **快速可靠** - 使用Bun、TypeScript构建，具有严格的类型检查
 - 📱 **跨平台** - 适用于桌面、平板和移动设备
+- 🖥️ **桌面应用** - 基于Tauri的原生桌面应用，支持自动剪切板监听
+- 🔄 **持久会话** - 浏览器刷新后自动重新加入房间
+- ⏰ **智能管理** - 2小时无活动自动登出，房间自动销毁和文件清理
+- 👤 **用户名去重** - 自动处理重复用户名，添加随机后缀
+- 🗂️ **文件管理** - 12小时文件保留策略，自动清理过期文件
+- 🔔 **系统通知** - 文件上传/删除、房间销毁等事件的清晰通知
 - 🐛 **调试日志** - 可配置的前端和后端调试日志系统
 - 🌍 **多语言** - 支持中文和英文界面
 
 ## 🏗️ 架构
 
-这个项目采用monorepo架构，包含三个主要包：
+这个项目采用monorepo架构，包含四个主要包：
 
 - **`shared/`** - 公共类型、模式和工具（TypeScript + Zod）
 - **`server/`** - 后端API和WebSocket服务器（Node.js + Express + Socket.IO）
 - **`client/`** - 前端React应用程序（React + Vite + Tailwind CSS）
+- **`desktop/`** - 桌面应用程序（Tauri + Rust，支持Windows、macOS、Linux）
 
 ## 🛠️ 技术栈
 
@@ -48,10 +55,17 @@
 - **验证**: Zod schemas
 - **工具**: 共享工具函数
 
+### 桌面
+- **框架**: Tauri (Rust + WebView)
+- **前端集成**: React + TypeScript 复用
+- **系统功能**: 剪切板监听、系统通知、自动启动
+- **跨平台**: Windows、macOS、Linux 支持
+
 ## 🚀 快速开始
 
 ### 前置条件
 - 系统中安装了 [Bun](https://bun.sh)
+- （可选）桌面应用需要 [Rust](https://rustup.rs/) 环境
 
 ### 安装
 
@@ -85,17 +99,29 @@ bun run server:dev
 bun run client:dev
 ```
 
+**桌面应用**：
+```bash
+bun run desktop:dev
+```
+
 ### 生产环境
 
-构建所有包：
+构建所有包（包含统一部署）：
 ```bash
 bun run build
 ```
 
-启动服务器：
+启动统一服务（前端+后端）：
 ```bash
-cd server && bun run start
+bun run start
 ```
+
+构建桌面应用：
+```bash
+bun run desktop:build
+```
+
+> **注意**: 生产环境下，前端和后端会运行在同一个端口（默认3001），无需分别部署。
 
 ## 📖 使用方法
 
@@ -143,6 +169,8 @@ bun run server:dev
 
 - **房间隔离**: 不同房间的用户无法看到彼此的数据
 - **无持久存储**: 消息仅在会话期间保存在内存中
+- **会话持久**: 浏览器刷新后自动重新加入房间
+- **智能清理**: 用户离线或无活动时自动清理数据
 - **安全头部**: Helmet.js提供安全头部
 - **输入验证**: 所有数据都使用Zod schemas验证
 - **CORS保护**: 可配置的CORS设置
@@ -150,6 +178,9 @@ bun run server:dev
 ## 📁 文件传输
 
 - **服务器上传**: 文件上传到服务器进行共享
+- **智能管理**: 按房间分组存储，支持自动清理
+- **保留策略**: 12小时最大保留时间，房间销毁时自动删除
+- **系统通知**: 文件上传、删除操作的实时通知
 - **P2P传输**: 局域网中设备间直接传输（WebRTC）
 - **大小限制**: 最大文件大小100MB
 - **类型支持**: 支持所有文件类型
@@ -190,10 +221,16 @@ bun run lint
 bun run shared:build
 bun run server:build
 bun run client:build
+bun run desktop:build
 
 # 启动单个服务
 bun run server:dev
 bun run client:dev
+bun run desktop:dev
+
+# 图标管理
+bun run icons:generate         # 生成Web图标
+bun run icons:sync-desktop     # 同步桌面图标
 ```
 
 ## 🤝 贡献
@@ -226,16 +263,23 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 🎨 **Modern UI** - Beautiful interface built with React, Tailwind CSS, and shadcn/ui
 - ⚡ **Fast & Reliable** - Built with Bun, TypeScript, and strict type checking
 - 📱 **Cross-Platform** - Works on desktop, tablet, and mobile devices
+- 🖥️ **Desktop Application** - Native Tauri-based desktop app with automatic clipboard monitoring
+- 🔄 **Session Persistence** - Automatically rejoin rooms after browser refresh
+- ⏰ **Smart Management** - 2-hour inactivity auto-logout, room auto-destruction and file cleanup
+- 👤 **Username Deduplication** - Automatic handling of duplicate usernames with random suffixes
+- 🗂️ **File Management** - 12-hour file retention policy with automatic cleanup
+- 🔔 **System Notifications** - Clear notifications for file uploads/deletions, room destruction events
 - 🐛 **Debug Logging** - Configurable frontend and backend debug logging system
 - 🌍 **Multilingual** - Support for Chinese and English interfaces
 
 ## 🏗️ Architecture
 
-This project is built as a monorepo with three main packages:
+This project is built as a monorepo with four main packages:
 
 - **`shared/`** - Common types, schemas, and utilities (TypeScript + Zod)
 - **`server/`** - Backend API and WebSocket server (Node.js + Express + Socket.IO)
 - **`client/`** - Frontend React application (React + Vite + Tailwind CSS)
+- **`desktop/`** - Desktop application (Tauri + Rust, supports Windows, macOS, Linux)
 
 ## 🛠️ Tech Stack
 
@@ -260,10 +304,17 @@ This project is built as a monorepo with three main packages:
 - **Validation**: Zod schemas
 - **Utilities**: Shared utility functions
 
+### Desktop
+- **Framework**: Tauri (Rust + WebView)
+- **Frontend Integration**: React + TypeScript reuse
+- **System Features**: Clipboard monitoring, system notifications, autostart
+- **Cross-Platform**: Windows, macOS, Linux support
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 - [Bun](https://bun.sh) installed on your system
+- (Optional) [Rust](https://rustup.rs/) environment for desktop application
 
 ### Installation
 
@@ -297,17 +348,29 @@ bun run server:dev
 bun run client:dev
 ```
 
+**Desktop Application**:
+```bash
+bun run desktop:dev
+```
+
 ### Production
 
-Build all packages:
+Build all packages (with unified deployment):
 ```bash
 bun run build
 ```
 
-Start the server:
+Start unified service (frontend + backend):
 ```bash
-cd server && bun run start
+bun run start
 ```
+
+Build desktop application:
+```bash
+bun run desktop:build
+```
+
+> **Note**: In production, frontend and backend run on the same port (default 3001), no separate deployment needed.
 
 ## 📖 Usage
 
@@ -355,6 +418,8 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 
 - **Room Isolation**: Users in different rooms cannot see each other's data
 - **No Persistent Storage**: Messages are only kept in memory during the session
+- **Session Persistence**: Automatically rejoin rooms after browser refresh
+- **Smart Cleanup**: Automatic data cleanup when users go offline or inactive
 - **Secure Headers**: Helmet.js provides security headers
 - **Input Validation**: All data is validated using Zod schemas
 - **CORS Protection**: Configurable CORS settings
@@ -362,6 +427,9 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 ## 📁 File Transfer
 
 - **Server Upload**: Files are uploaded to the server for sharing
+- **Smart Management**: Room-based file grouping with automatic cleanup
+- **Retention Policy**: 12-hour maximum retention, auto-delete on room destruction
+- **System Notifications**: Real-time notifications for file upload/delete operations
 - **P2P Transfer**: Direct device-to-device transfer for local network (WebRTC)
 - **Size Limit**: Maximum file size of 100MB
 - **Type Support**: All file types are supported
@@ -402,10 +470,16 @@ bun run lint
 bun run shared:build
 bun run server:build
 bun run client:build
+bun run desktop:build
 
 # Start individual services
 bun run server:dev
 bun run client:dev
+bun run desktop:dev
+
+# Icon management
+bun run icons:generate         # Generate web icons
+bun run icons:sync-desktop     # Sync desktop icons
 ```
 
 ## 🤝 Contributing
