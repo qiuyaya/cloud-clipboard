@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.12] - 2025-08-16
+
+- fix: 添加构建诊断并禁用Tauri bundle以解决二进制文件丢失问题
+
+
 ## [1.0.11] - 2025-08-16
 
 - fix: 修复artifact准备脚本以适应不同target目录结构

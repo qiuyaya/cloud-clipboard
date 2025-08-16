@@ -1,6 +1,6 @@
 {
   "name": "@cloud-clipboard/server",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Backend server for cloud clipboard",
   "main": "dist/index.js",
   "scripts": {
