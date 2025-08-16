@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.6] - 2025-08-16
+
+- fix: 添加Cargo.toml中缺失的二进制目标配置
+
+
 ## [1.0.5] - 2025-08-16
 
 - fix: 修复Tauri前端资源路径配置

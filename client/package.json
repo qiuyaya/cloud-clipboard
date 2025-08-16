@@ -1,6 +1,6 @@
 {
   "name": "@cloud-clipboard/client",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Frontend client for cloud clipboard",
   "type": "module",
   "scripts": {
