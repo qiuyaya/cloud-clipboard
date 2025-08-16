@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.7] - 2025-08-16
+
+- fix: 简化Cargo.toml中的二进制名称
+
+
 ## [1.0.6] - 2025-08-16
 
 - fix: 添加Cargo.toml中缺失的二进制目标配置
