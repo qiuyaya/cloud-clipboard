@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.11] - 2025-08-16
+
+- fix: 修复artifact准备脚本以适应不同target目录结构
+
+
 ## [1.0.10] - 2025-08-16
 
 - fix: 修复TypeScript编译错误 - 确保所有代码路径都有返回值
