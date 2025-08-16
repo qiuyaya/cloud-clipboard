@@ -1,6 +1,6 @@
 {
   "name": "cloud-clipboard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A cloud clipboard application for sharing text and files across devices",
   "main": "index.js",
   "scripts": {
@@ -28,7 +28,12 @@
     "server:type-check": "cd server && tsc --noEmit",
     "client:type-check": "cd client && tsc --noEmit"
   },
-  "workspaces": ["server", "client", "shared", "desktop"],
+  "workspaces": [
+    "server",
+    "client",
+    "shared",
+    "desktop"
+  ],
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
