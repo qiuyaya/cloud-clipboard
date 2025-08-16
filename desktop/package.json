@@ -1,6 +1,6 @@
 {
   "name": "cloud-clipboard-desktop",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Cloud Clipboard Desktop Application",
   "main": "index.js",
   "scripts": {

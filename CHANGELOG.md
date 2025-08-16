@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.10] - 2025-08-16
+
+- fix: 修复TypeScript编译错误 - 确保所有代码路径都有返回值
+
+
 ## [1.0.9] - 2025-08-16
 
 - fix: 清理desktop-integration.tsx中的未使用返回值
