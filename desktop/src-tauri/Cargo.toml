@@ -8,7 +8,7 @@ repository = ""
 edition = "2021"
 
 [[bin]]
-name = "app"
+name = "cloud-clipboard-desktop"
 path = "src/main.rs"
 
 [lib]
