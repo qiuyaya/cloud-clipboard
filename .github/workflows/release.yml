@@ -124,7 +124,12 @@ jobs:
       - name: Prepare artifacts
         shell: bash
         run: |
-          cd desktop/src-tauri/target/${{ matrix.target }}/release
+          # Try to find the correct release directory
+          if [ -d "desktop/src-tauri/target/${{ matrix.target }}/release" ]; then
+            cd desktop/src-tauri/target/${{ matrix.target }}/release
+          else
+            cd desktop/src-tauri/target/release
+          fi
           
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             # Windows: .exe and .msi
