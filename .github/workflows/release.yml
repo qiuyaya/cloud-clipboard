@@ -119,6 +119,23 @@ jobs:
         run: |
           cd desktop
           bun run tauri build -- --target ${{ matrix.target }}
+      
+      # Diagnose build output
+      - name: Diagnose build output
+        shell: bash
+        run: |
+          echo "=== Diagnosing build output ==="
+          echo "Looking for binary in target/${{ matrix.target }}/release/:"
+          if [ -d "desktop/src-tauri/target/${{ matrix.target }}/release" ]; then
+            ls -la desktop/src-tauri/target/${{ matrix.target }}/release/cloud-clipboard-desktop* || echo "No cloud-clipboard-desktop* found in target-specific dir"
+          fi
+          echo "Looking for binary in target/release/:"
+          if [ -d "desktop/src-tauri/target/release" ]; then
+            ls -la desktop/src-tauri/target/release/cloud-clipboard-desktop* || echo "No cloud-clipboard-desktop* found in general release dir"
+          fi
+          echo "Looking for any cloud-clipboard-desktop files:"
+          find desktop/src-tauri/target -name "cloud-clipboard-desktop*" -type f 2>/dev/null || echo "No cloud-clipboard-desktop* files found anywhere"
+          echo "=== End diagnosis ==="
 
       # Prepare artifacts
       - name: Prepare artifacts
