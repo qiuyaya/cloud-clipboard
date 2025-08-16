@@ -5,7 +5,7 @@
   "identifier": "com.cloudclipboard.desktop",
   "build": {
     "beforeBuildCommand": "",
-    "frontendDist": "../client/dist",
+    "frontendDist": "../../client/dist",
     "devUrl": "http://localhost:3000"
   },
   "bundle": {
