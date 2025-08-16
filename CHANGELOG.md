@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.8] - 2025-08-16
+
+- fix: 简化Tauri打包目标为仅app格式
+
+
 ## [1.0.7] - 2025-08-16
 
 - fix: 简化Cargo.toml中的二进制名称
