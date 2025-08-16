@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.9] - 2025-08-16
+
+- fix: 清理desktop-integration.tsx中的未使用返回值
+- fix: 修复Tauri bundle配置以生成正确的artifacts
+- fix: 修复二进制文件名称以匹配workflow期望
+
+
 ## [1.0.8] - 2025-08-16
 
 - fix: 简化Tauri打包目标为仅app格式
