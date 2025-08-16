@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.2] - 2025-08-16
+
+- fix: 修复GitHub Actions工作流以使用Bun和优化构建
+
+
 ## [1.0.1] - 2025-08-16
 
 - fix: 移除 clipboard API 的异步调用
