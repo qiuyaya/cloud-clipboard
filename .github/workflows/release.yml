@@ -19,7 +19,7 @@ jobs:
   build-desktop:
     name: Build Desktop App
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -56,11 +56,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '20'
-          cache: 'npm'
+          bun-version: latest
+      
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('desktop/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -94,12 +109,12 @@ jobs:
       # Install dependencies for all packages
       - name: Install dependencies
         run: |
-          npm ci
-          cd desktop && npm ci
+          bun install --frozen-lockfile
+          cd desktop && npm install
 
       # Build shared package
       - name: Build shared package
-        run: npm run shared:build
+        run: bun run shared:build
 
       # Build client for desktop
       - name: Build client for desktop
@@ -161,23 +176,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: '20'
-          cache: 'npm'
+          bun-version: latest
+      
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build shared package
-        run: npm run shared:build
+        run: bun run shared:build
 
       - name: Build client
-        run: npm run client:build
+        run: bun run client:build
 
       - name: Build server
-        run: npm run server:build
+        run: bun run server:build
 
       - name: Create web distribution
         run: |
