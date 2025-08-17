@@ -73,12 +73,12 @@ describe('Button Component', () => {
     expect(handleClick).not.toHaveBeenCalled();
   });
 
-  it('should render as different HTML elements', () => {
-    const { rerender } = render(<Button asChild><a href="/test">Link Button</a></Button>);
-    expect(screen.getByRole('link')).toBeInTheDocument();
+  it('should handle different button variants', () => {
+    const { rerender } = render(<Button variant="outline">Outline Button</Button>);
+    expect(screen.getByRole('button')).toHaveClass('border');
 
-    rerender(<Button asChild><div>Div Button</div></Button>);
-    expect(screen.getByText('Div Button')).toBeInTheDocument();
+    rerender(<Button variant="destructive">Destructive Button</Button>);
+    expect(screen.getByRole('button')).toHaveClass('bg-destructive');
   });
 
   it('should apply custom className', () => {

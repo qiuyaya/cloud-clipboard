@@ -232,7 +232,7 @@ describe('Integration Tests', () => {
         .set('X-Large-Header', largeHeader);
       
       // Should either succeed or return appropriate error
-      expect([200, 400, 413, 431]).toContain(response.status);
+      expect([200, 400, 413, 431].includes(response.status)).toBe(true);
     });
 
     it('should handle different content types', async () => {
@@ -271,7 +271,7 @@ describe('Integration Tests', () => {
           .get('/api/health')
           .set('User-Agent', userAgent);
 
-        expect([200]).toContain(response.status);
+        expect(response.status).toBe(200);
         expect(response.body.success).toBe(true);
       }
     });

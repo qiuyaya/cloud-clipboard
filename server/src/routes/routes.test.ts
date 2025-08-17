@@ -2,13 +2,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import request from 'supertest';
 import { Server } from 'http';
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
+// Removed unused imports: path, fs
 import { RoomService } from '../services/RoomService';
 import { FileManager } from '../services/FileManager';
 import { createRoomRoutes } from './rooms';
 import { createFileRoutes } from './files';
-import type { APIResponse } from '@cloud-clipboard/shared';
+// Removed unused import: APIResponse
 
 describe('Routes Coverage Tests', () => {
   let app: express.Application;
@@ -58,7 +57,7 @@ describe('Routes Coverage Tests', () => {
         const response = await request(app)
           .get(`/api/rooms/${encodeURIComponent(key)}`);
           
-        expect([400, 404]).toContain(response.status);
+        expect([400, 404].includes(response.status)).toBe(true);
       }
     });
 
@@ -82,7 +81,7 @@ describe('Routes Coverage Tests', () => {
         const response = await request(app)
           .get(`/api/rooms/${roomKey}`);
 
-        expect([200, 404]).toContain(response.status);
+        expect([200, 404].includes(response.status)).toBe(true);
         if (response.status === 200) {
           expect(response.body.success).toBe(true);
           expect(response.body.data.key).toBe(roomKey);
@@ -110,7 +109,7 @@ describe('Routes Coverage Tests', () => {
       const stats = roomService.getRoomStats();
       expect(typeof stats.totalRooms).toBe('number');
       expect(typeof stats.totalUsers).toBe('number');
-      expect(stats.totalRooms).toBeGreaterThan(0);
+      expect(stats.totalRooms > 0).toBe(true);
     });
   });
 
@@ -129,7 +128,7 @@ describe('Routes Coverage Tests', () => {
         const response = await request(app)
           .get(`/api/files/download/${encodeURIComponent(filePath)}`);
           
-        expect([400, 403, 404]).toContain(response.status);
+        expect([400, 403, 404].includes(response.status)).toBe(true);
       }
     });
 
@@ -149,7 +148,7 @@ describe('Routes Coverage Tests', () => {
         .set('x-room-key', 'test-room')
         .set('x-user-id', 'test-user');
 
-      expect([400, 401]).toContain(response.status);
+      expect([400, 401].includes(response.status)).toBe(true);
     });
 
     it('should handle file deletion without authentication', async () => {
@@ -164,8 +163,8 @@ describe('Routes Coverage Tests', () => {
       const stats = fileManager.getStats();
       expect(typeof stats.totalFiles).toBe('number');
       expect(typeof stats.totalSize).toBe('number');
-      expect(stats.totalFiles).toBeGreaterThanOrEqual(0);
-      expect(stats.totalSize).toBeGreaterThanOrEqual(0);
+      expect(stats.totalFiles >= 0).toBe(true);
+      expect(stats.totalSize >= 0).toBe(true);
     });
   });
 
@@ -176,7 +175,7 @@ describe('Routes Coverage Tests', () => {
         .set('Content-Type', 'application/json')
         .send('{ invalid json }');
 
-      expect([400, 404]).toContain(response.status);
+      expect([400, 404].includes(response.status)).toBe(true);
     });
 
     it('should handle requests with missing content-type', async () => {
@@ -184,7 +183,7 @@ describe('Routes Coverage Tests', () => {
         .post('/api/files/upload')
         .send('raw data without content-type');
 
-      expect([400, 401]).toContain(response.status);
+      expect([400, 401].includes(response.status)).toBe(true);
     });
 
     it('should handle extremely long URLs', async () => {
@@ -192,7 +191,7 @@ describe('Routes Coverage Tests', () => {
       const response = await request(app)
         .get(`/api/rooms/${longPath}`);
 
-      expect([400, 404, 414]).toContain(response.status);
+      expect([400, 404, 414].includes(response.status)).toBe(true);
     });
   });
 
@@ -212,7 +211,7 @@ describe('Routes Coverage Tests', () => {
       
       // All should return either 404 (room doesn't exist) or 200 (room exists)
       responses.forEach(response => {
-        expect([200, 404]).toContain(response.status);
+        expect([200, 404].includes(response.status)).toBe(true);
       });
     });
 
@@ -235,9 +234,9 @@ describe('Routes Coverage Tests', () => {
       let response = await request(app)
         .get(`/api/rooms/${roomKey}`);
 
-      expect([200, 404]).toContain(response.status);
+      expect([200, 404].includes(response.status)).toBe(true);
       if (response.status === 200) {
-        expect(response.body.data.users.length).toBeGreaterThan(0);
+        expect(response.body.data.users.length > 0).toBe(true);
       }
 
       // Leave room
@@ -247,7 +246,7 @@ describe('Routes Coverage Tests', () => {
       response = await request(app)
         .get(`/api/rooms/${roomKey}`);
         
-      expect([200, 404]).toContain(response.status);
+      expect([200, 404].includes(response.status)).toBe(true);
     });
   });
 });

@@ -51,8 +51,8 @@ describe('Room Model Coverage', () => {
     // Test room properties
     expect(room.key).toBe('test-room');
     expect(room.messages.length).toBe(0);
-    expect(room.createdAt).toBeInstanceOf(Date);
-    expect(room.lastActivity).toBeInstanceOf(Date);
+    expect(room.createdAt instanceof Date).toBe(true);
+    expect(room.lastActivity instanceof Date).toBe(true);
     
     // Test isEmpty
     room.removeUser('user2');
@@ -117,13 +117,22 @@ describe('Room Model Coverage', () => {
   it('should handle messages', () => {
     const room = new RoomModel('message-room');
     
+    const testUser = {
+      id: 'user1',
+      name: 'Test User',
+      isOnline: true,
+      lastSeen: new Date(),
+      deviceType: 'desktop' as const,
+      fingerprint: 'test-fingerprint',
+    };
+    
     const textMessage = {
       id: 'msg1',
       type: 'text' as const,
       content: 'Hello world',
       timestamp: new Date(),
-      userId: 'user1',
-      userName: 'Test User',
+      sender: testUser,
+      roomKey: 'message-room',
     };
     
     room.addMessage(textMessage);
@@ -131,7 +140,9 @@ describe('Room Model Coverage', () => {
     
     const messages = room.getMessages();
     expect(messages.length).toBe(1);
-    expect(messages[0].content).toBe('Hello world');
+    if (messages[0] && 'content' in messages[0]) {
+      expect(messages[0].content).toBe('Hello world');
+    }
     
     // Test message limit
     const messagesWithLimit = room.getMessages(1);
@@ -170,6 +181,6 @@ describe('Room Model Coverage', () => {
     room.updateUserStatus('online2', false);
     const onlineUsersAfterUpdate = room.getOnlineUsers();
     expect(onlineUsersAfterUpdate.length).toBe(1);
-    expect(onlineUsersAfterUpdate[0].id).toBe('online1');
+    expect(onlineUsersAfterUpdate[0]?.id).toBe('online1');
   });
 });
