@@ -2,6 +2,7 @@
   "name": "cloud-clipboard",
   "version": "1.0.12",
   "description": "A real-time cloud clipboard application with secure room-based sharing, desktop app support, automatic file management, and modern PWA features",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"bun run server:dev\" \"bun run client:dev\"",
@@ -44,7 +45,7 @@
     "client:test:watch": "cd client && bun run test:watch",
     "client:test:coverage": "cd client && bun run test:coverage",
     "client:test:e2e": "cd client && bun run test:e2e",
-    "lint": "eslint . --ext .ts,.tsx",
+    "lint": "eslint .",
     "type-check": "cd shared && tsc --noEmit --skipLibCheck --skipDefaultLibCheck && cd ../server && tsc --noEmit --skipLibCheck --skipDefaultLibCheck",
     "shared:type-check": "cd shared && tsc --noEmit",
     "server:type-check": "cd server && tsc --noEmit",
