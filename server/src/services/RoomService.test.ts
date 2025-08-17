@@ -234,7 +234,7 @@ describe('RoomService', () => {
       roomService.leaveRoom('testroom123', mockUser.id);
     });
 
-    it('should not destroy room if online users remain', () => {
+    it('should not destroy room if online users remain', async () => {
       const user2 = { ...mockUser, id: 'user-2', name: 'User2' };
       
       roomService.joinRoom('testroom123', mockUser);
@@ -248,11 +248,10 @@ describe('RoomService', () => {
       // Make first user offline
       roomService.updateUserStatus('testroom123', mockUser.id, false);
       
-      // Room should still exist because user2 is online
-      setTimeout(() => {
-        expect(destroyEmitted).toBe(false);
-        expect(roomService.getRoom('testroom123')).toBeDefined();
-      }, 100);
+      // Wait a bit and check room should still exist because user2 is online
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(destroyEmitted).toBe(false);
+      expect(roomService.getRoom('testroom123')).toBeDefined();
     });
   });
 
@@ -295,7 +294,7 @@ describe('RoomService', () => {
       (roomService as any).cleanupInactiveRooms();
     });
 
-    it('should not cleanup active rooms', () => {
+    it('should not cleanup active rooms', async () => {
       roomService.joinRoom('activeroom123', mockUser);
       
       let destroyEmitted = false;
@@ -306,10 +305,10 @@ describe('RoomService', () => {
       // Manually trigger cleanup
       (roomService as any).cleanupInactiveRooms();
       
-      setTimeout(() => {
-        expect(destroyEmitted).toBe(false);
-        expect(roomService.getRoom('activeroom123')).toBeDefined();
-      }, 100);
+      // Wait a bit and check room should still exist
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(destroyEmitted).toBe(false);
+      expect(roomService.getRoom('activeroom123')).toBeDefined();
     });
   });
 
