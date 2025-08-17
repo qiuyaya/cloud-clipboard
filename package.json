@@ -37,7 +37,7 @@
     "shared:test:watch": "cd shared && bun test --watch",
     "shared:test:coverage": "cd shared && bun test --coverage",
     "server:test": "cd server && bun test",
-    "server:test:watch": "cd server && bun test --watch", 
+    "server:test:watch": "cd server && bun test --watch",
     "server:test:coverage": "cd server && bun test --coverage",
     "server:test:integration": "cd server && bun test --grep integration",
     "client:test": "cd client && bun run test",
@@ -57,17 +57,17 @@
     "desktop"
   ],
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.3.0",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
     "@vitejs/plugin-react": "^5.0.0",
-    "concurrently": "^8.0.0",
+    "concurrently": "^9.2.0",
     "esbuild": "^0.25.9",
-    "eslint": "^8.0.0",
-    "typescript": "^5.0.0",
+    "eslint": "^9.33.0",
+    "typescript": "^5.9.2",
     "vite": "^7.1.2",
-    "@playwright/test": "^1.40.0",
-    "supertest": "^6.3.0",
-    "@types/supertest": "^6.0.0"
+    "@playwright/test": "^1.54.2",
+    "supertest": "^7.1.4",
+    "@types/supertest": "^6.0.3"
   }
 }
