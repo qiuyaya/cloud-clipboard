@@ -158,7 +158,7 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
               <Input
                 id="roomKey"
                 type="text"
-                placeholder="e.g. room123, test_room, my-room-1"
+                placeholder={t('roomJoin.roomKeyPlaceholder')}
                 value={roomKey}
                 onChange={(e) => setRoomKey(e.target.value.slice(0, 50))}
                 disabled={isConnecting}
@@ -177,7 +177,7 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
               <Input
                 id="username"
                 type="text"
-                placeholder="Your name"
+                placeholder={t('roomJoin.usernamePlaceholder')}
                 value={username}
                 onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9\s._-]/g, '').slice(0, 50))}
                 disabled={isConnecting}
