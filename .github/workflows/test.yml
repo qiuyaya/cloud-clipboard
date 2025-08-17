@@ -26,8 +26,7 @@ jobs:
       - name: Lint code
         run: bun run lint
         
-      - name: Type check
-        run: bun run type-check
+      # Type check is already done in CI workflow, skip here to avoid duplication
 
   unit-tests:
     name: Unit Tests
