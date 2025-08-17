@@ -11,13 +11,22 @@ export const generateRoomKey = (): string => {
 export const detectDeviceType = (userAgent: string): User['deviceType'] => {
   const ua = userAgent.toLowerCase();
   
-  if (/mobile|android|iphone|ipad|phone|tablet/i.test(ua)) {
-    if (/tablet|ipad/i.test(ua)) {
-      return 'tablet';
-    }
+  // Check tablet first (before mobile) since tablets often contain mobile keywords
+  if (/tablet|ipad/i.test(ua)) {
+    return 'tablet';
+  }
+  
+  // Check for Android tablets by model number patterns
+  if (/android.*sm-t\d+/i.test(ua)) {
+    return 'tablet';
+  }
+  
+  // Then check mobile devices
+  if (/mobile|android|iphone|phone/i.test(ua)) {
     return 'mobile';
   }
   
+  // Check desktop/laptop devices
   if (/desktop|windows|mac|linux/i.test(ua)) {
     return 'desktop';
   }

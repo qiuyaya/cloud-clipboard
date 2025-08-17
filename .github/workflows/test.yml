@@ -1,0 +1,257 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Lint code
+        run: bun run lint
+        
+      - name: Type check
+        run: bun run type-check
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build shared package
+        run: bun run shared:build
+        
+      - name: Run shared tests
+        run: bun run shared:test
+        
+      - name: Run server tests
+        run: bun run server:test
+        
+      - name: Run client tests
+        run: bun run client:test
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build shared package
+        run: bun run shared:build
+        
+      - name: Run integration tests
+        run: bun run test:integration
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build shared package
+        run: bun run shared:build
+        
+      - name: Run tests with coverage
+        run: bun run test:coverage
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/coverage-final.json
+          fail_ci_if_error: false
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Install Playwright browsers
+        run: cd client && bunx playwright install --with-deps
+        
+      - name: Build shared package
+        run: bun run shared:build
+        
+      - name: Run Playwright tests
+        run: bun run client:test:e2e
+        
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: client/playwright-report/
+          retention-days: 30
+
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build project
+        run: bun run build
+        
+      - name: Check build artifacts
+        run: |
+          ls -la server/dist/
+          ls -la client/dist/
+          ls -la shared/dist/
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Run security audit
+        run: bun audit
+        continue-on-error: true
+        
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript,typescript
+          
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build project
+        run: bun run build
+        
+      - name: Start server for performance test
+        run: |
+          bun run server:start &
+          sleep 10
+        
+      - name: Run basic performance tests
+        run: |
+          # Test server health endpoint
+          curl -f http://localhost:3001/api/health
+          
+          # Test server response time
+          time curl -f http://localhost:3001/api/health
+        
+      - name: Stop server
+        run: pkill -f "bun run server:start" || true
+
+  test-matrix:
+    name: Test Matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        bun-version: [latest]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun-version }}
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build shared package
+        run: bun run shared:build
+        
+      - name: Run unit tests
+        run: bun run test

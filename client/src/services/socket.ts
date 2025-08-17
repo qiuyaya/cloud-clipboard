@@ -209,6 +209,18 @@ class SocketService {
   isSocketConnected(): boolean {
     return this.isConnected && this.socket?.connected === true;
   }
+
+  on(event: string, callback: (...args: any[]) => void): void {
+    if (this.socket) {
+      this.socket.on(event as any, callback);
+    }
+  }
+
+  off(event: string, callback?: (...args: any[]) => void): void {
+    if (this.socket) {
+      this.socket.off(event as any, callback);
+    }
+  }
 }
 
 export const socketService = new SocketService();

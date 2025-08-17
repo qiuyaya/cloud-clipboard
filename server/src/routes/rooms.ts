@@ -127,5 +127,39 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
     }
   });
 
+  // Route for getting room info by path parameter (for testing)
+  router.get('/:roomKey', (req, res) => {
+    try {
+      const { roomKey } = req.params;
+      const room = roomService.getRoom(roomKey);
+      
+      if (!room) {
+        res.status(404).json({
+          success: false,
+          message: 'Room not found',
+        });
+        return;
+      }
+
+      const roomInfo: RoomInfo = {
+        key: room.key,
+        users: room.getUserList(),
+        messageCount: room.getMessages().length,
+        createdAt: room.createdAt,
+        lastActivity: room.lastActivity,
+      };
+
+      res.json({
+        success: true,
+        data: roomInfo,
+      });
+    } catch {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get room info',
+      });
+    }
+  });
+
   return router;
 };

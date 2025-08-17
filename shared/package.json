@@ -6,12 +6,16 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
     "zod": "^3.22.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@types/bun": "latest"
   }
 }

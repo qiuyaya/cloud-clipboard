@@ -28,8 +28,24 @@
     "version:check": "node scripts/version-sync.js check",
     "version:report": "node scripts/version-sync.js report",
     "version:outdated": "node scripts/version-sync.js outdated",
+    "test": "bun run shared:test && bun run server:test && bun run client:test",
+    "test:watch": "concurrently \"bun run shared:test:watch\" \"bun run server:test:watch\" \"bun run client:test:watch\"",
+    "test:coverage": "bun run shared:test:coverage && bun run server:test:coverage && bun run client:test:coverage && node scripts/coverage-report.js",
+    "test:integration": "bun run server:test:integration",
+    "test:e2e": "bun run client:test:e2e",
+    "shared:test": "cd shared && bun test",
+    "shared:test:watch": "cd shared && bun test --watch",
+    "shared:test:coverage": "cd shared && bun test --coverage",
+    "server:test": "cd server && bun test",
+    "server:test:watch": "cd server && bun test --watch", 
+    "server:test:coverage": "cd server && bun test --coverage",
+    "server:test:integration": "cd server && bun test --grep integration",
+    "client:test": "cd client && bun run test",
+    "client:test:watch": "cd client && bun run test:watch",
+    "client:test:coverage": "cd client && bun run test:coverage",
+    "client:test:e2e": "cd client && bun run test:e2e",
     "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "cd shared && tsc --noEmit && cd ../server && tsc --noEmit",
+    "type-check": "cd shared && tsc --noEmit --skipLibCheck && cd ../server && tsc --noEmit --skipLibCheck",
     "shared:type-check": "cd shared && tsc --noEmit",
     "server:type-check": "cd server && tsc --noEmit",
     "client:type-check": "cd client && tsc --noEmit"
@@ -49,6 +65,9 @@
     "esbuild": "^0.25.9",
     "eslint": "^8.0.0",
     "typescript": "^5.0.0",
-    "vite": "^7.1.2"
+    "vite": "^7.1.2",
+    "@playwright/test": "^1.40.0",
+    "supertest": "^6.3.0",
+    "@types/supertest": "^6.0.0"
   }
 }

@@ -10,13 +10,15 @@ class DebugLogger {
   };
 
   constructor() {
-    // Check localStorage for saved debug config
-    const savedConfig = localStorage.getItem('cloud-clipboard-debug');
-    if (savedConfig) {
-      try {
-        this.config = { ...this.config, ...JSON.parse(savedConfig) };
-      } catch {
-        console.warn('Failed to parse debug config from localStorage');
+    // Check localStorage for saved debug config (only in browser environment)
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const savedConfig = localStorage.getItem('cloud-clipboard-debug');
+      if (savedConfig) {
+        try {
+          this.config = { ...this.config, ...JSON.parse(savedConfig) };
+        } catch {
+          console.warn('Failed to parse debug config from localStorage');
+        }
       }
     }
 
@@ -57,12 +59,16 @@ class DebugLogger {
 
   clear() {
     this.config = { enabled: false, level: 'info' };
-    localStorage.removeItem('cloud-clipboard-debug');
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.removeItem('cloud-clipboard-debug');
+    }
     console.log('🚀 Cloud Clipboard Debug Config: CLEARED');
   }
 
   private saveConfig() {
-    localStorage.setItem('cloud-clipboard-debug', JSON.stringify(this.config));
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      localStorage.setItem('cloud-clipboard-debug', JSON.stringify(this.config));
+    }
   }
 
   private showHelp() {

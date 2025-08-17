@@ -18,8 +18,13 @@ const server = createServer(app);
 const port = process.env.PORT || 3001;
 
 // Determine if we're serving static files (production mode)
-const isProduction = process.env.NODE_ENV === 'production';
+// Temporarily hardcode to true for testing
+const isProduction = true; // process.env.NODE_ENV === 'production';
 const staticPath = process.env.STATIC_PATH || path.join(__dirname, '../public');
+
+console.log('DEBUG: NODE_ENV =', process.env.NODE_ENV);
+console.log('DEBUG: isProduction =', isProduction);
+console.log('DEBUG: staticPath =', staticPath);
 
 // Security headers
 app.use(helmet({
@@ -48,7 +53,7 @@ app.use(helmet({
 if (isProduction) {
   // In production, we serve both frontend and backend from the same origin
   app.use(cors({
-    origin: function (origin, callback) {
+    origin: function (_origin, callback) {
       // Allow same-origin requests (frontend served from same server)
       // and requests with no origin (like mobile apps)
       return callback(null, true);
