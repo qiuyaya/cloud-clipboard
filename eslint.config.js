@@ -56,9 +56,12 @@ export default [
       'client/test-results/**',
       'client/playwright-report/**',
       'server/uploads/**',
+      'server/public/**',
       'uploads/**',
       '*.config.js',
       '*.config.ts',
+      'client/public/**',
+      'assets/**',
     ],
   },
 ];

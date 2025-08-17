@@ -5,8 +5,12 @@
  * Generates all required icon formats from the main SVG source
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ASSETS_DIR = path.join(__dirname, '../assets/icons');
 const CLIENT_PUBLIC_DIR = path.join(__dirname, '../client/public');
@@ -156,8 +160,9 @@ function main() {
   }
 }
 
-if (require.main === module) {
+// Check if script is run directly (ES modules equivalent of require.main === module)
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = { generateWebIcons, copyToAssets, generateManifest };
+export { generateWebIcons, copyToAssets, generateManifest };
