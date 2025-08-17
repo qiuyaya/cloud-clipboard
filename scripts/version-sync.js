@@ -152,7 +152,7 @@ function listOutdatedDependencies() {
       }
     });
 
-  } catch (error) {
+  } catch {
     log('Could not check outdated dependencies', 'warning');
   }
 }
@@ -218,7 +218,7 @@ function main() {
   const command = process.argv[2] || 'check';
 
   switch (command) {
-    case 'check':
+    case 'check': {
       const isConsistent = checkVersionConsistency();
       if (isConsistent) {
         log('\n🎉 All versions are consistent!', 'success');
@@ -230,6 +230,7 @@ function main() {
         process.exit(1);
       }
       break;
+    }
 
     case 'report':
       checkVersionConsistency();

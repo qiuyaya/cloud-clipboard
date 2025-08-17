@@ -10,7 +10,7 @@ const path = require('path');
 
 const ASSETS_DIR = path.join(__dirname, '../assets/icons');
 const CLIENT_PUBLIC_DIR = path.join(__dirname, '../client/public');
-const TAURI_ICONS_DIR = path.join(__dirname, '../desktop/src-tauri/icons');
+// const TAURI_ICONS_DIR = path.join(__dirname, '../desktop/src-tauri/icons');
 
 // Main SVG content for the app icon
 const mainIconSVG = `<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">

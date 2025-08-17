@@ -36,7 +36,7 @@ function formatPercentage(pct) {
   return `${color}${pct.toFixed(2)}%\x1b[0m`;
 }
 
-function checkThresholds(metrics, thresholds, packageName) {
+function checkThresholds(metrics, thresholds) {
   const failures = [];
   
   for (const [metric, threshold] of Object.entries(thresholds)) {

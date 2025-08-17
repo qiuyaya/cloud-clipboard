@@ -178,7 +178,7 @@ function generateChangelog(version) {
       fs.writeFileSync(changelogPath, lines.join('\n'));
       log('Updated CHANGELOG.md', 'success');
     }
-  } catch (error) {
+  } catch {
     log('Could not generate changelog automatically', 'warning');
   }
 }
