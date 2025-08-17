@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Base
+
+- Always respond in 中文
+- After any changes, verify whether related documentation needs to be updated.
+- After any module’s code is modified, add or improve its test cases accordingly.
+- Before committing any code, run the tests for the corresponding module; only commit if all test cases pass.
+
 ## Essential Commands
 
 ### Development

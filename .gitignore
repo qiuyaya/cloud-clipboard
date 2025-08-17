@@ -6,6 +6,11 @@ dist/
 desktop/src-tauri/target/
 .claude/log/
 
+# Tests
+coverage
+test-results
+playwright-report
+
 # Generated icons (keep source in assets/icons)
 client/public/favicon-*.svg
 server/public/

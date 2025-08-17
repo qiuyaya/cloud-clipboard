@@ -294,6 +294,55 @@ describe('Utility Functions Tests', () => {
         delete (globalThis as any).window;
       }
     });
+
+    it('should handle errors in fingerprint generation and use fallback', () => {
+      // Mock browser environment that throws errors
+      (globalThis as any).window = {
+        screen: {
+          width: 1920,
+          height: 1080,
+          colorDepth: 24,
+        },
+        navigator: {
+          userAgent: 'Mozilla/5.0 (Test Browser)',
+          language: 'en-US',
+          cookieEnabled: true,
+        },
+        document: {
+          createElement: () => {
+            throw new Error('Canvas error');
+          },
+        },
+      };
+
+      // Mock Intl to throw error
+      const originalIntl = globalThis.Intl;
+      globalThis.Intl = {
+        ...originalIntl,
+        DateTimeFormat: () => {
+          throw new Error('Timezone error');
+        },
+      } as any;
+
+      try {
+        const fingerprint = generateBrowserFingerprint();
+        
+        // Should use fallback values
+        expect(fingerprint).toHaveProperty('userAgent');
+        expect(fingerprint).toHaveProperty('language', 'en-US');
+        expect(fingerprint).toHaveProperty('timezone', 'unknown');
+        expect(fingerprint).toHaveProperty('screen');
+        expect(fingerprint).toHaveProperty('colorDepth', 24);
+        expect(fingerprint).toHaveProperty('cookieEnabled', true);
+        expect(fingerprint).toHaveProperty('doNotTrack', 'unknown');
+        expect(fingerprint).toHaveProperty('hash');
+        expect(typeof fingerprint.hash).toBe('string');
+        expect(fingerprint.hash.length).toBeGreaterThan(0);
+      } finally {
+        globalThis.Intl = originalIntl;
+        delete (globalThis as any).window;
+      }
+    });
   });
 
   describe('generateUserIdFromFingerprint', () => {
