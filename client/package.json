@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
@@ -38,6 +38,7 @@
     "i18next-browser-languagedetector": "^8.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.33.0",
     "@playwright/test": "^1.54.2",
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
