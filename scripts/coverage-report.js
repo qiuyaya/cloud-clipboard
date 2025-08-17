@@ -185,8 +185,9 @@ function main() {
   }
 }
 
-if (require.main === module) {
+// Check if script is run directly (ES modules equivalent of require.main === module)
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = { generateReport };
+export { generateReport };
