@@ -222,7 +222,6 @@ describe('Schema Validation Tests', () => {
     });
 
     it('should allow optional doNotTrack', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { doNotTrack, ...fingerprintWithoutDNT } = validFingerprint;
       expect(() => BrowserFingerprintSchema.parse(fingerprintWithoutDNT)).not.toThrow();
     });
@@ -231,7 +230,6 @@ describe('Schema Validation Tests', () => {
       const requiredFields = ['userAgent', 'language', 'timezone', 'screen', 'colorDepth', 'cookieEnabled', 'hash'];
       
       requiredFields.forEach(field => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { [field as keyof typeof validFingerprint]: removed, ...incomplete } = validFingerprint;
         expect(() => BrowserFingerprintSchema.parse(incomplete)).toThrow();
       });
@@ -263,7 +261,6 @@ describe('Schema Validation Tests', () => {
     });
 
     it('should allow optional fingerprint', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { fingerprint, ...requestWithoutFingerprint } = validJoinRequest;
       expect(() => JoinRoomRequestSchema.parse(requestWithoutFingerprint)).not.toThrow();
     });

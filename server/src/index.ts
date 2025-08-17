@@ -169,7 +169,6 @@ if (isProduction) {
   });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((error: Error, _req: express.Request, res: express.Response<APIResponse>, _next: express.NextFunction) => {
   console.error('Unhandled error:', error);
   res.status(500).json({
