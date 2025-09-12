@@ -1,6 +1,6 @@
 [package]
 name = "cloud-clipboard-desktop"
-version = "1.0.17"
+version = "1.0.18"
 description = "Cloud Clipboard Desktop Application"
 authors = ["you"]
 license = ""

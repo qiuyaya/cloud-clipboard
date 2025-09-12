@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.18] - 2025-09-12
+
+- fix: 优化Docker构建以减小镜像体积和修复构建错误
+
+
 ## [1.0.17] - 2025-09-12
 
 - fix：更新镜像
