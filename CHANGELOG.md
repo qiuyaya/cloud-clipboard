@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.14] - 2025-09-12
+
+- fix: 修复Docker构建失败和安全问题
+
+
 ## [1.0.13] - 2025-09-12
 
 - feat: 添加Docker镜像自动发布到GitHub Container Registry
