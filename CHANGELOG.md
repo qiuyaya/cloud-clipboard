@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.13] - 2025-09-12
+
+- feat: 添加Docker镜像自动发布到GitHub Container Registry
+- fix: 完成 coverage-report.js 的 ES modules 转换
+- fix: 将脚本转换为 ES modules 并修复 ESLint 配置
+- fix: 修复 JavaScript 脚本中的 ESLint 错误
+- fix: 修复 ESLint 规则和 Node.js 环境配置
+- fix: 提交剩余的 ESLint 配置文件
+- fix: 升级 ESLint 到 v9 并修复配置问题
+- fix: 更新 lockfile 以修复依赖安装问题
+- fix: 修复 Tailwind CSS 兼容性问题并降级到稳定版本
+- fix: 修复E2E测试问题
+- fix: 从Test Suite中移除重复的type-check
+- fix: 临时移除client从type-check以通过CI
+- fix: 调整测试覆盖率配置以通过CI
+- fix: 修复RoomService异步测试问题
+- fix: 修复GitHub Actions测试问题
+- fix: 修复GitHub Actions失败问题
+- test: 修复单元测试
+- feat: 实现全面的自动化测试框架并修复所有测试失败问题
+- feat: 实现现代化图标系统和项目基础设施改进
+
+
 ## [Unreleased] - 2025-08-16
 
 ### Added
