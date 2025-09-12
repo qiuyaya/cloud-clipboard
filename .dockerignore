@@ -1,24 +1,45 @@
-# Dependencies
+# Dependencies (构建阶段会重新安装)
 node_modules
 */node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build outputs
+# Build outputs (构建阶段会重新生成)
 dist
 */dist
 build
 */build
+
+# Desktop app (不需要在Docker中)
+desktop
+
+# Scripts (构建时会复制需要的)
+scripts/generate-icons.js
+scripts/sync-desktop-icons.js
+scripts/build-client.js
+scripts/release.js
+scripts/version-sync.js
 
 # Development files
 .git
 .gitignore
 *.md
 README.md
+CHANGELOG.md
+LICENSE
 .env.local
 .env.development
 .env.test
+
+# 各种配置文件
+.prettierrc*
+.eslintrc*
+tsconfig.json
+*/tsconfig.json
+vite.config.*
+vitest.config.*
+playwright.config.*
 
 # IDE files
 .vscode

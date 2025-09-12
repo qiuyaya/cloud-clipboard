@@ -10,7 +10,7 @@ WORKDIR /app
 RUN npm install -g bun
 
 # Copy package files
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY shared/package.json ./shared/
 COPY server/package.json ./server/
 COPY client/package.json ./client/

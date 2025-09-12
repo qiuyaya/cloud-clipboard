@@ -1,44 +1,76 @@
-# 简化的 Docker 构建文件用于调试
-FROM node:18-alpine
+# Stage 1: 构建阶段
+FROM node:18-alpine AS builder
+
+# 安装构建依赖
+RUN apk add --no-cache python3 make g++ curl
 
 WORKDIR /app
 
-# 安装系统依赖
-RUN apk add --no-cache libc6-compat python3 make g++
+# 安装bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
 
-# 安装 bun
-RUN npm install -g bun
-
-# 复制所有文件
-COPY . .
+# 复制依赖文件
+COPY package.json bun.lock ./
+COPY shared/package.json ./shared/
+COPY server/package.json ./server/
+COPY client/package.json ./client/
 
 # 安装依赖
 RUN bun install --frozen-lockfile
 
-# 构建所有包
-RUN bun run shared:build
-RUN bun run client:build
-RUN bun run server:build
+# 复制源代码
+COPY shared ./shared
+COPY server ./server
+COPY client ./client
+COPY scripts ./scripts
 
-# 复制客户端到服务器公共目录
-RUN bun run copy-client
+# 构建
+ENV NODE_ENV=production
+RUN bun run shared:build && \
+    bun run client:build && \
+    bun run server:build && \
+    bun run copy-client
 
-# 创建非root用户
-RUN addgroup -g 1001 -S nodejs && adduser -S cloudclipboard -u 1001
+# 清理dev依赖
+RUN bun install --production --frozen-lockfile
 
-# 创建上传目录
-RUN mkdir -p /app/uploads && chown -R cloudclipboard:nodejs /app/uploads
+# Stage 2: 极简运行时
+FROM alpine:3.19 AS runtime
 
-# 切换到非root用户
+# 安装运行时必需品（仅curl用于健康检查）
+RUN apk add --no-cache curl
+
+# 安装bun运行时（无需Node.js）
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
+
+# 创建用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S cloudclipboard -u 1001
+
+WORKDIR /app
+
+# 复制构建产物和生产依赖
+COPY --from=builder --chown=cloudclipboard:nodejs /app/server/dist ./server/dist
+COPY --from=builder --chown=cloudclipboard:nodejs /app/server/public ./server/public
+COPY --from=builder --chown=cloudclipboard:nodejs /app/shared/dist ./shared/dist
+COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modules
+
+# 创建必要目录
+RUN mkdir -p /app/uploads && \
+    chown -R cloudclipboard:nodejs /app/uploads
+
 USER cloudclipboard
 
-# 暴露端口
 EXPOSE 3001
 
-# 设置环境变量
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV UPLOAD_DIR=/app/uploads
 
-# 启动服务
+# 简化的健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
 CMD ["bun", "run", "server/dist/index.js"]
