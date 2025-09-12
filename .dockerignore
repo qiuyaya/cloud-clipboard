@@ -14,12 +14,12 @@ build
 # Desktop app (不需要在Docker中)
 desktop
 
-# Scripts (构建时会复制需要的)
-scripts/generate-icons.js
-scripts/sync-desktop-icons.js
+# 运行时不需要的构建脚本
+scripts/sync-desktop-icons.js  
 scripts/build-client.js
 scripts/release.js
 scripts/version-sync.js
+scripts/coverage-report.js
 
 # Development files
 .git
