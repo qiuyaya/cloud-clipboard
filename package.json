@@ -1,12 +1,12 @@
 {
   "name": "cloud-clipboard",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "A real-time cloud clipboard application with secure room-based sharing, desktop app support, automatic file management, and modern PWA features",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"bun run server:dev\" \"bun run client:dev\"",
-    "build": "bun run shared:build && bun run icons:generate && bun run client:build && bun run build:production",
+    "build": "bun run icons:generate && bun run client:build && bun run build:production",
     "build:production": "bun run server:build && bun run copy-client",
     "copy-client": "rm -rf server/public && cp -r client/dist server/public",
     "icons:generate": "node scripts/generate-icons.js",
