@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.20] - 2025-09-12
+
+- fix: 简化Dockerfile确保构建稳定性
+
+
 ## [1.0.19] - 2025-09-12
 
 - fix: 修复Docker构建错误并大幅优化镜像体积
