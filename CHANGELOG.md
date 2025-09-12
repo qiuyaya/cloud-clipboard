@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2025-09-12
+
+- feat: 重构依赖关系和添加HTTP支持
+- fix: 移除frozen-lockfile标志解决Docker构建问题
+
+
 ## [1.0.22] - 2025-09-12
 
 - fix: 移除frozen-lockfile标志解决Docker构建问题
