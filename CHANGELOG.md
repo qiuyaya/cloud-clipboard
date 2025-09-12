@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.21] - 2025-09-12
+
+- fix: 修复monorepo依赖关系和Docker构建顺序
+- fix: 使用最简化Dockerfile确保构建成功
+
+
 ## [1.0.20] - 2025-09-12
 
 - fix: 简化Dockerfile确保构建稳定性
