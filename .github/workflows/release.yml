@@ -236,10 +236,66 @@ jobs:
           path: cloud-clipboard-web.tar.gz
           retention-days: 5
 
+  # Build and push Docker image
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # Create GitHub release
   create-release:
     name: Create Release
-    needs: [build-desktop, build-web]
+    needs: [build-desktop, build-web, build-docker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -287,6 +343,7 @@ jobs:
           
           #### 🌐 Web Application
           - **Full Package**: Download \`cloud-clipboard-web.tar.gz\` for self-hosting
+          - **Docker**: Pull image with \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
           
           ### ✨ Features
           - 🔄 **Auto clipboard sync**: Automatically sync clipboard content across devices
@@ -308,6 +365,11 @@ jobs:
           1. Download \`cloud-clipboard-web.tar.gz\`
           2. Extract and follow the README for deployment instructions
           3. Access via web browser
+          
+          #### Docker (Recommended for self-hosting)
+          1. Pull the image: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
+          2. Run with: \`docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
+          3. Access at http://localhost:3001
           
           ---
           
