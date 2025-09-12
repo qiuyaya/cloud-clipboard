@@ -10,7 +10,7 @@ COPY server/package.json ./server/
 COPY client/package.json ./client/
 
 # 安装所有依赖（包括devDependencies用于构建）
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # 复制源代码
 COPY shared ./shared
@@ -28,7 +28,7 @@ RUN bun run shared:build && \
 
 # 清理devDependencies，只保留生产依赖
 RUN rm -rf node_modules && \
-    bun install --production --frozen-lockfile
+    bun install --production
 
 # Stage 2: 极简运行时
 FROM oven/bun:alpine AS runtime
