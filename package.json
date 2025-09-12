@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"bun run server:dev\" \"bun run client:dev\"",
-    "build": "bun run shared:build && bun run icons:generate && bun run client:build && bun run build:production",
+    "build": "bun run icons:generate && bun run client:build && bun run build:production",
     "build:production": "bun run server:build && bun run copy-client",
     "copy-client": "rm -rf server/public && cp -r client/dist server/public",
     "icons:generate": "node scripts/generate-icons.js",

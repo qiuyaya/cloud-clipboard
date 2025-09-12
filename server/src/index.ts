@@ -26,10 +26,13 @@ console.log('DEBUG: NODE_ENV =', process.env.NODE_ENV);
 console.log('DEBUG: isProduction =', isProduction);
 console.log('DEBUG: staticPath =', staticPath);
 
-// Security headers
+// Security headers - conditionally based on HTTP/HTTPS mode
+const allowHttp = process.env.ALLOW_HTTP === 'true';
+
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: {
+  crossOriginOpenerPolicy: allowHttp ? false : { policy: 'same-origin' },
+  contentSecurityPolicy: allowHttp ? false : {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
@@ -40,13 +43,15 @@ app.use(helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
+      upgradeInsecureRequests: [],
     },
   },
-  hsts: {
+  hsts: allowHttp ? false : {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
-  }
+  },
+  originAgentCluster: allowHttp ? false : true,
 }));
 
 // CORS configuration

@@ -3,32 +3,19 @@ FROM oven/bun AS builder
 
 WORKDIR /app
 
-# 复制依赖文件到正确的位置（遵循monorepo结构）
-COPY package.json bun.lock ./
-COPY shared/package.json ./shared/
-COPY server/package.json ./server/
-COPY client/package.json ./client/
+# 复制依赖文件
+COPY ./ ./
 
-# 安装所有依赖（包括devDependencies用于构建）
-RUN bun install
+# 安装依赖
+RUN bun install --frozen-lockfile
 
-# 复制源代码
-COPY shared ./shared
-COPY server ./server
-COPY client ./client
-COPY scripts ./scripts
-
-# 按正确顺序构建：shared -> icons -> client -> server
+# 构建
 ENV NODE_ENV=production
-RUN bun run shared:build && \
-    bun run icons:generate && \
-    bun run client:build && \
-    bun run server:build && \
-    bun run copy-client
+RUN bun run build
 
-# 清理devDependencies，只保留生产依赖
-RUN rm -rf node_modules && \
-    bun install --production
+# 清理dev依赖
+RUN rm -rf node_modules
+RUN bun install --production --frozen-lockfile
 
 # Stage 2: 极简运行时
 FROM oven/bun:alpine AS runtime
@@ -42,7 +29,6 @@ WORKDIR /app
 # 复制构建产物和生产依赖
 COPY --from=builder --chown=cloudclipboard:nodejs /app/server/dist ./server/dist
 COPY --from=builder --chown=cloudclipboard:nodejs /app/server/public ./server/public
-COPY --from=builder --chown=cloudclipboard:nodejs /app/shared/dist ./shared/dist
 COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modules
 
 # 创建必要目录

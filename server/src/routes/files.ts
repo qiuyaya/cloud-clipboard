@@ -10,6 +10,19 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { FileManager } from '../services/FileManager';
 
+const getProtocol = (req: any): string => {
+  // Check for ALLOW_HTTP environment variable
+  const allowHttp = process.env.ALLOW_HTTP === 'true';
+  
+  if (allowHttp) {
+    // If HTTP is allowed, use the actual protocol from the request
+    return req.protocol;
+  }
+  
+  // Default behavior: prefer HTTPS
+  return req.secure ? 'https' : 'http';
+};
+
 const router = Router();
 
 const storage = multer.diskStorage({
@@ -128,7 +141,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
         message: 'File uploaded successfully',
         data: {
           fileId: fileData.id,
-          downloadUrl: `${req.secure ? 'https' : 'http'}://${req.get('host')}/api/files/download/${fileData.id}`,
+          downloadUrl: `${getProtocol(req)}://${req.get('host')}/api/files/download/${fileData.id}`,
           ...fileInfo,
         },
       });
