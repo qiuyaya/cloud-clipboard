@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.16] - 2025-09-12
+
+- fix: 简化Dockerfile以解决复杂多阶段构建问题
+
+
 ## [1.0.15] - 2025-09-12
 
 - fix: 回退Docker Actions到稳定版本
