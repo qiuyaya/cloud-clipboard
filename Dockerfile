@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 # Copy package files for dependency installation
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY shared/package.json ./shared/
 COPY server/package.json ./server/
 COPY client/package.json ./client/
@@ -29,7 +29,7 @@ RUN npm install -g bun
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/shared/node_modules ./shared/node_modules
 COPY shared ./shared
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 
 # Build shared package
 RUN bun run shared:build
@@ -49,7 +49,7 @@ COPY --from=shared-builder /app/shared/package.json ./shared/package.json
 
 # Copy server source
 COPY server ./server
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 
 # Build server
 RUN bun run server:build
@@ -69,7 +69,7 @@ COPY --from=shared-builder /app/shared/package.json ./shared/package.json
 
 # Copy client source
 COPY client ./client
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 
 # Build client with production environment
 ENV NODE_ENV=production
