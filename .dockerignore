@@ -5,14 +5,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build outputs (构建阶段会重新生成)
-dist
-*/dist
+# Desktop app (不需要在Docker中)
+desktop
+
+# 一些构建输出可以忽略（会重新生成）
 build
 */build
 
-# Desktop app (不需要在Docker中)
-desktop
+# 但保留shared/dist，因为其他包可能需要引用构建好的类型定义
 
 # 运行时不需要的构建脚本
 scripts/sync-desktop-icons.js  
