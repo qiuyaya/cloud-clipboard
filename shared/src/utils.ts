@@ -17,7 +17,7 @@ export const detectDeviceType = (userAgent: string): User['deviceType'] => {
   }
   
   // Check for Android tablets by model number patterns
-  if (/android.*sm-t\d+/i.test(ua)) {
+  if (/android/i.test(ua) && /sm-t\d+/i.test(ua)) {
     return 'tablet';
   }
   

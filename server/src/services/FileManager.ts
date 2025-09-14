@@ -79,7 +79,7 @@ export class FileManager {
       console.log(`File ${file.filename} deleted (reason: ${reason})`);
       return { filename: file.filename, roomKey: file.roomKey };
     } catch (error) {
-      console.error(`Failed to delete file ${fileId}:`, error);
+      console.error('Failed to delete file %s:', fileId, error);
       return null;
     }
   }

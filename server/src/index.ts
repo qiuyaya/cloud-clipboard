@@ -32,18 +32,18 @@ const allowHttp = process.env.ALLOW_HTTP === 'true';
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: allowHttp ? false : { policy: 'same-origin' },
-  contentSecurityPolicy: allowHttp ? false : {
+  contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-eval'"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "ws:", "wss:"],
+      connectSrc: ["'self'", "ws:", "wss:", ...(allowHttp ? ["http:"] : [])],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
-      upgradeInsecureRequests: [],
+      ...(allowHttp ? {} : { upgradeInsecureRequests: [] }),
     },
   },
   hsts: allowHttp ? false : {
@@ -118,7 +118,7 @@ roomService.on('roomDestroyed', (roomKey: string) => {
 // Serve static files in production
 if (isProduction) {
   // Serve static files from the built client
-  app.use(express.static(staticPath, {
+  app.use(generalRateLimit.middleware(), express.static(staticPath, {
     maxAge: '1d', // Cache static assets for 1 day
     etag: true,
     lastModified: true,
@@ -161,7 +161,7 @@ app.get('/api', (_req, res: express.Response<APIResponse>) => {
 
 // Handle frontend routes in production (SPA fallback)
 if (isProduction) {
-  app.get('*', (_req, res) => {
+  app.get('*', generalRateLimit.middleware(), (_req, res) => {
     res.sendFile(path.join(staticPath, 'index.html'));
   });
 } else {
