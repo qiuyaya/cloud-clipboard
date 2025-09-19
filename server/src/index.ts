@@ -9,7 +9,7 @@ import { SocketService } from './services/SocketService';
 import { FileManager } from './services/FileManager';
 import { createRoomRoutes } from './routes/rooms';
 import { createFileRoutes } from './routes/files';
-import { generalRateLimit } from './middleware/rateLimit';
+import { generalRateLimit, strictRateLimit } from './middleware/rateLimit';
 import { log } from './utils/logger';
 import type { APIResponse } from '@cloud-clipboard/shared';
 
@@ -161,7 +161,7 @@ app.get('/api', (_req, res: express.Response<APIResponse>) => {
 
 // Handle frontend routes in production (SPA fallback)
 if (isProduction) {
-  app.get('*', generalRateLimit.middleware(), (_req, res) => {
+  app.get('*', strictRateLimit.middleware(), (_req, res) => {
     res.sendFile(path.join(staticPath, 'index.html'));
   });
 } else {

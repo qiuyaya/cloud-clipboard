@@ -3,7 +3,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { authenticateRoom } from '../middleware/auth';
 import { validateParams } from '../middleware/validation';
-import { uploadRateLimit, generalRateLimit } from '../middleware/rateLimit';
+import { uploadRateLimit, strictRateLimit } from '../middleware/rateLimit';
 import { sanitizeFileName } from '@cloud-clipboard/shared';
 import type { FileInfo } from '@cloud-clipboard/shared';
 import * as fs from 'fs';
@@ -154,7 +154,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
     }
   });
 
-  router.get('/download/:fileId', generalRateLimit.middleware(), validateParams(FileParamsSchema), (req, res: any) => {
+  router.get('/download/:fileId', strictRateLimit.middleware(), validateParams(FileParamsSchema), (req, res: any) => {
     try {
       const { fileId } = req.params as { fileId: string };
       
@@ -220,7 +220,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
     }
   });
 
-  router.delete('/:fileId', generalRateLimit.middleware(), authenticateRoom, validateParams(FileParamsSchema), (req, res: any) => {
+  router.delete('/:fileId', strictRateLimit.middleware(), authenticateRoom, validateParams(FileParamsSchema), (req, res: any) => {
     try {
       const { fileId } = req.params as { fileId: string };
       

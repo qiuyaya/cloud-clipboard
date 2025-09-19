@@ -163,7 +163,6 @@ jobs:
         run: |
           ls -la server/dist/
           ls -la client/dist/
-          ls -la shared/dist/
 
   security-scan:
     name: Security Scan

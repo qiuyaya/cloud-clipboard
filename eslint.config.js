@@ -49,7 +49,6 @@ export default [
       '**/*.d.ts',
       'client/dist/**',
       'server/dist/**',
-      'shared/dist/**',
       'desktop/dist/**',
       'desktop/src-tauri/target/**',
       'desktop/src-tauri/**',
