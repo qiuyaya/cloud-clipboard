@@ -16,7 +16,7 @@ export default [
       },
     },
     rules: {
-      'no-console': 'warn',
+      'no-console': 'off', // Allow console statements for debugging
       'no-unused-vars': 'off', // Turn off base rule to avoid conflicts
       'no-undef': 'off', // TypeScript handles this
       'no-constant-binary-expression': 'off', // Allow intentional constant expressions in tests
@@ -49,6 +49,7 @@ export default [
       '**/*.d.ts',
       'client/dist/**',
       'server/dist/**',
+      'shared/dist/**',
       'desktop/dist/**',
       'desktop/src-tauri/target/**',
       'desktop/src-tauri/**',
