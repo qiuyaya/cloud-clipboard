@@ -3,9 +3,7 @@ version: '3.8'
 services:
   # Main application service
   cloud-clipboard:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    images: ghcr.io/qiuyaya/cloud-clipboard:latest
     container_name: cloud-clipboard-app
     restart: unless-stopped
     ports:

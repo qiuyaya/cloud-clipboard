@@ -1,0 +1,7 @@
+node_modules/
+**/dist/**
+**/*.js
+*.d.ts
+desktop/src-tauri/
+vite.config.ts
+vite.config.*.ts

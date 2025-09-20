@@ -19,9 +19,9 @@
     "no-unused-vars": "off"
   },
   "ignorePatterns": [
-    "dist/",
+    "**/dist/**",
     "node_modules/",
-    "*.js",
+    "**/*.js",
     "*.d.ts",
     "desktop/src-tauri/",
     "vite.config.ts",

@@ -28,22 +28,24 @@ console.log('DEBUG: staticPath =', staticPath);
 
 // Security headers - conditionally based on HTTP/HTTPS mode
 const allowHttp = process.env.ALLOW_HTTP === 'true';
+console.log('DEBUG: ALLOW_HTTP =', process.env.ALLOW_HTTP);
+console.log('DEBUG: allowHttp =', allowHttp);
 
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: allowHttp ? false : { policy: 'same-origin' },
-  contentSecurityPolicy: {
+  contentSecurityPolicy: allowHttp ? false : {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-eval'"],
       imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "ws:", "wss:", ...(allowHttp ? ["http:"] : [])],
+      connectSrc: ["'self'", "ws:", "wss:"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
-      ...(allowHttp ? {} : { upgradeInsecureRequests: [] }),
+      upgradeInsecureRequests: [],
     },
   },
   hsts: allowHttp ? false : {
