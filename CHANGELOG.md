@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2025-09-20
+
+- fix: 修复ESLint配置彻底解决CI lint错误
+- fix: 修复ESLint配置和lint错误
+- feat: 更新部署配置并优化HTTP支持
+- refactor: 移除shared模块构建检查和优化速率限制
+- fix: resolve GitHub security code scanning vulnerabilities
+- chore: release v1.1.0
+- feat: 重构依赖关系和添加HTTP支持
+
+
 ## [1.1.0] - 2025-09-12
 
 - feat: 重构依赖关系和添加HTTP支持
