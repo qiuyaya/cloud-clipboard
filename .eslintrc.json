@@ -16,7 +16,8 @@
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/no-explicit-any": "off",
     "no-undef": "off",
-    "no-unused-vars": "off"
+    "no-unused-vars": "off",
+    "no-console": "off"
   },
   "ignorePatterns": [
     "**/dist/**",
