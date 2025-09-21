@@ -38,9 +38,9 @@ describe('Utility Functions Tests', () => {
       expect(key2.length).toBeGreaterThan(0);
       expect(key1).not.toBe(key2);
       
-      // Should contain only alphanumeric characters
-      expect(key1).toMatch(/^[a-z0-9]+$/);
-      expect(key2).toMatch(/^[a-z0-9]+$/);
+      // Should contain only alphanumeric characters (case insensitive)
+      expect(key1).toMatch(/^[a-zA-Z0-9]+$/);
+      expect(key2).toMatch(/^[a-zA-Z0-9]+$/);
     });
   });
 

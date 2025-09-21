@@ -162,7 +162,9 @@ function App(): JSX.Element {
     const socket = socketService.connect();
 
     const handleConnect = () => {
-      debug.info('Socket connected successfully');
+      debug.info('Socket connected successfully', { 
+        socketConnected: socketService.isSocketConnected() 
+      });
       setIsConnected(true);
       
       // Auto-rejoin room if we have saved data
@@ -325,8 +327,9 @@ function App(): JSX.Element {
     };
 
     const handleError = (error: string) => {
-      debug.error('Socket error', { error });
+      debug.error('Socket error', { error, currentRoomKey: roomKey });
       setIsConnecting(false);
+      
       toast({
         variant: 'destructive',
         title: t('toast.connectionError'),

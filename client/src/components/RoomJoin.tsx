@@ -7,7 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useTranslation } from 'react-i18next';
 import type { JoinRoomRequest, BrowserFingerprint } from '@cloud-clipboard/shared';
-import { RoomKeySchema, generateBrowserFingerprint } from '@cloud-clipboard/shared';
+import { RoomKeySchema, generateBrowserFingerprint, generateRoomKey } from '@cloud-clipboard/shared';
 
 interface RoomJoinProps {
   onJoinRoom: (data: JoinRoomRequest) => void;
@@ -45,6 +45,18 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
       const fingerprint = generateBrowserFingerprint();
       localStorage.setItem('cloudClipboard_fingerprint', JSON.stringify(fingerprint));
       setCachedFingerprint(fingerprint);
+    }
+  }, []);
+
+  // Check for room key in URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomKeyFromUrl = urlParams.get('room');
+    if (roomKeyFromUrl) {
+      setRoomKey(roomKeyFromUrl);
+      // Clear the URL parameter to avoid confusion
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
     }
   }, []);
 
@@ -133,6 +145,40 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
     return 'unknown';
   };
 
+  const handleQuickCreate = () => {
+    if (!cachedFingerprint) {
+      toast({
+        variant: 'destructive',
+        title: t('toast.error'),
+        description: t('roomJoin.errors.fingerprintNotReady'),
+      });
+      return;
+    }
+
+    if (!username.trim()) {
+      toast({
+        variant: 'destructive',
+        title: t('toast.error'),
+        description: t('roomJoin.errors.usernameRequired'),
+      });
+      return;
+    }
+
+    const newRoomKey = generateRoomKey();
+    
+    const joinData: JoinRoomRequest = {
+      type: 'join_room',
+      roomKey: newRoomKey,
+      user: {
+        name: username.trim(),
+        deviceType: detectDeviceType(),
+      },
+      fingerprint: cachedFingerprint,
+    };
+
+    onJoinRoom(joinData);
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <div className="absolute top-4 right-4 flex gap-2">
@@ -197,6 +243,23 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
               {isConnecting ? t('roomJoin.joining') : t('roomJoin.joinButton')}
             </Button>
           </form>
+          
+          <div className="mt-4 flex items-center">
+            <div className="flex-1 border-t border-muted"></div>
+            <span className="px-4 text-xs text-muted-foreground">
+              {t('roomJoin.or')}
+            </span>
+            <div className="flex-1 border-t border-muted"></div>
+          </div>
+          
+          <Button 
+            variant="outline"
+            className="w-full mt-4"
+            onClick={handleQuickCreate}
+            disabled={isConnecting || !username.trim()}
+          >
+            {t('roomJoin.quickCreateButton')}
+          </Button>
           
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">

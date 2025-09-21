@@ -7,8 +7,13 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useTranslation } from 'react-i18next';
 import { formatFileSize, formatTimestamp } from '@cloud-clipboard/shared';
-import type { User, TextMessage, FileMessage, RoomKey } from '@cloud-clipboard/shared';
-import { Copy, Send, Upload, Users, LogOut, File, Download } from 'lucide-react';
+import type { 
+  User, 
+  TextMessage, 
+  FileMessage, 
+  RoomKey 
+} from '@cloud-clipboard/shared';
+import { Copy, Send, Upload, Users, LogOut, File, Download, Share2 } from 'lucide-react';
 
 interface ClipboardRoomProps {
   roomKey: RoomKey;
@@ -91,6 +96,26 @@ export function ClipboardRoom({
     }
   };
 
+  const shareRoom = async (): Promise<void> => {
+    const currentUrl = window.location.origin;
+    const shareUrl = `${currentUrl}/?room=${encodeURIComponent(roomKey)}`;
+    
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: t('toast.shareUrlCopied'),
+        description: t('toast.shareUrlCopiedDesc'),
+      });
+    } catch (error) {
+      // If clipboard fails, show the URL for manual copying
+      toast({
+        title: t('share.manualCopy'),
+        description: shareUrl,
+        duration: 10000,
+      });
+    }
+  };
+
   const onlineUsers = users.filter(user => user.isOnline);
 
   return (
@@ -105,14 +130,25 @@ export function ClipboardRoom({
                 {t('room.usersOnline', { count: onlineUsers.length })}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <LanguageToggle />
-              <ThemeToggle />
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={shareRoom}
+                className="flex items-center gap-2 min-w-fit"
+              >
+                <Share2 className="h-4 w-4" />
+                {t('room.share')}
+              </Button>
+              <div className="flex items-center gap-1">
+                <LanguageToggle />
+                <ThemeToggle />
+              </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onLeaveRoom}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 min-w-fit"
               >
                 <LogOut className="h-4 w-4" />
                 {t('room.leave')}
@@ -122,7 +158,7 @@ export function ClipboardRoom({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="flex items-center gap-2 mb-3">
               <Users className="h-4 w-4" />
               <span className="font-medium text-sm">{t('room.usersInRoom')}</span>

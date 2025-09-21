@@ -1,5 +1,10 @@
 import { RoomModel } from '../models/Room';
-import type { RoomKey, User, TextMessage, FileMessage } from '@cloud-clipboard/shared';
+import type { 
+  RoomKey, 
+  User, 
+  TextMessage, 
+  FileMessage 
+} from '@cloud-clipboard/shared';
 import { EventEmitter } from 'events';
 
 export class RoomService extends EventEmitter {

@@ -13,13 +13,16 @@
     "joinButton": "Join Room",
     "joining": "Joining...",
     "shareHint": "Share the same room key with others to collaborate",
+    "or": "or",
+    "quickCreateButton": "Quick Create Room",
     "errors": {
       "required": "Please enter both room key and username",
       "invalidKey": "Room key can only contain letters, numbers, hyphens, and underscores",
       "tooShort": "Room key must be at least 6 characters",
       "needsBoth": "Room key must contain both letters and numbers",
       "invalidChars": "Room key can only contain letters, numbers, underscores (_), and hyphens (-)",
-      "fingerprintNotReady": "Fingerprint not ready. Please try again."
+      "fingerprintNotReady": "Fingerprint not ready. Please try again.",
+      "usernameRequired": "Please enter your name"
     },
     "hints": {
       "roomKeyFormat": "Must be 6+ characters with letters and numbers (can include _ and -)",
@@ -31,6 +34,7 @@
     "usersOnline": "{{count}} user online",
     "usersOnline_other": "{{count}} users online",
     "leave": "Leave",
+    "share": "Share",
     "usersInRoom": "Users in room",
     "you": "(You)",
     "online": "Online",
@@ -78,7 +82,14 @@
     "roomDestroyed": "Room destroyed",
     "roomDestroyedDesc": "Room was destroyed and all files were deleted",
     "fileRetentionExpired": "File expired",
-    "fileRetentionExpiredDesc": "{{fileName}} was deleted after 12 hours of retention"
+    "fileRetentionExpiredDesc": "{{fileName}} was deleted after 12 hours of retention",
+    "shareUrlCopied": "Share link copied",
+    "shareUrlCopiedDesc": "Room share link has been copied to clipboard"
+  },
+  "share": {
+    "title": "Join Cloud Clipboard Room",
+    "text": "I invite you to join room: {{roomKey}}",
+    "manualCopy": "Please manually copy this link"
   },
   "theme": {
     "light": "Light",

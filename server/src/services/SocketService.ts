@@ -154,6 +154,11 @@ export class SocketService {
       log.debug('Join room data validation passed', {}, 'SocketService');
       const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
       
+      console.log(`🏠 [Server] Join attempt for room ${validatedData.roomKey}`, {
+        existingUsersCount: existingUsers.length,
+        userName: validatedData.user.name
+      });
+      
       // Generate user ID based on fingerprint for consistent identity
       let userId: string;
       let fingerprint: string | undefined;

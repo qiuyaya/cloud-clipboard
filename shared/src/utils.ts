@@ -5,7 +5,27 @@ export const generateUserId = (): string => {
 };
 
 export const generateRoomKey = (): string => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  // Generate a room key that satisfies the RoomKeySchema requirements:
+  // - At least 6 characters
+  // - Contains both letters and numbers
+  // - Only alphanumeric, underscores, and hyphens
+  const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const numbers = '0123456789';
+  const allChars = letters + numbers;
+  
+  let result = '';
+  
+  // Ensure at least one letter and one number
+  result += letters.charAt(Math.floor(Math.random() * letters.length));
+  result += numbers.charAt(Math.floor(Math.random() * numbers.length));
+  
+  // Add remaining characters (total length: 8 characters)
+  for (let i = 2; i < 8; i++) {
+    result += allChars.charAt(Math.floor(Math.random() * allChars.length));
+  }
+  
+  // Shuffle the result to avoid predictable patterns
+  return result.split('').sort(() => Math.random() - 0.5).join('');
 };
 
 export const detectDeviceType = (userAgent: string): User['deviceType'] => {
