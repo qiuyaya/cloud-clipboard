@@ -2,13 +2,18 @@ import { Server as SocketIOServer } from 'socket.io';
 import type { Server } from 'http';
 import { RoomService } from './RoomService';
 import { log } from '../utils/logger';
+import { randomUUID } from 'crypto';
 import {
   JoinRoomRequestSchema,
+  JoinRoomWithPasswordRequestSchema,
   LeaveRoomRequestSchema,
   TextMessageSchema,
   FileMessageSchema,
+  SetRoomPasswordRequestSchema,
+  ShareRoomLinkRequestSchema,
   generateUserId,
   generateUserIdFromFingerprint,
+  generateDefaultUsername,
   detectDeviceType,
 } from '@cloud-clipboard/shared';
 import type {
@@ -16,9 +21,12 @@ import type {
   ClientToServerEvents,
   User,
   JoinRoomRequest,
+  JoinRoomWithPasswordRequest,
   LeaveRoomRequest,
   TextMessage,
   FileMessage,
+  SetRoomPasswordRequest,
+  ShareRoomLinkRequest,
 } from '@cloud-clipboard/shared';
 
 export class SocketService {
@@ -96,6 +104,15 @@ export class SocketService {
         }
       });
 
+      socket.on('joinRoomWithPassword', (data: JoinRoomWithPasswordRequest) => {
+        log.debug('JoinRoomWithPassword event received', { socketId: socket.id, roomKey: data.roomKey }, 'SocketService');
+        if (this.checkRateLimit(socket.id, 5, 60000)) { // 5 joins per minute
+          this.handleJoinRoomWithPassword(socket, data);
+        } else {
+          socket.emit('error', 'Too many join attempts. Please wait.');
+        }
+      });
+
       socket.on('leaveRoom', (data: LeaveRoomRequest) => {
         if (this.checkRateLimit(socket.id, 10, 60000)) { // 10 leaves per minute
           this.handleLeaveRoom(socket, data);
@@ -115,6 +132,22 @@ export class SocketService {
       socket.on('requestUserList', (roomKey: string) => {
         if (this.checkRateLimit(socket.id, 20, 60000)) { // 20 user list requests per minute
           this.handleRequestUserList(socket, roomKey);
+        } else {
+          socket.emit('error', 'Too many requests. Please wait.');
+        }
+      });
+
+      socket.on('setRoomPassword', (data: SetRoomPasswordRequest) => {
+        if (this.checkRateLimit(socket.id, 10, 60000)) { // 10 password changes per minute
+          this.handleSetRoomPassword(socket, data);
+        } else {
+          socket.emit('error', 'Too many requests. Please wait.');
+        }
+      });
+
+      socket.on('shareRoomLink', (data: ShareRoomLinkRequest) => {
+        if (this.checkRateLimit(socket.id, 20, 60000)) { // 20 share requests per minute
+          this.handleShareRoomLink(socket, data);
         } else {
           socket.emit('error', 'Too many requests. Please wait.');
         }
@@ -152,6 +185,12 @@ export class SocketService {
       log.debug('Validating join room data with schema', {}, 'SocketService');
       const validatedData = JoinRoomRequestSchema.parse(data);
       log.debug('Join room data validation passed', {}, 'SocketService');
+
+      // Check if room requires password
+      if (this.roomService.isRoomPasswordProtected(validatedData.roomKey)) {
+        socket.emit('passwordRequired', { roomKey: validatedData.roomKey });
+        return;
+      }
       const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
       
       console.log(`🏠 [Server] Join attempt for room ${validatedData.roomKey}`, {
@@ -200,15 +239,15 @@ export class SocketService {
       }
       
       // Check for duplicate names and generate unique name if needed
-      let uniqueName = validatedData.user.name;
-      const existingNames = existingUsers.filter(u => u.fingerprint !== fingerprint).map(u => u.name.toLowerCase());
+      let uniqueName = validatedData.user.name || generateDefaultUsername();
+      const existingNames = existingUsers.filter(u => u.fingerprint !== fingerprint).map(u => u.name?.toLowerCase() || '').filter(name => name !== '');
       
       // Only add suffix if name conflicts with OTHER users (different fingerprint)
       if (existingNames.includes(uniqueName.toLowerCase())) {
         // Generate random suffix until we find a unique name, keeping within 50 char limit
         let attempts = 0;
         const maxBaseLength = 44; // Leave room for "_" + 5 char suffix
-        const baseName = validatedData.user.name.slice(0, maxBaseLength);
+        const baseName = uniqueName.slice(0, maxBaseLength);
         
         do {
           const randomSuffix = Math.random().toString(36).substring(2, 7); // 5 chars
@@ -217,7 +256,7 @@ export class SocketService {
         } while (existingNames.includes(uniqueName.toLowerCase()) && attempts < 10);
       } else {
         // Ensure name doesn't exceed 50 characters
-        uniqueName = validatedData.user.name.slice(0, 50);
+        uniqueName = uniqueName.slice(0, 50);
       }
       
       // Create new user
@@ -265,6 +304,105 @@ export class SocketService {
       }
       
       socket.emit('error', errorMessage);
+    }
+  }
+
+  private handleJoinRoomWithPassword(socket: any, data: JoinRoomWithPasswordRequest): void {
+    try {
+      const validatedData = JoinRoomWithPasswordRequestSchema.parse(data);
+      
+      const result = this.roomService.joinRoomWithPassword(
+        validatedData.roomKey,
+        {
+          id: '', // Will be generated
+          name: validatedData.user.name || generateDefaultUsername(),
+          deviceType: validatedData.user.deviceType,
+          isOnline: true,
+          lastSeen: new Date(),
+          fingerprint: validatedData.fingerprint?.hash,
+        },
+        validatedData.password
+      );
+
+      if (!result.success) {
+        socket.emit('error', result.error || 'Failed to join room');
+        return;
+      }
+
+      const room = result.room!;
+      
+      // Handle user joining logic similar to handleJoinRoom
+      const existingUsers = room.getUserList();
+      let userId: string;
+      let fingerprint: string | undefined;
+      
+      if (validatedData.fingerprint) {
+        fingerprint = validatedData.fingerprint.hash;
+        userId = generateUserIdFromFingerprint(fingerprint);
+        
+        const existingUser = existingUsers.find(u => u.fingerprint === fingerprint);
+        if (existingUser) {
+          existingUser.isOnline = true;
+          existingUser.lastSeen = new Date();
+          
+          this.userSockets.set(existingUser.id, socket.id);
+          this.socketUsers.set(socket.id, existingUser);
+          
+          socket.join(validatedData.roomKey);
+          
+          this.roomService.updateUserStatus(validatedData.roomKey, existingUser.id, true);
+          
+          socket.emit('userJoined', existingUser);
+          socket.emit('userList', room.getUserList());
+          socket.to(validatedData.roomKey).emit('userList', room.getUserList());
+          
+          return;
+        }
+      } else {
+        userId = generateUserId();
+      }
+      
+      // Check for duplicate names
+      let uniqueName = validatedData.user.name || generateDefaultUsername();
+      const existingNames = existingUsers.filter(u => u.fingerprint !== fingerprint).map(u => u.name?.toLowerCase() || '').filter(name => name !== '');
+      
+      if (existingNames.includes(uniqueName.toLowerCase())) {
+        let attempts = 0;
+        const maxBaseLength = 44;
+        const baseName = uniqueName.slice(0, maxBaseLength);
+        
+        do {
+          const randomSuffix = Math.random().toString(36).substring(2, 7);
+          uniqueName = `${baseName}_${randomSuffix}`;
+          attempts++;
+        } while (existingNames.includes(uniqueName.toLowerCase()) && attempts < 10);
+      } else {
+        uniqueName = uniqueName.slice(0, 50);
+      }
+      
+      const user: User = {
+        id: userId,
+        name: uniqueName,
+        deviceType: validatedData.user.deviceType || detectDeviceType(socket.handshake.headers['user-agent'] || ''),
+        isOnline: true,
+        lastSeen: new Date(),
+        fingerprint,
+      };
+
+      socket.join(validatedData.roomKey);
+      this.userSockets.set(user.id, socket.id);
+      this.socketUsers.set(socket.id, user);
+      
+      socket.emit('userJoined', user);
+      socket.emit('userList', room.getUserList());
+      
+      socket.to(validatedData.roomKey).emit('userJoined', user);
+      socket.to(validatedData.roomKey).emit('userList', room.getUserList());
+
+      console.log(`✅ [Server] User ${user.name} successfully joined password-protected room ${validatedData.roomKey}`);
+    } catch (error) {
+      console.error('Join room with password error:', error);
+      socket.emit('error', 'Failed to join room with password');
     }
   }
 
@@ -332,6 +470,96 @@ export class SocketService {
     } catch (error) {
       console.error('Request user list error:', error);
       socket.emit('error', 'Failed to get user list');
+    }
+  }
+
+  private handleSetRoomPassword(socket: any, data: SetRoomPasswordRequest): void {
+    try {
+      const validatedData = SetRoomPasswordRequestSchema.parse(data);
+      
+      // Verify user is in the room
+      const user = this.socketUsers.get(socket.id);
+      if (!user) {
+        socket.emit('error', 'User not authenticated');
+        return;
+      }
+
+      const users = this.roomService.getUsersInRoom(validatedData.roomKey);
+      if (!users.find(u => u.id === user.id)) {
+        socket.emit('error', 'User not in room');
+        return;
+      }
+
+      // Generate password if one is being set, undefined to remove
+      let password: string | undefined;
+      if ('password' in validatedData) {
+        // Password field is present - set password (generate if empty)
+        password = validatedData.password || randomUUID();
+      } else {
+        // Password field is not present - remove password
+        password = undefined;
+      }
+      
+      const success = this.roomService.setRoomPassword(validatedData.roomKey, password);
+      
+      if (success) {
+        const hasPassword = !!password;
+        
+        // Notify all users in the room
+        this.io.to(validatedData.roomKey).emit('roomPasswordSet', {
+          roomKey: validatedData.roomKey,
+          hasPassword
+        });
+
+        console.log(`🔒 [Server] Room ${validatedData.roomKey} password ${hasPassword ? 'set' : 'removed'} by ${user.name}`);
+      } else {
+        socket.emit('error', 'Failed to set room password');
+      }
+    } catch (error) {
+      console.error('Set room password error:', error);
+      socket.emit('error', 'Failed to set room password');
+    }
+  }
+
+  private handleShareRoomLink(socket: any, data: ShareRoomLinkRequest): void {
+    try {
+      const validatedData = ShareRoomLinkRequestSchema.parse(data);
+      
+      // Verify user is in the room
+      const user = this.socketUsers.get(socket.id);
+      if (!user) {
+        socket.emit('error', 'User not authenticated');
+        return;
+      }
+
+      const users = this.roomService.getUsersInRoom(validatedData.roomKey);
+      if (!users.find(u => u.id === user.id)) {
+        socket.emit('error', 'User not in room');
+        return;
+      }
+
+      const room = this.roomService.getRoom(validatedData.roomKey);
+      if (!room) {
+        socket.emit('error', 'Room not found');
+        return;
+      }
+
+      // Generate share link with password if room is password protected
+      let shareLink = `${process.env.CLIENT_URL || 'http://localhost:3000'}/?room=${validatedData.roomKey}`;
+      
+      if (room.hasPassword()) {
+        shareLink += `&password=${room.password}`;
+      }
+
+      socket.emit('roomLinkGenerated', {
+        roomKey: validatedData.roomKey,
+        shareLink
+      });
+
+      console.log(`🔗 [Server] Share link generated for room ${validatedData.roomKey} by ${user.name}`);
+    } catch (error) {
+      console.error('Share room link error:', error);
+      socket.emit('error', 'Failed to generate share link');
     }
   }
 

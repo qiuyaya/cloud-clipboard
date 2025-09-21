@@ -16,6 +16,7 @@
     "or": "或",
     "quickCreateButton": "快速创建房间",
     "errors": {
+      "roomKeyRequired": "请输入房间密钥",
       "required": "请输入房间密钥和用户名",
       "invalidKey": "房间密钥只能包含字母、数字、连字符和下划线",
       "tooShort": "房间密钥至少需要6个字符",
@@ -29,12 +30,26 @@
       "usernameFormat": "仅允许字母、数字、空格、点、下划线和连字符"
     }
   },
+  "passwordInput": {
+    "title": "输入房间密钥",
+    "description": "房间 {{roomKey}} 需要密钥",
+    "password": "房间密钥",
+    "passwordPlaceholder": "输入房间密钥",
+    "joinButton": "加入房间",
+    "cancelButton": "取消",
+    "joining": "加入中...",
+    "errors": {
+      "required": "请输入房间密钥"
+    }
+  },
   "room": {
     "title": "房间：{{roomKey}}",
     "usersOnline": "{{count}} 名用户在线",
     "usersOnline_other": "{{count}} 名用户在线",
     "leave": "离开",
     "share": "分享",
+    "setPassword": "设置密钥",
+    "removePassword": "移除密钥",
     "usersInRoom": "房间用户",
     "you": "（您）",
     "online": "在线",
@@ -84,7 +99,16 @@
     "fileRetentionExpired": "文件已过期",
     "fileRetentionExpiredDesc": "{{fileName}} 保存12小时后已被删除",
     "shareUrlCopied": "分享链接已复制",
-    "shareUrlCopiedDesc": "房间分享链接已复制到剪贴板"
+    "shareUrlCopiedDesc": "房间分享链接已复制到剪贴板",
+    "passwordRequired": "需要房间密钥",
+    "passwordRequiredDesc": "此房间需要密钥才能进入",
+    "passwordSet": "房间密钥已设置",
+    "passwordSetDesc": "房间现在受密钥保护",
+    "passwordRemoved": "房间密钥已移除",
+    "passwordRemovedDesc": "房间现在可公开访问",
+    "linkCopied": "分享链接已复制",
+    "linkCopiedDesc": "包含密钥的房间链接已复制到剪贴板",
+    "linkCopyFailed": "复制链接失败"
   },
   "share": {
     "title": "加入云剪切板房间",

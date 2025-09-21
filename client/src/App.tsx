@@ -16,6 +16,7 @@ import type {
   TextMessage,
   FileMessage,
   JoinRoomRequest,
+  JoinRoomWithPasswordRequest,
   LeaveRoomRequest,
   RoomKey,
 } from '@cloud-clipboard/shared';
@@ -65,6 +66,13 @@ function App(): JSX.Element {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [hasRoomPassword, setHasRoomPassword] = useState(false);
+  const [pendingRoomJoin, setPendingRoomJoin] = useState<{
+    roomKey: string;
+    username: string | undefined;
+    fingerprint: any;
+  } | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -371,6 +379,39 @@ function App(): JSX.Element {
       handleLeaveRoom();
     };
 
+    const handlePasswordRequired = (data: { roomKey: string }) => {
+      setIsConnecting(false);
+      setShowPasswordInput(true);
+      
+      toast({
+        title: t('toast.passwordRequired'),
+        description: t('toast.passwordRequiredDesc'),
+      });
+    };
+
+    const handleRoomPasswordSet = (data: { roomKey: string; hasPassword: boolean }) => {
+      setHasRoomPassword(data.hasPassword);
+      toast({
+        title: data.hasPassword ? t('toast.passwordSet') : t('toast.passwordRemoved'),
+        description: data.hasPassword ? t('toast.passwordSetDesc') : t('toast.passwordRemovedDesc'),
+      });
+    };
+
+    const handleRoomLinkGenerated = (data: { roomKey: string; shareLink: string }) => {
+      navigator.clipboard.writeText(data.shareLink).then(() => {
+        toast({
+          title: t('toast.linkCopied'),
+          description: t('toast.linkCopiedDesc'),
+        });
+      }).catch(() => {
+        toast({
+          variant: 'destructive',
+          title: t('toast.error'),
+          description: t('toast.linkCopyFailed'),
+        });
+      });
+    };
+
     // Attach event handlers
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
@@ -381,6 +422,9 @@ function App(): JSX.Element {
     socketService.onError(handleError);
     socketService.onSystemMessage(handleSystemMessage);
     socketService.onRoomDestroyed(handleRoomDestroyed);
+    socketService.onPasswordRequired(handlePasswordRequired);
+    socketService.onRoomPasswordSet(handleRoomPasswordSet);
+    socketService.onRoomLinkGenerated(handleRoomLinkGenerated);
 
     return () => {
       socketService.disconnect();
@@ -409,6 +453,13 @@ function App(): JSX.Element {
     setIsConnecting(true);
     setRoomKey(data.roomKey);
     
+    // Save pending join data for password input if needed
+    setPendingRoomJoin({
+      roomKey: data.roomKey,
+      username: data.user.name,
+      fingerprint: data.fingerprint
+    });
+    
     // Save to localStorage
     saveToLocalStorage('cloudClipboard_roomKey', data.roomKey);
     
@@ -436,6 +487,34 @@ function App(): JSX.Element {
     // Clean up timeout when component unmounts or user joins successfully
     return () => clearTimeout(joinTimeout);
   }, [isConnected, isConnecting, currentUser, toast, t]);
+
+  const handleJoinRoomWithPassword = useCallback((data: JoinRoomWithPasswordRequest) => {
+    debug.info('handleJoinRoomWithPassword called');
+    
+    if (!isConnected) {
+      toast({
+        variant: 'destructive',
+        title: t('toast.connectionError'),
+        description: t('toast.notConnected'),
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+    setShowPasswordInput(false);
+    
+    socketService.joinRoomWithPassword(data);
+  }, [isConnected, toast, t]);
+
+  const handleCancelPassword = useCallback(() => {
+    setShowPasswordInput(false);
+    setIsConnecting(false);
+    setPendingRoomJoin(null);
+    
+    // Clear stored room key since we're canceling
+    setRoomKey(null);
+    localStorage.removeItem('cloudClipboard_roomKey');
+  }, []);
 
   const handleLeaveRoom = useCallback(() => {
     if (currentUser && roomKey) {
@@ -558,12 +637,41 @@ function App(): JSX.Element {
     }
   }, [currentUser, roomKey, toast]);
 
+  const handleSetRoomPassword = useCallback((shouldHavePassword: boolean) => {
+    if (!roomKey) return;
+
+    const request: any = {
+      type: 'set_room_password' as const,
+      roomKey,
+    };
+
+    if (shouldHavePassword) {
+      // Set password - let server generate new password
+      request.password = '';
+    }
+    // If shouldHavePassword is false, don't include password field to remove it
+
+    socketService.setRoomPassword(request);
+  }, [roomKey]);
+
+  const handleShareRoomLink = useCallback(() => {
+    if (!roomKey) return;
+
+    socketService.shareRoomLink({
+      type: 'share_room_link',
+      roomKey,
+    });
+  }, [roomKey]);
+
   if (!currentUser || !roomKey) {
     return (
       <>
         <RoomJoin
           onJoinRoom={handleJoinRoom}
+          onJoinRoomWithPassword={handleJoinRoomWithPassword}
           isConnecting={isConnecting}
+          showPasswordInput={showPasswordInput}
+          onCancelPassword={handleCancelPassword}
         />
         <Toaster />
       </>
@@ -580,6 +688,9 @@ function App(): JSX.Element {
         onSendMessage={handleSendMessage}
         onSendFile={handleSendFile}
         onLeaveRoom={handleLeaveRoom}
+        onSetRoomPassword={handleSetRoomPassword}
+        onShareRoomLink={handleShareRoomLink}
+        hasRoomPassword={hasRoomPassword}
       />
       <Toaster />
     </>

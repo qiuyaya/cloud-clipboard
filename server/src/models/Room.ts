@@ -4,6 +4,7 @@ import type {
   TextMessage,
   FileMessage,
   RoomKey,
+  RoomPassword,
 } from '@cloud-clipboard/shared';
 
 export class RoomModel implements Room {
@@ -12,6 +13,7 @@ export class RoomModel implements Room {
   messages: (TextMessage | FileMessage)[];
   createdAt: Date;
   lastActivity: Date;
+  password?: RoomPassword;
   private maxMessages = 100;
 
   constructor(key: RoomKey) {
@@ -72,6 +74,23 @@ export class RoomModel implements Room {
 
   getOnlineUsers(): User[] {
     return Array.from(this.users.values()).filter(user => user.isOnline);
+  }
+
+  setPassword(password?: RoomPassword): void {
+    if (password === undefined) {
+      delete this.password;
+    } else {
+      this.password = password;
+    }
+    this.updateActivity();
+  }
+
+  hasPassword(): boolean {
+    return !!this.password;
+  }
+
+  validatePassword(password: RoomPassword): boolean {
+    return this.password === password;
   }
 
   private updateActivity(): void {

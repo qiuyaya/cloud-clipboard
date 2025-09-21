@@ -28,6 +28,16 @@ export const generateRoomKey = (): string => {
   return result.split('').sort(() => Math.random() - 0.5).join('');
 };
 
+export const generateDefaultUsername = (): string => {
+  // Generate a random 6-character alphanumeric string
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `用户${result}`;
+};
+
 export const detectDeviceType = (userAgent: string): User['deviceType'] => {
   const ua = userAgent.toLowerCase();
   

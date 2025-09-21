@@ -13,7 +13,7 @@ import type {
   FileMessage, 
   RoomKey 
 } from '@cloud-clipboard/shared';
-import { Copy, Send, Upload, Users, LogOut, File, Download, Share2 } from 'lucide-react';
+import { Copy, Send, Upload, Users, LogOut, File, Download, Share2, Lock, Unlock } from 'lucide-react';
 
 interface ClipboardRoomProps {
   roomKey: RoomKey;
@@ -23,6 +23,9 @@ interface ClipboardRoomProps {
   onSendMessage: (content: string) => void;
   onSendFile: (file: File) => void;
   onLeaveRoom: () => void;
+  onSetRoomPassword: (hasPassword: boolean) => void;
+  onShareRoomLink: () => void;
+  hasRoomPassword?: boolean;
 }
 
 export function ClipboardRoom({
@@ -33,6 +36,9 @@ export function ClipboardRoom({
   onSendMessage,
   onSendFile,
   onLeaveRoom,
+  onSetRoomPassword,
+  onShareRoomLink,
+  hasRoomPassword = false,
 }: ClipboardRoomProps): JSX.Element {
   const [textInput, setTextInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,24 +102,12 @@ export function ClipboardRoom({
     }
   };
 
-  const shareRoom = async (): Promise<void> => {
-    const currentUrl = window.location.origin;
-    const shareUrl = `${currentUrl}/?room=${encodeURIComponent(roomKey)}`;
-    
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast({
-        title: t('toast.shareUrlCopied'),
-        description: t('toast.shareUrlCopiedDesc'),
-      });
-    } catch (error) {
-      // If clipboard fails, show the URL for manual copying
-      toast({
-        title: t('share.manualCopy'),
-        description: shareUrl,
-        duration: 10000,
-      });
-    }
+  const shareRoom = (): void => {
+    onShareRoomLink();
+  };
+
+  const toggleRoomPassword = (): void => {
+    onSetRoomPassword(!hasRoomPassword);
   };
 
   const onlineUsers = users.filter(user => user.isOnline);
@@ -131,6 +125,16 @@ export function ClipboardRoom({
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleRoomPassword}
+                className="flex items-center gap-2 min-w-fit"
+                title={hasRoomPassword ? t('room.removePassword') : t('room.setPassword')}
+              >
+                {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                {hasRoomPassword ? t('room.removePassword') : t('room.setPassword')}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

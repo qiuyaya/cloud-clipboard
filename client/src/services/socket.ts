@@ -7,7 +7,10 @@ import type {
   FileMessage,
   WebSocketMessage,
   JoinRoomRequest,
+  JoinRoomWithPasswordRequest,
   LeaveRoomRequest,
+  SetRoomPasswordRequest,
+  ShareRoomLinkRequest,
 } from '@cloud-clipboard/shared';
 import { debug } from '../utils/debug';
 
@@ -98,6 +101,34 @@ class SocketService {
       this.socket.emit('joinRoom', data);
     } else {
       debug.error('No socket available, cannot join room');
+    }
+  }
+
+  joinRoomWithPassword(data: JoinRoomWithPasswordRequest): void {
+    debug.info('Attempting to join room with password');
+    
+    if (this.socket) {
+      if (!this.socket.connected) {
+        debug.error('Socket exists but not connected, cannot join room');
+        return;
+      }
+      
+      debug.debug('Emitting joinRoomWithPassword event');
+      this.socket.emit('joinRoomWithPassword', data);
+    } else {
+      debug.error('No socket available, cannot join room');
+    }
+  }
+
+  setRoomPassword(data: SetRoomPasswordRequest): void {
+    if (this.socket) {
+      this.socket.emit('setRoomPassword', data);
+    }
+  }
+
+  shareRoomLink(data: ShareRoomLinkRequest): void {
+    if (this.socket) {
+      this.socket.emit('shareRoomLink', data);
     }
   }
 
@@ -199,6 +230,24 @@ class SocketService {
   onP2PIceCandidate(callback: (data: { from: string; candidate: string }) => void): void {
     if (this.socket) {
       this.socket.on('p2pIceCandidate', callback);
+    }
+  }
+
+  onPasswordRequired(callback: (data: { roomKey: string }) => void): void {
+    if (this.socket) {
+      this.socket.on('passwordRequired', callback);
+    }
+  }
+
+  onRoomPasswordSet(callback: (data: { roomKey: string; hasPassword: boolean }) => void): void {
+    if (this.socket) {
+      this.socket.on('roomPasswordSet', callback);
+    }
+  }
+
+  onRoomLinkGenerated(callback: (data: { roomKey: string; shareLink: string }) => void): void {
+    if (this.socket) {
+      this.socket.on('roomLinkGenerated', callback);
     }
   }
 

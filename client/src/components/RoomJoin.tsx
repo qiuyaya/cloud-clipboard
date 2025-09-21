@@ -5,19 +5,31 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/useToast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { PasswordInput } from '@/components/PasswordInput';
 import { useTranslation } from 'react-i18next';
-import type { JoinRoomRequest, BrowserFingerprint } from '@cloud-clipboard/shared';
-import { RoomKeySchema, generateBrowserFingerprint, generateRoomKey } from '@cloud-clipboard/shared';
+import type { JoinRoomRequest, JoinRoomWithPasswordRequest, BrowserFingerprint } from '@cloud-clipboard/shared';
+import { RoomKeySchema, generateBrowserFingerprint, generateRoomKey, generateDefaultUsername } from '@cloud-clipboard/shared';
 
 interface RoomJoinProps {
   onJoinRoom: (data: JoinRoomRequest) => void;
+  onJoinRoomWithPassword: (data: JoinRoomWithPasswordRequest) => void;
   isConnecting: boolean;
+  showPasswordInput?: boolean;
+  onCancelPassword?: () => void;
 }
 
-export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Element {
+export function RoomJoin({ 
+  onJoinRoom, 
+  onJoinRoomWithPassword, 
+  isConnecting, 
+  showPasswordInput, 
+  onCancelPassword 
+}: RoomJoinProps): JSX.Element {
   const [roomKey, setRoomKey] = useState('');
   const [username, setUsername] = useState('');
+  const [urlPassword, setUrlPassword] = useState<string | null>(null);
   const [cachedFingerprint, setCachedFingerprint] = useState<BrowserFingerprint | null>(null);
+  const [isFromShareLink, setIsFromShareLink] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -48,26 +60,81 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
     }
   }, []);
 
-  // Check for room key in URL parameters
+  // Check for room key and password in URL parameters and auto-join if found
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const roomKeyFromUrl = urlParams.get('room');
+    const passwordFromUrl = urlParams.get('password');
+    
     if (roomKeyFromUrl) {
       setRoomKey(roomKeyFromUrl);
-      // Clear the URL parameter to avoid confusion
+      setIsFromShareLink(true);
+      
+      if (passwordFromUrl) {
+        setUrlPassword(passwordFromUrl);
+      }
+      
+      // Clear the URL parameters to avoid confusion
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
   }, []);
 
+  // Auto-join room when we have all necessary data from share link
+  useEffect(() => {
+    if (roomKey && cachedFingerprint && roomKey.trim().length > 0 && 
+        !isConnecting && isFromShareLink) {
+      // This is a share link, auto-join the room
+      
+      // Generate default username if not provided
+      const finalUsername = username.trim() || generateDefaultUsername();
+      
+      try {
+        const validatedKey = RoomKeySchema.parse(roomKey.trim());
+        
+        // If we have a password from URL, join with password directly
+        if (urlPassword) {
+          const joinWithPasswordData: JoinRoomWithPasswordRequest = {
+            type: 'join_room_with_password',
+            roomKey: validatedKey,
+            password: urlPassword,
+            user: {
+              name: finalUsername,
+              deviceType: detectDeviceType(),
+            },
+            fingerprint: cachedFingerprint,
+          };
+          onJoinRoomWithPassword(joinWithPasswordData);
+        } else {
+          const joinData: JoinRoomRequest = {
+            type: 'join_room',
+            roomKey: validatedKey,
+            user: {
+              name: finalUsername,
+              deviceType: detectDeviceType(),
+            },
+            fingerprint: cachedFingerprint,
+          };
+          onJoinRoom(joinData);
+        }
+        
+        // Mark that we've handled the share link
+        setIsFromShareLink(false);
+      } catch (error) {
+        // If validation fails, let user manually correct and join
+        console.warn('Auto-join failed due to validation error:', error);
+      }
+    }
+  }, [roomKey, cachedFingerprint, username, urlPassword, isConnecting, isFromShareLink, onJoinRoom, onJoinRoomWithPassword]);
+
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     
-    if (!roomKey.trim() || !username.trim()) {
+    if (!roomKey.trim()) {
       toast({
         variant: 'destructive',
         title: t('toast.error'),
-        description: t('roomJoin.errors.required'),
+        description: t('roomJoin.errors.roomKeyRequired'),
       });
       return;
     }
@@ -84,17 +151,35 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
     try {
       const validatedKey = RoomKeySchema.parse(roomKey.trim());
       
-      const joinData: JoinRoomRequest = {
-        type: 'join_room',
-        roomKey: validatedKey,
-        user: {
-          name: username.trim(),
-          deviceType: detectDeviceType(),
-        },
-        fingerprint: cachedFingerprint, // Use cached fingerprint instead of generating new one
-      };
+      // Generate default username if not provided
+      const finalUsername = username.trim() || generateDefaultUsername();
+      
+      // If we have a password from URL, join with password directly
+      if (urlPassword) {
+        const joinWithPasswordData: JoinRoomWithPasswordRequest = {
+          type: 'join_room_with_password',
+          roomKey: validatedKey,
+          password: urlPassword,
+          user: {
+            name: finalUsername,
+            deviceType: detectDeviceType(),
+          },
+          fingerprint: cachedFingerprint,
+        };
+        onJoinRoomWithPassword(joinWithPasswordData);
+      } else {
+        const joinData: JoinRoomRequest = {
+          type: 'join_room',
+          roomKey: validatedKey,
+          user: {
+            name: finalUsername,
+            deviceType: detectDeviceType(),
+          },
+          fingerprint: cachedFingerprint, // Use cached fingerprint instead of generating new one
+        };
 
-      onJoinRoom(joinData);
+        onJoinRoom(joinData);
+      }
     } catch (error) {
       let errorMessage = t('roomJoin.errors.invalidKey');
       
@@ -155,22 +240,16 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
       return;
     }
 
-    if (!username.trim()) {
-      toast({
-        variant: 'destructive',
-        title: t('toast.error'),
-        description: t('roomJoin.errors.usernameRequired'),
-      });
-      return;
-    }
-
     const newRoomKey = generateRoomKey();
+    
+    // Generate default username if not provided
+    const finalUsername = username.trim() || generateDefaultUsername();
     
     const joinData: JoinRoomRequest = {
       type: 'join_room',
       roomKey: newRoomKey,
       user: {
-        name: username.trim(),
+        name: finalUsername,
         deviceType: detectDeviceType(),
       },
       fingerprint: cachedFingerprint,
@@ -178,6 +257,20 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
 
     onJoinRoom(joinData);
   };
+
+  // Show password input if needed
+  if (showPasswordInput && roomKey && username && cachedFingerprint) {
+    return (
+      <PasswordInput
+        roomKey={roomKey}
+        username={username}
+        fingerprint={cachedFingerprint}
+        onJoinRoomWithPassword={onJoinRoomWithPassword}
+        onCancel={onCancelPassword || (() => {})}
+        isConnecting={isConnecting}
+      />
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -238,7 +331,7 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
             <Button 
               type="submit" 
               className="w-full"
-              disabled={isConnecting || !roomKey.trim() || !username.trim()}
+              disabled={isConnecting || !roomKey.trim()}
             >
               {isConnecting ? t('roomJoin.joining') : t('roomJoin.joinButton')}
             </Button>
@@ -256,7 +349,7 @@ export function RoomJoin({ onJoinRoom, isConnecting }: RoomJoinProps): JSX.Eleme
             variant="outline"
             className="w-full mt-4"
             onClick={handleQuickCreate}
-            disabled={isConnecting || !username.trim()}
+            disabled={isConnecting}
           >
             {t('roomJoin.quickCreateButton')}
           </Button>

@@ -18,8 +18,7 @@ const server = createServer(app);
 const port = process.env.PORT || 3001;
 
 // Determine if we're serving static files (production mode)
-// Temporarily hardcode to true for testing
-const isProduction = true; // process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === 'production';
 const staticPath = process.env.STATIC_PATH || path.join(__dirname, '../public');
 
 console.log('DEBUG: NODE_ENV =', process.env.NODE_ENV);

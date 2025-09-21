@@ -35,13 +35,13 @@ export const BrowserFingerprintSchema = z.object({
 export const UserSchema = z.object({
   id: z.string().uuid(),
   name: z.string()
-    .min(1, 'Name is required')
     .max(50, 'Name must not exceed 50 characters')
-    .regex(/^[a-zA-Z0-9\s._-]+$/, 'Name contains invalid characters')
+    .regex(/^[a-zA-Z0-9\s._\u4e00-\u9fff-]+$/, 'Name contains invalid characters')
     .refine((name) => {
       const trimmed = name.trim();
       return trimmed.length > 0 && trimmed === name;
-    }, 'Name cannot start or end with whitespace'),
+    }, 'Name cannot start or end with whitespace')
+    .optional(),
   isOnline: z.boolean(),
   lastSeen: z.date(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']),
@@ -120,12 +120,39 @@ export const UserListMessageSchema = z.object({
   roomKey: RoomKeySchema,
 });
 
+export const RoomPasswordSchema = z.string().uuid('Room password must be a valid UUID');
+
+export const SetRoomPasswordRequestSchema = z.object({
+  type: z.literal('set_room_password'),
+  roomKey: RoomKeySchema,
+  password: z.union([
+    RoomPasswordSchema,
+    z.literal(''), // Allow empty string to trigger server-side password generation
+  ]).optional(), // null/undefined to remove password
+});
+
+export const JoinRoomWithPasswordRequestSchema = z.object({
+  type: z.literal('join_room_with_password'),
+  roomKey: RoomKeySchema,
+  password: RoomPasswordSchema,
+  user: UserSchema.omit({ id: true, isOnline: true, lastSeen: true }),
+  fingerprint: BrowserFingerprintSchema.optional(),
+});
+
+export const ShareRoomLinkRequestSchema = z.object({
+  type: z.literal('share_room_link'),
+  roomKey: RoomKeySchema,
+});
+
 export const WebSocketMessageSchema = z.discriminatedUnion('type', [
   TextMessageSchema,
   FileMessageSchema,
   JoinRoomRequestSchema,
+  JoinRoomWithPasswordRequestSchema,
   LeaveRoomRequestSchema,
   UserListMessageSchema,
+  SetRoomPasswordRequestSchema,
+  ShareRoomLinkRequestSchema,
   z.object({ type: z.literal('ping'), timestamp: z.date() }),
   z.object({ type: z.literal('pong'), timestamp: z.date() }),
 ]);
@@ -150,4 +177,5 @@ export const RoomInfoSchema = z.object({
   messageCount: z.number().min(0),
   createdAt: z.date(),
   lastActivity: z.date(),
+  hasPassword: z.boolean().optional(),
 });

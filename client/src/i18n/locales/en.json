@@ -16,6 +16,7 @@
     "or": "or",
     "quickCreateButton": "Quick Create Room",
     "errors": {
+      "roomKeyRequired": "Please enter room key",
       "required": "Please enter both room key and username",
       "invalidKey": "Room key can only contain letters, numbers, hyphens, and underscores",
       "tooShort": "Room key must be at least 6 characters",
@@ -29,12 +30,26 @@
       "usernameFormat": "Letters, numbers, spaces, dots, underscores and hyphens only"
     }
   },
+  "passwordInput": {
+    "title": "Enter Room Password",
+    "description": "Room {{roomKey}} requires a password",
+    "password": "Room Password",
+    "passwordPlaceholder": "Enter room password",
+    "joinButton": "Join Room",
+    "cancelButton": "Cancel",
+    "joining": "Joining...",
+    "errors": {
+      "required": "Please enter the room password"
+    }
+  },
   "room": {
     "title": "Room: {{roomKey}}",
     "usersOnline": "{{count}} user online",
     "usersOnline_other": "{{count}} users online",
     "leave": "Leave",
     "share": "Share",
+    "setPassword": "Set Password",
+    "removePassword": "Remove Password",
     "usersInRoom": "Users in room",
     "you": "(You)",
     "online": "Online",
@@ -84,7 +99,16 @@
     "fileRetentionExpired": "File expired",
     "fileRetentionExpiredDesc": "{{fileName}} was deleted after 12 hours of retention",
     "shareUrlCopied": "Share link copied",
-    "shareUrlCopiedDesc": "Room share link has been copied to clipboard"
+    "shareUrlCopiedDesc": "Room share link has been copied to clipboard",
+    "passwordRequired": "Room Password Required",
+    "passwordRequiredDesc": "This room requires a password to enter",
+    "passwordSet": "Room Password Set",
+    "passwordSetDesc": "Room is now password protected",
+    "passwordRemoved": "Room Password Removed", 
+    "passwordRemovedDesc": "Room is now publicly accessible",
+    "linkCopied": "Share Link Copied",
+    "linkCopiedDesc": "Room link with password has been copied to clipboard",
+    "linkCopyFailed": "Failed to copy link"
   },
   "share": {
     "title": "Join Cloud Clipboard Room",

@@ -3,7 +3,8 @@ import type {
   RoomKey, 
   User, 
   TextMessage, 
-  FileMessage 
+  FileMessage,
+  RoomPassword
 } from '@cloud-clipboard/shared';
 import { EventEmitter } from 'events';
 
@@ -40,6 +41,38 @@ export class RoomService extends EventEmitter {
     const room = this.getRoomOrCreate(key);
     room.addUser(user);
     return room;
+  }
+
+  joinRoomWithPassword(key: RoomKey, user: User, password: RoomPassword): { success: boolean; room?: RoomModel; error?: string } {
+    const room = this.getRoom(key);
+    
+    if (!room) {
+      return { success: false, error: 'Room not found' };
+    }
+
+    if (!room.hasPassword()) {
+      return { success: false, error: 'Room does not require a password' };
+    }
+
+    if (!room.validatePassword(password)) {
+      return { success: false, error: 'Invalid password' };
+    }
+
+    room.addUser(user);
+    return { success: true, room };
+  }
+
+  setRoomPassword(key: RoomKey, password?: RoomPassword): boolean {
+    const room = this.getRoom(key);
+    if (!room) return false;
+
+    room.setPassword(password);
+    return true;
+  }
+
+  isRoomPasswordProtected(key: RoomKey): boolean {
+    const room = this.getRoom(key);
+    return room ? room.hasPassword() : false;
   }
 
   leaveRoom(key: RoomKey, userId: string): boolean {
