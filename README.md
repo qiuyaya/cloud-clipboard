@@ -1,6 +1,6 @@
 # Cloud Clipboard / 云剪贴板
 
-*中文 | [English](#english)*
+_中文 | [English](#english)_
 
 一个实时云剪贴板应用程序，允许您使用基于房间的身份验证在不同设备之间安全地共享文本和文件。
 
@@ -22,6 +22,8 @@
 - 🔔 **系统通知** - 文件上传/删除、房间销毁等事件的清晰通知
 - 🐛 **调试日志** - 可配置的前端和后端调试日志系统
 - 🌍 **多语言** - 支持中文和英文界面
+- 🔒 **房间密码** - 可选的房间密码保护功能
+- 🧪 **全面测试** - 单元测试、集成测试和E2E测试覆盖
 
 ## 🏗️ 架构
 
@@ -35,6 +37,7 @@
 ## 🛠️ 技术栈
 
 ### 后端
+
 - **运行时**: Bun
 - **框架**: Express.js
 - **WebSocket**: Socket.IO
@@ -43,6 +46,7 @@
 - **文件上传**: Multer
 
 ### 前端
+
 - **框架**: React 18
 - **构建工具**: Vite
 - **样式**: Tailwind CSS
@@ -51,11 +55,13 @@
 - **验证**: Zod schemas
 
 ### 共享
+
 - **类型系统**: 严格模式的TypeScript
 - **验证**: Zod schemas
 - **工具**: 共享工具函数
 
 ### 桌面
+
 - **框架**: Tauri (Rust + WebView)
 - **前端集成**: React + TypeScript 复用
 - **系统功能**: 剪切板监听、系统通知、自动启动
@@ -64,6 +70,7 @@
 ## 🚀 快速开始
 
 ### 前置条件
+
 - 系统中安装了 [Bun](https://bun.sh)
 - （可选）桌面应用需要 [Rust](https://rustup.rs/) 环境
 
@@ -75,14 +82,10 @@
    bun install
    ```
 
-3. 构建共享包：
-   ```bash
-   bun run shared:build
-   ```
-
 ### 开发
 
 同时启动服务器和客户端开发模式：
+
 ```bash
 bun run dev
 ```
@@ -90,16 +93,19 @@ bun run dev
 或者分别启动：
 
 **服务器** (运行在 http://localhost:3001)：
+
 ```bash
 bun run server:dev
 ```
 
 **客户端** (运行在 http://localhost:3000)：
+
 ```bash
 bun run client:dev
 ```
 
 **桌面应用**：
+
 ```bash
 bun run desktop:dev
 ```
@@ -107,16 +113,19 @@ bun run desktop:dev
 ### 生产环境
 
 构建所有包（包含统一部署）：
+
 ```bash
 bun run build
 ```
 
 启动统一服务（前端+后端）：
+
 ```bash
 bun run start
 ```
 
 构建桌面应用：
+
 ```bash
 bun run desktop:build
 ```
@@ -140,16 +149,16 @@ bun run desktop:build
 
 ```javascript
 // 启用调试模式
-cloudClipboardDebug.enable()
+cloudClipboardDebug.enable();
 
 // 设置日志级别
-cloudClipboardDebug.setLevel("debug")  // debug, info, warn, error
+cloudClipboardDebug.setLevel('debug'); // debug, info, warn, error
 
 // 查看配置
-cloudClipboardDebug.getConfig()
+cloudClipboardDebug.getConfig();
 
 // 关闭调试
-cloudClipboardDebug.disable()
+cloudClipboardDebug.disable();
 ```
 
 ### 后端日志配置
@@ -188,8 +197,9 @@ bun run server:dev
 ## 🌍 环境变量
 
 ### 服务器
+
 - `PORT` - 服务器端口（默认：3001）
-- `CLIENT_URL` - 前端URL用于CORS（默认：*）
+- `CLIENT_URL` - 前端URL用于CORS（默认：\*）
 - `NODE_ENV` - 环境模式
 - `LOG_LEVEL` - 日志级别（DEBUG, INFO, WARN, ERROR, SILENT）
 - `LOG_COLORS` - 彩色日志输出（true/false）
@@ -197,6 +207,7 @@ bun run server:dev
 - `LOG_CONTEXT` - 上下文标签（true/false）
 
 ### 客户端
+
 - `VITE_SERVER_URL` - 后端服务器URL（默认：http://localhost:3001）
 
 ## 📋 开发命令
@@ -218,7 +229,6 @@ bun run type-check
 bun run lint
 
 # 构建单个包
-bun run shared:build
 bun run server:build
 bun run client:build
 bun run desktop:build
@@ -249,7 +259,7 @@ bun run icons:sync-desktop     # 同步桌面图标
 
 # English
 
-*[中文](#cloud-clipboard--云剪贴板) | English*
+_[中文](#cloud-clipboard--云剪贴板) | English_
 
 A real-time cloud clipboard application that allows you to share text and files across different devices securely using room-based authentication.
 
@@ -271,6 +281,8 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 🔔 **System Notifications** - Clear notifications for file uploads/deletions, room destruction events
 - 🐛 **Debug Logging** - Configurable frontend and backend debug logging system
 - 🌍 **Multilingual** - Support for Chinese and English interfaces
+- 🔒 **Room Password** - Optional room password protection feature
+- 🧪 **Comprehensive Testing** - Unit tests, integration tests, and E2E test coverage
 
 ## 🏗️ Architecture
 
@@ -284,6 +296,7 @@ This project is built as a monorepo with four main packages:
 ## 🛠️ Tech Stack
 
 ### Backend
+
 - **Runtime**: Bun
 - **Framework**: Express.js
 - **WebSockets**: Socket.IO
@@ -292,6 +305,7 @@ This project is built as a monorepo with four main packages:
 - **File Upload**: Multer
 
 ### Frontend
+
 - **Framework**: React 18
 - **Build Tool**: Vite
 - **Styling**: Tailwind CSS
@@ -300,11 +314,13 @@ This project is built as a monorepo with four main packages:
 - **Validation**: Zod schemas
 
 ### Shared
+
 - **Type System**: TypeScript with strict mode
 - **Validation**: Zod schemas
 - **Utilities**: Shared utility functions
 
 ### Desktop
+
 - **Framework**: Tauri (Rust + WebView)
 - **Frontend Integration**: React + TypeScript reuse
 - **System Features**: Clipboard monitoring, system notifications, autostart
@@ -313,6 +329,7 @@ This project is built as a monorepo with four main packages:
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - [Bun](https://bun.sh) installed on your system
 - (Optional) [Rust](https://rustup.rs/) environment for desktop application
 
@@ -324,14 +341,10 @@ This project is built as a monorepo with four main packages:
    bun install
    ```
 
-3. Build the shared package:
-   ```bash
-   bun run shared:build
-   ```
-
 ### Development
 
 Start both server and client in development mode:
+
 ```bash
 bun run dev
 ```
@@ -339,16 +352,19 @@ bun run dev
 Or start them separately:
 
 **Server** (runs on http://localhost:3001):
+
 ```bash
 bun run server:dev
 ```
 
 **Client** (runs on http://localhost:3000):
+
 ```bash
 bun run client:dev
 ```
 
 **Desktop Application**:
+
 ```bash
 bun run desktop:dev
 ```
@@ -356,16 +372,19 @@ bun run desktop:dev
 ### Production
 
 Build all packages (with unified deployment):
+
 ```bash
 bun run build
 ```
 
 Start unified service (frontend + backend):
+
 ```bash
 bun run start
 ```
 
 Build desktop application:
+
 ```bash
 bun run desktop:build
 ```
@@ -389,16 +408,16 @@ Use the following commands in the browser console:
 
 ```javascript
 // Enable debug mode
-cloudClipboardDebug.enable()
+cloudClipboardDebug.enable();
 
 // Set log level
-cloudClipboardDebug.setLevel("debug")  // debug, info, warn, error
+cloudClipboardDebug.setLevel('debug'); // debug, info, warn, error
 
 // Check configuration
-cloudClipboardDebug.getConfig()
+cloudClipboardDebug.getConfig();
 
 // Disable debug
-cloudClipboardDebug.disable()
+cloudClipboardDebug.disable();
 ```
 
 ### Backend Logging Configuration
@@ -437,8 +456,9 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 ## 🌍 Environment Variables
 
 ### Server
+
 - `PORT` - Server port (default: 3001)
-- `CLIENT_URL` - Frontend URL for CORS (default: *)
+- `CLIENT_URL` - Frontend URL for CORS (default: \*)
 - `NODE_ENV` - Environment mode
 - `LOG_LEVEL` - Log level (DEBUG, INFO, WARN, ERROR, SILENT)
 - `LOG_COLORS` - Colored log output (true/false)
@@ -446,6 +466,7 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 - `LOG_CONTEXT` - Context labels (true/false)
 
 ### Client
+
 - `VITE_SERVER_URL` - Backend server URL (default: http://localhost:3001)
 
 ## 📋 Development Commands
@@ -467,7 +488,6 @@ bun run type-check
 bun run lint
 
 # Build individual packages
-bun run shared:build
 bun run server:build
 bun run client:build
 bun run desktop:build

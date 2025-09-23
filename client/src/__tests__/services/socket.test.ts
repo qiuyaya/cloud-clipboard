@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { io } from 'socket.io-client';
-import { socketService } from './socket';
+import { socketService } from '../../services/socket';
 import type { 
   JoinRoomRequest, 
   TextMessage, 

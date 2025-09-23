@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { Server } from 'http';
 import express from 'express';
-import { RoomService } from './services/RoomService';
-import { FileManager } from './services/FileManager';
-import { createRoomRoutes } from './routes/rooms';
-import { createFileRoutes } from './routes/files';
+import { RoomService } from '../services/RoomService';
+import { FileManager } from '../services/FileManager';
+import { createRoomRoutes } from '../routes/rooms';
+import { createFileRoutes } from '../routes/files';
 import type { APIResponse } from '@cloud-clipboard/shared';
 
 describe('Integration Tests', () => {

@@ -1,0 +1,5 @@
+# 运行lint-staged（代码格式化和linting）
+echo "Running code formatting and linting..."
+npx lint-staged
+
+echo "Pre-commit checks completed!"

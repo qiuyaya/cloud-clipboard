@@ -4,11 +4,11 @@
     "description": "Enter a room key to share text and files across your devices"
   },
   "roomJoin": {
-    "title": "Cloud Clipboard", 
+    "title": "Cloud Clipboard",
     "description": "Enter a room key to share text and files across your devices",
     "roomKey": "Room Key",
     "roomKeyPlaceholder": "Enter room key",
-    "username": "Your Name", 
+    "username": "Your Name",
     "usernamePlaceholder": "Enter your name",
     "joinButton": "Join Room",
     "joining": "Joining...",
@@ -104,11 +104,13 @@
     "passwordRequiredDesc": "This room requires a password to enter",
     "passwordSet": "Room Password Set",
     "passwordSetDesc": "Room is now password protected",
-    "passwordRemoved": "Room Password Removed", 
+    "passwordRemoved": "Room Password Removed",
     "passwordRemovedDesc": "Room is now publicly accessible",
     "linkCopied": "Share Link Copied",
     "linkCopiedDesc": "Room link with password has been copied to clipboard",
-    "linkCopyFailed": "Failed to copy link"
+    "linkCopyFailed": "Failed to copy link",
+    "sessionExpired": "Session Expired",
+    "sessionExpiredDesc": "Room or user no longer exists, please rejoin the room"
   },
   "share": {
     "title": "Join Cloud Clipboard Room",

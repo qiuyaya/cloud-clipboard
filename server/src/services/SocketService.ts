@@ -15,6 +15,8 @@ import {
   generateUserIdFromFingerprint,
   generateDefaultUsername,
   detectDeviceType,
+  SOCKET_RATE_LIMITS,
+  CLEANUP_INTERVALS,
 } from '@cloud-clipboard/shared';
 import type {
   ServerToClientEvents,
@@ -56,7 +58,7 @@ export class SocketService {
     // Clean up rate limit data every 5 minutes
     setInterval(() => {
       this.cleanupRateLimits();
-    }, 5 * 60 * 1000);
+    }, CLEANUP_INTERVALS.RATE_LIMIT_CLEANUP);
   }
 
   private checkRateLimit(socketId: string, maxRequests: number, windowMs: number): boolean {
@@ -95,7 +97,7 @@ export class SocketService {
 
       socket.on('joinRoom', (data: JoinRoomRequest) => {
         log.debug('JoinRoom event received', { socketId: socket.id, data }, 'SocketService');
-        if (this.checkRateLimit(socket.id, 5, 60000)) { // 5 joins per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.JOIN_ROOM.MAX_REQUESTS, SOCKET_RATE_LIMITS.JOIN_ROOM.WINDOW_MS)) {
           log.debug('Rate limit check passed for join room', { socketId: socket.id }, 'SocketService');
           this.handleJoinRoom(socket, data);
         } else {
@@ -106,7 +108,7 @@ export class SocketService {
 
       socket.on('joinRoomWithPassword', (data: JoinRoomWithPasswordRequest) => {
         log.debug('JoinRoomWithPassword event received', { socketId: socket.id, roomKey: data.roomKey }, 'SocketService');
-        if (this.checkRateLimit(socket.id, 5, 60000)) { // 5 joins per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.JOIN_ROOM.MAX_REQUESTS, SOCKET_RATE_LIMITS.JOIN_ROOM.WINDOW_MS)) {
           this.handleJoinRoomWithPassword(socket, data);
         } else {
           socket.emit('error', 'Too many join attempts. Please wait.');
@@ -114,7 +116,7 @@ export class SocketService {
       });
 
       socket.on('leaveRoom', (data: LeaveRoomRequest) => {
-        if (this.checkRateLimit(socket.id, 10, 60000)) { // 10 leaves per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.LEAVE_ROOM.MAX_REQUESTS, SOCKET_RATE_LIMITS.LEAVE_ROOM.WINDOW_MS)) {
           this.handleLeaveRoom(socket, data);
         } else {
           socket.emit('error', 'Too many leave attempts. Please wait.');
@@ -122,7 +124,7 @@ export class SocketService {
       });
 
       socket.on('sendMessage', (message: TextMessage | FileMessage) => {
-        if (this.checkRateLimit(socket.id, 30, 60000)) { // 30 messages per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.SEND_MESSAGE.MAX_REQUESTS, SOCKET_RATE_LIMITS.SEND_MESSAGE.WINDOW_MS)) {
           this.handleSendMessage(socket, message);
         } else {
           socket.emit('error', 'Too many messages. Please wait.');
@@ -130,7 +132,7 @@ export class SocketService {
       });
 
       socket.on('requestUserList', (roomKey: string) => {
-        if (this.checkRateLimit(socket.id, 20, 60000)) { // 20 user list requests per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.USER_LIST.MAX_REQUESTS, SOCKET_RATE_LIMITS.USER_LIST.WINDOW_MS)) {
           this.handleRequestUserList(socket, roomKey);
         } else {
           socket.emit('error', 'Too many requests. Please wait.');
@@ -138,7 +140,7 @@ export class SocketService {
       });
 
       socket.on('setRoomPassword', (data: SetRoomPasswordRequest) => {
-        if (this.checkRateLimit(socket.id, 10, 60000)) { // 10 password changes per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.PASSWORD_CHANGE.MAX_REQUESTS, SOCKET_RATE_LIMITS.PASSWORD_CHANGE.WINDOW_MS)) {
           this.handleSetRoomPassword(socket, data);
         } else {
           socket.emit('error', 'Too many requests. Please wait.');
@@ -146,7 +148,7 @@ export class SocketService {
       });
 
       socket.on('shareRoomLink', (data: ShareRoomLinkRequest) => {
-        if (this.checkRateLimit(socket.id, 20, 60000)) { // 20 share requests per minute
+        if (this.checkRateLimit(socket.id, SOCKET_RATE_LIMITS.SHARE_ROOM.MAX_REQUESTS, SOCKET_RATE_LIMITS.SHARE_ROOM.WINDOW_MS)) {
           this.handleShareRoomLink(socket, data);
         } else {
           socket.emit('error', 'Too many requests. Please wait.');

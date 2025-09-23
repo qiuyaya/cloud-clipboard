@@ -108,7 +108,9 @@
     "passwordRemovedDesc": "房间现在可公开访问",
     "linkCopied": "分享链接已复制",
     "linkCopiedDesc": "包含密钥的房间链接已复制到剪贴板",
-    "linkCopyFailed": "复制链接失败"
+    "linkCopyFailed": "复制链接失败",
+    "sessionExpired": "会话已过期",
+    "sessionExpiredDesc": "房间或用户不存在，请重新加入房间"
   },
   "share": {
     "title": "加入云剪切板房间",
@@ -117,7 +119,7 @@
   },
   "theme": {
     "light": "浅色",
-    "dark": "深色", 
+    "dark": "深色",
     "system": "跟随系统"
   },
   "language": {

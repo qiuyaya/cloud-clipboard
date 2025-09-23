@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { APIResponse } from '@cloud-clipboard/shared';
+import { HTTP_RATE_LIMITS, CLEANUP_INTERVALS } from '@cloud-clipboard/shared';
 
 interface RateLimitRecord {
   requests: number;
@@ -13,8 +14,8 @@ class RateLimiter {
   private keyGenerator: (req: Request) => string;
 
   constructor(
-    windowMs: number = 15 * 60 * 1000, // 15 minutes
-    maxRequests: number = 100,
+    windowMs: number = HTTP_RATE_LIMITS.GENERAL.WINDOW_MS,
+    maxRequests: number = HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS,
     keyGenerator: (req: Request) => string = (req) => req.ip || 'unknown'
   ) {
     this.windowMs = windowMs;
@@ -22,7 +23,7 @@ class RateLimiter {
     this.keyGenerator = keyGenerator;
 
     // Clean up expired records every 5 minutes
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    setInterval(() => this.cleanup(), CLEANUP_INTERVALS.RATE_LIMIT_CLEANUP);
   }
 
   private cleanup(): void {
@@ -74,28 +75,28 @@ class RateLimiter {
 
 // Different rate limiters for different endpoints
 export const generalRateLimit = new RateLimiter(
-  15 * 60 * 1000, // 15 minutes
-  100             // 100 requests per window
+  HTTP_RATE_LIMITS.GENERAL.WINDOW_MS,
+  HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS
 );
 
 export const uploadRateLimit = new RateLimiter(
-  60 * 1000,      // 1 minute
-  5               // 5 uploads per minute
+  HTTP_RATE_LIMITS.UPLOAD.WINDOW_MS,
+  HTTP_RATE_LIMITS.UPLOAD.MAX_REQUESTS
 );
 
 export const authRateLimit = new RateLimiter(
-  15 * 60 * 1000, // 15 minutes
-  20              // 20 auth attempts per window
+  HTTP_RATE_LIMITS.AUTH.WINDOW_MS,
+  HTTP_RATE_LIMITS.AUTH.MAX_REQUESTS
 );
 
 export const strictRateLimit = new RateLimiter(
-  5 * 60 * 1000,  // 5 minutes
-  50              // 50 requests per 5 minutes
+  HTTP_RATE_LIMITS.STRICT.WINDOW_MS,
+  HTTP_RATE_LIMITS.STRICT.MAX_REQUESTS
 );
 
 // IP + Room based rate limiter for room-specific actions
 export const roomActionRateLimit = new RateLimiter(
-  60 * 1000,      // 1 minute
-  30,             // 30 actions per minute
+  HTTP_RATE_LIMITS.ROOM_ACTION.WINDOW_MS,
+  HTTP_RATE_LIMITS.ROOM_ACTION.MAX_REQUESTS,
   (req) => `${req.ip}:${req.roomKey || 'no-room'}`
 );

@@ -10,7 +10,7 @@ import {
   generateBrowserFingerprint,
   generateUserIdFromFingerprint,
   simpleHash,
-} from './utils';
+} from '../utils';
 
 describe('Utility Functions Tests', () => {
   describe('generateUserId', () => {

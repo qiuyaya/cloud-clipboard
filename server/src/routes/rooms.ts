@@ -127,6 +127,43 @@ export const createRoomRoutes = (roomService: RoomService): Router => {
     }
   });
 
+  // Validate if user exists in room - for page refresh recovery
+  router.post('/validate-user', validateBody(z.object({
+    roomKey: RoomKeySchema,
+    userFingerprint: z.string(),
+  })), (req, res) => {
+    try {
+      const { roomKey, userFingerprint } = req.body;
+      const room = roomService.getRoom(roomKey);
+      
+      if (!room) {
+        res.json({
+          success: false,
+          message: 'Room not found',
+          data: { roomExists: false, userExists: false }
+        });
+        return;
+      }
+
+      const users = room.getUserList();
+      const userExists = users.some(user => user.fingerprint === userFingerprint);
+      
+      res.json({
+        success: true,
+        data: { 
+          roomExists: true, 
+          userExists,
+          user: userExists ? users.find(user => user.fingerprint === userFingerprint) : null
+        }
+      });
+    } catch {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to validate user',
+      });
+    }
+  });
+
   // Route for getting room info by path parameter (for testing)
   router.get('/:roomKey', (req, res) => {
     try {

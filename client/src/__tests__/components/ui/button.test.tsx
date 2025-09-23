@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button } from './button';
+import { Button } from '../../../components/ui/button';
 
 describe('Button Component', () => {
   it('should render with default variant and size', () => {

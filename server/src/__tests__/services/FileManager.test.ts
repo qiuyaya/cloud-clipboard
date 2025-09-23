@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
-import { FileManager } from './FileManager';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { FileManager } from '../../services/FileManager';
 import * as fs from 'fs';
 import type { RoomKey } from '@cloud-clipboard/shared';
 

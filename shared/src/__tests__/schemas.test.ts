@@ -11,7 +11,7 @@ import {
   APIResponseSchema,
   P2PConnectionSchema,
   RoomInfoSchema,
-} from './schemas';
+} from '../schemas';
 
 describe('Schema Validation Tests', () => {
   describe('RoomKeySchema', () => {

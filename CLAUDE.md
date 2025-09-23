@@ -12,24 +12,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ### Development
-- `bun run dev` - Start both server and client in development mode (server on port 3001, client on port 3000/3002)
-- `bun run shared:build` - Build shared package (must be run after modifying shared types/schemas)
+
+- `bun run dev` - Start both server and client in development mode (server on port 3001, client on port 3000)
 - `bun run server:dev` - Start only the server (port 3001)
 - `bun run client:dev` - Start only the client (port 3000)
+- `bun run desktop:dev` - Start desktop application in development mode
 - `bun run build` - Build all packages for production
+- `bun run desktop:build` - Build desktop application for production
 
 ### Code Quality
+
 - `bun run lint` - Run ESLint on all TypeScript files
 - `bun run type-check` - Run TypeScript compiler without emitting files
+
+### Testing
+
+- `bun run test` - Run all tests across all packages
+- `bun run test:watch` - Run tests in watch mode
+- `bun run test:coverage` - Generate test coverage reports
+- `bun run test:integration` - Run integration tests
+- `bun run test:e2e` - Run end-to-end tests
+
+### Icon Management
+
+- `bun run icons:generate` - Generate web icons from source
+- `bun run icons:sync-desktop` - Sync icons to desktop application
+
+### Release Management
+
+- `bun run release` - Create a new release (prompts for version type)
+- `bun run release:patch` - Create a patch release
+- `bun run release:minor` - Create a minor release
+- `bun run release:major` - Create a major release
+- `bun run version:check` - Check version consistency across packages
+
+### Documentation Management
+
+- `bun run docs:sync` - Check documentation consistency with code
+- `bun run docs:setup` - Setup Git hooks for automatic documentation checking
 
 ## Architecture
 
 ### Monorepo Structure
-This is a Bun-based monorepo with three workspaces that must be built in dependency order:
+
+This is a Bun-based monorepo with four workspaces that must be built in dependency order:
 
 1. **`shared/`** - Core types and validation schemas using Zod
-2. **`server/`** - Express.js + Socket.IO backend 
+2. **`server/`** - Express.js + Socket.IO backend
 3. **`client/`** - React + Vite frontend
+4. **`desktop/`** - Tauri-based cross-platform desktop application
 
 ### Key Architectural Patterns
 
@@ -42,8 +73,6 @@ This is a Bun-based monorepo with three workspaces that must be built in depende
 **Date Serialization Handling**: WebSocket transmission converts Date objects to strings. The `formatTimestamp` utility function in `shared/src/utils.ts` handles both Date objects and date strings to prevent RangeError exceptions.
 
 ### Critical Dependencies
-
-**After modifying shared package**: Always run `bun run shared:build` before starting development servers, as both client and server depend on the compiled shared package.
 
 **WebSocket Connection Management**: The client uses a singleton `socketService` in `client/src/services/socket.ts`. Connection stability is managed through careful useEffect dependencies in `App.tsx`.
 
@@ -70,7 +99,7 @@ Uses react-i18next with translations in `client/src/i18n/locales/`. All user-fac
 - No persistent storage - all data is in-memory only
 - Files are uploaded to server storage, not database
 - Maximum file size is 100MB
-- Room keys can be any non-empty string
+- Room keys must be 6-50 characters, alphanumeric with underscores/hyphens, containing both letters and numbers
 - Users are automatically removed from rooms on disconnect
 - New icon system implemented with SVG favicons and PWA manifest support
 - Icons located in `client/public/` directory with multiple sizes for different use cases
@@ -78,6 +107,7 @@ Uses react-i18next with translations in `client/src/i18n/locales/`. All user-fac
 ### Common Issues and Fixes
 
 **Date Serialization**: WebSocket transmission converts Date objects to strings. Always check for and convert string dates back to Date objects before Zod validation:
+
 ```typescript
 const userWithDate = {
   ...user,
@@ -85,10 +115,99 @@ const userWithDate = {
 };
 ```
 
-**File Upload URLs**: Server returns absolute URLs for file downloads. The client handles both relative and absolute URL formats for backwards compatibility.\n\n### New Features Implemented\n\n**Browser Refresh Persistence**: Users remain in rooms after browser refresh through localStorage persistence. Auto-rejoin happens on reconnection.\n\n**Inactivity Management**: 2-hour inactivity timer automatically logs out inactive users. Activity is tracked through mouse, keyboard, and touch events.\n\n**Unique Usernames**: Duplicate usernames automatically get random suffixes (format: `username_abc123`) when joining rooms.\n\n**Room Auto-Destruction**: Rooms are automatically destroyed when all users go offline or after 24 hours of inactivity. Triggers file cleanup.\n\n**File Management**: \n- Files are tracked by room and upload time\n- Auto-deletion when rooms are destroyed  \n- 12-hour maximum retention policy\n- Hourly cleanup process\n- System notifications for all file operations\n\n**System Notifications**: Clear messages for file uploads, deletions, room destruction, and auto-logout events in both English and Chinese.
+**File Upload URLs**: Server returns absolute URLs for file downloads. The client handles both relative and absolute URL formats for backwards compatibility.
+
+### New Features Implemented
+
+**Browser Refresh Persistence**: Users remain in rooms after browser refresh through localStorage persistence. Auto-rejoin happens on reconnection.
+
+**Inactivity Management**: 2-hour inactivity timer automatically logs out inactive users. Activity is tracked through mouse, keyboard, and touch events.
+
+**Unique Usernames**: Duplicate usernames automatically get random suffixes (format: `username_abc123`) when joining rooms.
+
+**Room Auto-Destruction**: Rooms are automatically destroyed when all users go offline or after 24 hours of inactivity. Triggers file cleanup.
+
+**File Management**:
+
+- Files are tracked by room and upload time
+- Auto-deletion when rooms are destroyed
+- 12-hour maximum retention policy
+- Hourly cleanup process
+- System notifications for all file operations
+
+**System Notifications**: Clear messages for file uploads, deletions, room destruction, and auto-logout events in both English and Chinese.
+
+**Room Password Protection**: Optional password protection for rooms with secure sharing functionality.
+
+**Desktop Application**: Cross-platform desktop app with:
+
+- Automatic clipboard monitoring
+- System notifications
+- Native file system integration
+- Auto-startup support
+- Window state persistence
+
+**Testing Framework**: Comprehensive test coverage with:
+
+- Unit tests for all modules
+- Integration tests for API endpoints
+- End-to-end tests for user flows
+- Automated test coverage reporting
+
+**Debug Logging System**: Configurable logging for both frontend and backend:
+
+- Browser console debug utilities
+- Server-side structured logging
+- Environment-based log level control
+- Colored output and timestamps
 
 **Icon System**: Modern SVG-based icon design featuring cloud and clipboard elements with gradients. Includes:
+
 - Main icon (`/client/public/icon.svg`) - 256x256 design
 - Multiple favicon sizes (16x16, 32x32, 48x48, 180x180, 192x192, 512x512)
 - PWA manifest (`/client/public/site.webmanifest`) with proper theme colors
 - HTML files updated with proper favicon references and meta tags
+
+## 文档维护指南
+
+### 需要更新文档的场景
+
+**新增或修改功能时**:
+
+1. 更新 README.md 的功能特性列表（中英文）
+2. 更新 CLAUDE.md 的架构说明和新功能实现部分
+3. 如涉及API变更，更新相关接口文档
+
+**新增或修改命令时**:
+
+1. 在 package.json 中添加新的 scripts
+2. 同步更新 CLAUDE.md 的 Essential Commands 部分
+3. 确保所有重要命令都有对应的中文说明
+
+**修改架构或依赖时**:
+
+1. 更新 CLAUDE.md 的架构说明
+2. 更新 README.md 的技术栈信息
+3. 如有重大变更，更新 CHANGELOG.md
+
+**新增环境变量时**:
+
+1. 更新 README.md 的环境变量部分
+2. 更新相关的配置说明文档
+
+### 文档一致性检查内容
+
+自动检查包括但不限于：
+
+- 版本号一致性（所有 package.json 文件）
+- 功能特性文档与实际代码实现的匹配
+- 命令文档与 package.json scripts 的一致性
+- 架构说明与实际项目结构的对应
+
+### 最佳实践
+
+1. **功能开发**: 新功能完成后立即更新相关文档
+2. **定期维护**: 每次版本发布前全面检查文档完整性
+3. **命令更新**: 添加新的 npm/bun 脚本后立即更新文档
+
+遵循这些指南可以确保项目文档始终与代码实现保持同步，为后续开发和维护提供准确的参考。
