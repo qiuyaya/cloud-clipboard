@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Main application service
@@ -12,10 +12,10 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - UPLOAD_DIR=/app/uploads
-      - MAX_FILE_SIZE=104857600  # 100MB in bytes
-      - ROOM_CLEANUP_INTERVAL=3600000  # 1 hour in milliseconds
+      - MAX_FILE_SIZE=104857600 # 100MB in bytes
+      - ROOM_CLEANUP_INTERVAL=3600000 # 1 hour in milliseconds
       - FILE_RETENTION_HOURS=12
-      - RATE_LIMIT_WINDOW_MS=60000  # 1 minute
+      - RATE_LIMIT_WINDOW_MS=60000 # 1 minute
       - RATE_LIMIT_MAX_REQUESTS=100
     volumes:
       - uploads:/app/uploads
@@ -68,7 +68,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=3600  # Check every hour
+      - WATCHTOWER_POLL_INTERVAL=3600 # Check every hour
       - WATCHTOWER_INCLUDE_RESTARTING=true
     networks:
       - cloud-clipboard-network

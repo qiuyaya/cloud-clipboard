@@ -111,7 +111,7 @@ Uses react-i18next with translations in `client/src/i18n/locales/`. All user-fac
 ```typescript
 const userWithDate = {
   ...user,
-  lastSeen: typeof user.lastSeen === 'string' ? new Date(user.lastSeen) : user.lastSeen,
+  lastSeen: typeof user.lastSeen === "string" ? new Date(user.lastSeen) : user.lastSeen,
 };
 ```
 

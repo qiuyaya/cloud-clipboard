@@ -1,11 +1,11 @@
-import { inspect } from 'util';
+import { inspect } from "util";
 
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
   WARN = 2,
   ERROR = 3,
-  SILENT = 4
+  SILENT = 4,
 }
 
 interface LogConfig {
@@ -20,7 +20,7 @@ class Logger {
     level: LogLevel.INFO,
     colors: true,
     timestamps: true,
-    context: true
+    context: true,
   };
 
   constructor() {
@@ -35,21 +35,21 @@ class Logger {
     }
 
     // Load other config from environment
-    if (process.env.LOG_COLORS === 'false') {
+    if (process.env.LOG_COLORS === "false") {
       this.config.colors = false;
     }
-    
-    if (process.env.LOG_TIMESTAMPS === 'false') {
+
+    if (process.env.LOG_TIMESTAMPS === "false") {
       this.config.timestamps = false;
     }
-    
-    if (process.env.LOG_CONTEXT === 'false') {
+
+    if (process.env.LOG_CONTEXT === "false") {
       this.config.context = false;
     }
   }
 
   setLevel(level: LogLevel | string) {
-    if (typeof level === 'string') {
+    if (typeof level === "string") {
       const upperLevel = level.toUpperCase();
       if (upperLevel in LogLevel) {
         this.config.level = LogLevel[upperLevel as keyof typeof LogLevel];
@@ -80,7 +80,7 @@ class Logger {
   }
 
   private formatMessage(level: string, message: string, data?: any, context?: string): string {
-    let output = '';
+    let output = "";
 
     // Add timestamp
     if (this.config.timestamps) {
@@ -95,12 +95,12 @@ class Logger {
     // Add level with colors
     if (this.config.colors) {
       const colors = {
-        DEBUG: '\x1b[36m', // cyan
-        INFO: '\x1b[32m',  // green
-        WARN: '\x1b[33m',  // yellow
-        ERROR: '\x1b[31m', // red
+        DEBUG: "\x1b[36m", // cyan
+        INFO: "\x1b[32m", // green
+        WARN: "\x1b[33m", // yellow
+        ERROR: "\x1b[31m", // red
       };
-      const color = colors[level as keyof typeof colors] || '';
+      const color = colors[level as keyof typeof colors] || "";
       output += `${color}[${level}]\x1b[0m `;
     } else {
       output += `[${level}] `;
@@ -120,9 +120,14 @@ class Logger {
 
     // Add data if provided
     if (data !== undefined) {
-      const dataStr = typeof data === 'object' 
-        ? inspect(data, { colors: this.config.colors, depth: 3, compact: true })
-        : String(data);
+      const dataStr =
+        typeof data === "object"
+          ? inspect(data, {
+              colors: this.config.colors,
+              depth: 3,
+              compact: true,
+            })
+          : String(data);
       output += ` ${dataStr}`;
     }
 
@@ -131,25 +136,25 @@ class Logger {
 
   debug(message: string, data?: any, context?: string) {
     if (this.shouldLog(LogLevel.DEBUG)) {
-      console.debug(this.formatMessage('DEBUG', message, data, context));
+      console.debug(this.formatMessage("DEBUG", message, data, context));
     }
   }
 
   info(message: string, data?: any, context?: string) {
     if (this.shouldLog(LogLevel.INFO)) {
-      console.info(this.formatMessage('INFO', message, data, context));
+      console.info(this.formatMessage("INFO", message, data, context));
     }
   }
 
   warn(message: string, data?: any, context?: string) {
     if (this.shouldLog(LogLevel.WARN)) {
-      console.warn(this.formatMessage('WARN', message, data, context));
+      console.warn(this.formatMessage("WARN", message, data, context));
     }
   }
 
   error(message: string, data?: any, context?: string) {
     if (this.shouldLog(LogLevel.ERROR)) {
-      console.error(this.formatMessage('ERROR', message, data, context));
+      console.error(this.formatMessage("ERROR", message, data, context));
     }
   }
 

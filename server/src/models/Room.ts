@@ -5,7 +5,7 @@ import type {
   FileMessage,
   RoomKey,
   RoomPassword,
-} from '@cloud-clipboard/shared';
+} from "@cloud-clipboard/shared";
 
 export class RoomModel implements Room {
   key: RoomKey;
@@ -52,11 +52,11 @@ export class RoomModel implements Room {
 
   addMessage(message: TextMessage | FileMessage): void {
     this.messages.push(message);
-    
+
     if (this.messages.length > this.maxMessages) {
       this.messages = this.messages.slice(-this.maxMessages);
     }
-    
+
     this.updateActivity();
   }
 
@@ -73,7 +73,7 @@ export class RoomModel implements Room {
   }
 
   getOnlineUsers(): User[] {
-    return Array.from(this.users.values()).filter(user => user.isOnline);
+    return Array.from(this.users.values()).filter((user) => user.isOnline);
   }
 
   setPassword(password?: RoomPassword): void {

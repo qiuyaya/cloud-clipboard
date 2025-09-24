@@ -1,6 +1,6 @@
-import type { Request, Response, NextFunction } from 'express';
-import { z, ZodSchema } from 'zod';
-import type { APIResponse } from '@cloud-clipboard/shared';
+import type { Request, Response, NextFunction } from "express";
+import { z, ZodSchema } from "zod";
+import type { APIResponse } from "@cloud-clipboard/shared";
 
 export const validateBody = <T>(schema: ZodSchema<T>) => {
   return (req: Request, res: Response<APIResponse>, next: NextFunction): void => {
@@ -11,13 +11,13 @@ export const validateBody = <T>(schema: ZodSchema<T>) => {
       if (error instanceof z.ZodError) {
         res.status(400).json({
           success: false,
-          message: 'Validation error',
+          message: "Validation error",
           data: error.errors,
         });
       } else {
         res.status(500).json({
           success: false,
-          message: 'Internal server error',
+          message: "Internal server error",
         });
       }
     }
@@ -33,13 +33,13 @@ export const validateQuery = <T>(schema: ZodSchema<T>) => {
       if (error instanceof z.ZodError) {
         res.status(400).json({
           success: false,
-          message: 'Query validation error',
+          message: "Query validation error",
           data: error.errors,
         });
       } else {
         res.status(500).json({
           success: false,
-          message: 'Internal server error',
+          message: "Internal server error",
         });
       }
     }
@@ -55,13 +55,13 @@ export const validateParams = <T>(schema: ZodSchema<T>) => {
       if (error instanceof z.ZodError) {
         res.status(400).json({
           success: false,
-          message: 'Parameter validation error',
+          message: "Parameter validation error",
           data: error.errors,
         });
       } else {
         res.status(500).json({
           success: false,
-          message: 'Internal server error',
+          message: "Internal server error",
         });
       }
     }

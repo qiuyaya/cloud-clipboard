@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import type { z } from "zod";
 import {
   RoomKeySchema,
   MessageTypeSchema,
@@ -18,7 +18,7 @@ import {
   RoomPasswordSchema,
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
-} from './schemas';
+} from "./schemas";
 
 export type RoomKey = z.infer<typeof RoomKeySchema>;
 export type MessageType = z.infer<typeof MessageTypeSchema>;
@@ -35,7 +35,7 @@ export type BrowserFingerprint = z.infer<typeof BrowserFingerprintSchema>;
 export type RoomPassword = z.infer<typeof RoomPasswordSchema>;
 export type SetRoomPasswordRequest = z.infer<typeof SetRoomPasswordRequestSchema>;
 export type ShareRoomLinkRequest = z.infer<typeof ShareRoomLinkRequestSchema>;
-export type APIResponse<T = unknown> = Omit<z.infer<typeof APIResponseSchema>, 'data'> & {
+export type APIResponse<T = unknown> = Omit<z.infer<typeof APIResponseSchema>, "data"> & {
   data?: T;
 };
 export type P2PConnection = z.infer<typeof P2PConnectionSchema>;
@@ -47,7 +47,10 @@ export interface ServerToClientEvents {
   userLeft: (userId: string) => void;
   userList: (users: User[]) => void;
   error: (error: string) => void;
-  systemMessage: (message: { type: 'file_deleted' | 'room_destroyed' | 'file_expired'; data: any }) => void;
+  systemMessage: (message: {
+    type: "file_deleted" | "room_destroyed" | "file_expired";
+    data: any;
+  }) => void;
   roomDestroyed: (data: { roomKey: string; deletedFiles: string[] }) => void;
   roomPasswordSet: (data: { roomKey: string; hasPassword: boolean }) => void;
   roomLinkGenerated: (data: { roomKey: string; shareLink: string }) => void;
@@ -81,7 +84,7 @@ export interface Room {
 
 export interface ClipboardItem {
   id: string;
-  type: 'text' | 'file';
+  type: "text" | "file";
   content?: string;
   fileInfo?: FileInfo;
   timestamp: Date;

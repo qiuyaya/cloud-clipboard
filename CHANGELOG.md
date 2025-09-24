@@ -12,58 +12,47 @@ All notable changes to this project will be documented in this file.
 - chore: release v1.1.0
 - feat: 重构依赖关系和添加HTTP支持
 
-
 ## [1.1.0] - 2025-09-12
 
 - feat: 重构依赖关系和添加HTTP支持
 - fix: 移除frozen-lockfile标志解决Docker构建问题
 
-
 ## [1.0.22] - 2025-09-12
 
 - fix: 移除frozen-lockfile标志解决Docker构建问题
-
 
 ## [1.0.21] - 2025-09-12
 
 - fix: 修复monorepo依赖关系和Docker构建顺序
 - fix: 使用最简化Dockerfile确保构建成功
 
-
 ## [1.0.20] - 2025-09-12
 
 - fix: 简化Dockerfile确保构建稳定性
-
 
 ## [1.0.19] - 2025-09-12
 
 - fix: 修复Docker构建错误并大幅优化镜像体积
 
-
 ## [1.0.18] - 2025-09-12
 
 - fix: 优化Docker构建以减小镜像体积和修复构建错误
-
 
 ## [1.0.17] - 2025-09-12
 
 - fix：更新镜像
 
-
 ## [1.0.16] - 2025-09-12
 
 - fix: 简化Dockerfile以解决复杂多阶段构建问题
-
 
 ## [1.0.15] - 2025-09-12
 
 - fix: 回退Docker Actions到稳定版本
 
-
 ## [1.0.14] - 2025-09-12
 
 - fix: 修复Docker构建失败和安全问题
-
 
 ## [1.0.13] - 2025-09-12
 
@@ -87,10 +76,10 @@ All notable changes to this project will be documented in this file.
 - feat: 实现全面的自动化测试框架并修复所有测试失败问题
 - feat: 实现现代化图标系统和项目基础设施改进
 
-
 ## [Unreleased] - 2025-08-16
 
 ### Added
+
 - 🎨 **Modern Icon System**: Beautiful SVG-based icon design with cloud and clipboard elements
   - Multiple favicon sizes (16x16, 32x32, 48x48, 180x180, 192x192, 512x512)
   - PWA manifest support with proper theme colors
@@ -116,6 +105,7 @@ All notable changes to this project will be documented in this file.
   - New icon management guide
 
 ### Features Present (Previously Implemented)
+
 - 🔄 **Browser Refresh Persistence**: Users remain in rooms after browser refresh
 - ⏰ **Inactivity Management**: 2-hour automatic logout with activity tracking
 - 👤 **Username Deduplication**: Automatic random suffixes for duplicate usernames
@@ -127,16 +117,13 @@ All notable changes to this project will be documented in this file.
 
 - fix: 添加构建诊断并禁用Tauri bundle以解决二进制文件丢失问题
 
-
 ## [1.0.11] - 2025-08-16
 
 - fix: 修复artifact准备脚本以适应不同target目录结构
 
-
 ## [1.0.10] - 2025-08-16
 
 - fix: 修复TypeScript编译错误 - 确保所有代码路径都有返回值
-
 
 ## [1.0.9] - 2025-08-16
 
@@ -144,41 +131,33 @@ All notable changes to this project will be documented in this file.
 - fix: 修复Tauri bundle配置以生成正确的artifacts
 - fix: 修复二进制文件名称以匹配workflow期望
 
-
 ## [1.0.8] - 2025-08-16
 
 - fix: 简化Tauri打包目标为仅app格式
-
 
 ## [1.0.7] - 2025-08-16
 
 - fix: 简化Cargo.toml中的二进制名称
 
-
 ## [1.0.6] - 2025-08-16
 
 - fix: 添加Cargo.toml中缺失的二进制目标配置
-
 
 ## [1.0.5] - 2025-08-16
 
 - fix: 修复Tauri前端资源路径配置
 
-
 ## [1.0.4] - 2025-08-16
 
 - fix: 修复Tauri构建配置问题
-
 
 ## [1.0.3] - 2025-08-16
 
 - fix: 修复GitHub Actions依赖安装和Linux包名问题
 
-
 ## [1.0.2] - 2025-08-16
 
 - fix: 修复GitHub Actions工作流以使用Bun和优化构建
-
 
 ## [1.0.1] - 2025-08-16
 
@@ -202,6 +181,3 @@ All notable changes to this project will be documented in this file.
 - fix: 修复WebSocket连接和国际化问题
 - feat: 增强功能完整性和用户体验
 - feat: 完成基本功能 #none
-
-
-

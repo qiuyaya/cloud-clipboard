@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { DesktopAPI, AppConfig } from './desktop-api';
-import { ClipboardMonitor } from './clipboard-monitor';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { DesktopAPI, AppConfig } from "./desktop-api";
+import { ClipboardMonitor } from "./clipboard-monitor";
 
 interface DesktopContextType {
   config: AppConfig | null;
@@ -15,7 +15,7 @@ const DesktopContext = createContext<DesktopContextType | null>(null);
 export const useDesktop = () => {
   const context = useContext(DesktopContext);
   if (!context) {
-    throw new Error('useDesktop must be used within a DesktopProvider');
+    throw new Error("useDesktop must be used within a DesktopProvider");
   }
   return context;
 };
@@ -25,9 +25,9 @@ interface DesktopProviderProps {
   onClipboardChange?: (text: string) => void;
 }
 
-export const DesktopProvider: React.FC<DesktopProviderProps> = ({ 
-  children, 
-  onClipboardChange 
+export const DesktopProvider: React.FC<DesktopProviderProps> = ({
+  children,
+  onClipboardChange,
 }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [clipboardMonitor, setClipboardMonitor] = useState<ClipboardMonitor | null>(null);
@@ -70,7 +70,7 @@ export const DesktopProvider: React.FC<DesktopProviderProps> = ({
       await DesktopAPI.showNotification(title, body);
     } else {
       // Fallback for web
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { body });
       }
     }
@@ -84,9 +84,5 @@ export const DesktopProvider: React.FC<DesktopProviderProps> = ({
     showNotification,
   };
 
-  return (
-    <DesktopContext.Provider value={contextValue}>
-      {children}
-    </DesktopContext.Provider>
-  );
+  return <DesktopContext.Provider value={contextValue}>{children}</DesktopContext.Provider>;
 };

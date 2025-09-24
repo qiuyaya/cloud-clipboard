@@ -1,35 +1,35 @@
 interface DebugConfig {
   enabled: boolean;
-  level: 'info' | 'warn' | 'error' | 'debug';
+  level: "info" | "warn" | "error" | "debug";
 }
 
 class DebugLogger {
   private config: DebugConfig = {
     enabled: false,
-    level: 'info'
+    level: "info",
   };
 
   constructor() {
     // Check localStorage for saved debug config (only in browser environment)
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      const savedConfig = localStorage.getItem('cloud-clipboard-debug');
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      const savedConfig = localStorage.getItem("cloud-clipboard-debug");
       if (savedConfig) {
         try {
           this.config = { ...this.config, ...JSON.parse(savedConfig) };
         } catch {
-          console.warn('Failed to parse debug config from localStorage');
+          console.warn("Failed to parse debug config from localStorage");
         }
       }
     }
 
     // Expose debug controls to global window object for console access
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       (window as any).cloudClipboardDebug = {
         enable: () => this.enable(),
         disable: () => this.disable(),
-        setLevel: (level: DebugConfig['level']) => this.setLevel(level),
+        setLevel: (level: DebugConfig["level"]) => this.setLevel(level),
         getConfig: () => this.getConfig(),
-        clear: () => this.clear()
+        clear: () => this.clear(),
       };
     }
   }
@@ -37,17 +37,17 @@ class DebugLogger {
   enable() {
     this.config.enabled = true;
     this.saveConfig();
-    console.log('🚀 Cloud Clipboard Debug Mode: ENABLED');
+    console.log("🚀 Cloud Clipboard Debug Mode: ENABLED");
     this.showHelp();
   }
 
   disable() {
     this.config.enabled = false;
     this.saveConfig();
-    console.log('🚀 Cloud Clipboard Debug Mode: DISABLED');
+    console.log("🚀 Cloud Clipboard Debug Mode: DISABLED");
   }
 
-  setLevel(level: DebugConfig['level']) {
+  setLevel(level: DebugConfig["level"]) {
     this.config.level = level;
     this.saveConfig();
     console.log(`🚀 Cloud Clipboard Debug Level: ${level.toUpperCase()}`);
@@ -58,16 +58,16 @@ class DebugLogger {
   }
 
   clear() {
-    this.config = { enabled: false, level: 'info' };
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.removeItem('cloud-clipboard-debug');
+    this.config = { enabled: false, level: "info" };
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      localStorage.removeItem("cloud-clipboard-debug");
     }
-    console.log('🚀 Cloud Clipboard Debug Config: CLEARED');
+    console.log("🚀 Cloud Clipboard Debug Config: CLEARED");
   }
 
   private saveConfig() {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      localStorage.setItem('cloud-clipboard-debug', JSON.stringify(this.config));
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      localStorage.setItem("cloud-clipboard-debug", JSON.stringify(this.config));
     }
   }
 
@@ -82,36 +82,36 @@ class DebugLogger {
     `);
   }
 
-  private shouldLog(level: DebugConfig['level']): boolean {
+  private shouldLog(level: DebugConfig["level"]): boolean {
     if (!this.config.enabled) return false;
-    
-    const levels = ['debug', 'info', 'warn', 'error'];
+
+    const levels = ["debug", "info", "warn", "error"];
     const configLevelIndex = levels.indexOf(this.config.level);
     const logLevelIndex = levels.indexOf(level);
-    
+
     return logLevelIndex >= configLevelIndex;
   }
 
   debug(message: string, ...args: any[]) {
-    if (this.shouldLog('debug')) {
+    if (this.shouldLog("debug")) {
       console.debug(`[DEBUG] ${message}`, ...args);
     }
   }
 
   info(message: string, ...args: any[]) {
-    if (this.shouldLog('info')) {
+    if (this.shouldLog("info")) {
       console.info(`[INFO] ${message}`, ...args);
     }
   }
 
   warn(message: string, ...args: any[]) {
-    if (this.shouldLog('warn')) {
+    if (this.shouldLog("warn")) {
       console.warn(`[WARN] ${message}`, ...args);
     }
   }
 
   error(message: string, ...args: any[]) {
-    if (this.shouldLog('error')) {
+    if (this.shouldLog("error")) {
       console.error(`[ERROR] ${message}`, ...args);
     }
   }

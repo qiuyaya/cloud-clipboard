@@ -5,15 +5,15 @@
  * Generates all required icon formats from the main SVG source
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ASSETS_DIR = path.join(__dirname, '../assets/icons');
-const CLIENT_PUBLIC_DIR = path.join(__dirname, '../client/public');
+const ASSETS_DIR = path.join(__dirname, "../assets/icons");
+const CLIENT_PUBLIC_DIR = path.join(__dirname, "../client/public");
 // const TAURI_ICONS_DIR = path.join(__dirname, '../desktop/src-tauri/icons');
 
 // Main SVG content for the app icon
@@ -64,98 +64,105 @@ const mainIconSVG = `<svg width="256" height="256" viewBox="0 0 256 256" fill="n
 const webSizes = [16, 32, 48, 180, 192, 512];
 
 function generateWebIcons() {
-  console.log('📱 Generating web icons...');
-  
+  console.log("📱 Generating web icons...");
+
   // Main app icon
-  fs.writeFileSync(path.join(CLIENT_PUBLIC_DIR, 'icon.svg'), mainIconSVG);
-  
+  fs.writeFileSync(path.join(CLIENT_PUBLIC_DIR, "icon.svg"), mainIconSVG);
+
   // Favicon (optimized for small size)
   const faviconSVG = mainIconSVG.replace('width="256" height="256"', 'width="32" height="32"');
-  fs.writeFileSync(path.join(CLIENT_PUBLIC_DIR, 'favicon.svg'), faviconSVG);
-  
+  fs.writeFileSync(path.join(CLIENT_PUBLIC_DIR, "favicon.svg"), faviconSVG);
+
   // Different sized favicons
-  webSizes.forEach(size => {
-    const scaledSVG = mainIconSVG.replace('width="256" height="256"', `width="${size}" height="${size}"`);
+  webSizes.forEach((size) => {
+    const scaledSVG = mainIconSVG.replace(
+      'width="256" height="256"',
+      `width="${size}" height="${size}"`,
+    );
     fs.writeFileSync(path.join(CLIENT_PUBLIC_DIR, `favicon-${size}x${size}.svg`), scaledSVG);
   });
-  
-  console.log(`✅ Generated web icons: icon.svg, favicon.svg, and ${webSizes.length} sized favicons`);
+
+  console.log(
+    `✅ Generated web icons: icon.svg, favicon.svg, and ${webSizes.length} sized favicons`,
+  );
 }
 
 function copyToAssets() {
-  console.log('📂 Copying icons to assets directory...');
-  
+  console.log("📂 Copying icons to assets directory...");
+
   // Ensure assets directory exists
   if (!fs.existsSync(ASSETS_DIR)) {
     fs.mkdirSync(ASSETS_DIR, { recursive: true });
   }
-  
+
   // Copy main icons
-  fs.writeFileSync(path.join(ASSETS_DIR, 'app-icon.svg'), mainIconSVG);
-  fs.writeFileSync(path.join(ASSETS_DIR, 'favicon.svg'), mainIconSVG.replace('width="256" height="256"', 'width="32" height="32"'));
-  
-  console.log('✅ Icons copied to assets directory');
+  fs.writeFileSync(path.join(ASSETS_DIR, "app-icon.svg"), mainIconSVG);
+  fs.writeFileSync(
+    path.join(ASSETS_DIR, "favicon.svg"),
+    mainIconSVG.replace('width="256" height="256"', 'width="32" height="32"'),
+  );
+
+  console.log("✅ Icons copied to assets directory");
 }
 
 function generateManifest() {
-  console.log('📄 Generating web manifest...');
-  
+  console.log("📄 Generating web manifest...");
+
   const manifest = {
     name: "Cloud Clipboard",
     short_name: "CloudClip",
     description: "Share clipboard content seamlessly across devices",
-    icons: webSizes.map(size => ({
+    icons: webSizes.map((size) => ({
       src: `/favicon-${size}x${size}.svg`,
       sizes: `${size}x${size}`,
       type: "image/svg+xml",
       ...(size === 180 ? { purpose: "apple-touch-icon" } : {}),
-      ...(size >= 192 ? { purpose: "any maskable" } : {})
+      ...(size >= 192 ? { purpose: "any maskable" } : {}),
     })),
     theme_color: "#6366f1",
     background_color: "#ffffff",
     display: "standalone",
     start_url: "/",
-    scope: "/"
+    scope: "/",
   };
-  
+
   fs.writeFileSync(
-    path.join(CLIENT_PUBLIC_DIR, 'site.webmanifest'),
-    JSON.stringify(manifest, null, 2)
+    path.join(CLIENT_PUBLIC_DIR, "site.webmanifest"),
+    JSON.stringify(manifest, null, 2),
   );
-  
-  console.log('✅ Web manifest generated');
+
+  console.log("✅ Web manifest generated");
 }
 
 function main() {
-  console.log('🎨 Cloud Clipboard Icon Generator');
-  console.log('==================================');
-  
+  console.log("🎨 Cloud Clipboard Icon Generator");
+  console.log("==================================");
+
   try {
     // Ensure directories exist
     if (!fs.existsSync(CLIENT_PUBLIC_DIR)) {
       fs.mkdirSync(CLIENT_PUBLIC_DIR, { recursive: true });
     }
-    
+
     generateWebIcons();
     copyToAssets();
     generateManifest();
-    
-    console.log('');
-    console.log('🎉 All icons generated successfully!');
-    console.log('');
-    console.log('📍 Generated files:');
+
+    console.log("");
+    console.log("🎉 All icons generated successfully!");
+    console.log("");
+    console.log("📍 Generated files:");
     console.log(`   • ${CLIENT_PUBLIC_DIR}/icon.svg`);
     console.log(`   • ${CLIENT_PUBLIC_DIR}/favicon.svg`);
     console.log(`   • ${CLIENT_PUBLIC_DIR}/favicon-*x*.svg (${webSizes.length} sizes)`);
     console.log(`   • ${CLIENT_PUBLIC_DIR}/site.webmanifest`);
     console.log(`   • ${ASSETS_DIR}/app-icon.svg`);
     console.log(`   • ${ASSETS_DIR}/favicon.svg`);
-    console.log('');
-    console.log('💡 Note: Desktop icons in Tauri format need to be generated manually');
-    console.log('   using design tools or online converters from the SVG source.');
-    
+    console.log("");
+    console.log("💡 Note: Desktop icons in Tauri format need to be generated manually");
+    console.log("   using design tools or online converters from the SVG source.");
   } catch (error) {
-    console.error('❌ Error generating icons:', error.message);
+    console.error("❌ Error generating icons:", error.message);
     process.exit(1);
   }
 }

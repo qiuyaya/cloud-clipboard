@@ -1,16 +1,16 @@
-import { Languages } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Languages } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useTranslation } from 'react-i18next';
+} from "@/components/ui/dropdown-menu";
+import { useTranslation } from "react-i18next";
 
 const languages = [
-  { code: 'zh', name: '中文' },
-  { code: 'en', name: 'English' },
+  { code: "zh", name: "中文" },
+  { code: "en", name: "English" },
 ];
 
 export function LanguageToggle(): JSX.Element {
@@ -29,7 +29,7 @@ export function LanguageToggle(): JSX.Element {
           <DropdownMenuItem
             key={lang.code}
             onClick={() => i18n.changeLanguage(lang.code)}
-            className={i18n.language === lang.code ? 'bg-accent' : ''}
+            className={i18n.language === lang.code ? "bg-accent" : ""}
           >
             <span>{lang.name}</span>
           </DropdownMenuItem>

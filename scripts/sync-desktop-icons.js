@@ -6,31 +6,31 @@
  * Note: PNG/ICO formats need to be generated manually using design tools
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ASSETS_ICONS_DIR = path.join(__dirname, '../assets/icons');
-const TAURI_ICONS_DIR = path.join(__dirname, '../desktop/src-tauri/icons');
+const ASSETS_ICONS_DIR = path.join(__dirname, "../assets/icons");
+const TAURI_ICONS_DIR = path.join(__dirname, "../desktop/src-tauri/icons");
 
 function syncDesktopIcons() {
-  console.log('🖥️  Syncing desktop icons...');
-  
+  console.log("🖥️  Syncing desktop icons...");
+
   // Ensure directories exist
   if (!fs.existsSync(TAURI_ICONS_DIR)) {
     fs.mkdirSync(TAURI_ICONS_DIR, { recursive: true });
   }
-  
+
   // Copy main SVG icon as reference
-  const mainIconPath = path.join(ASSETS_ICONS_DIR, 'app-icon.svg');
+  const mainIconPath = path.join(ASSETS_ICONS_DIR, "app-icon.svg");
   if (fs.existsSync(mainIconPath)) {
-    fs.copyFileSync(mainIconPath, path.join(TAURI_ICONS_DIR, 'app-icon.svg'));
-    console.log('✅ Copied app-icon.svg to Tauri icons directory');
+    fs.copyFileSync(mainIconPath, path.join(TAURI_ICONS_DIR, "app-icon.svg"));
+    console.log("✅ Copied app-icon.svg to Tauri icons directory");
   }
-  
+
   // Create a readme for manual conversion
   const readmeContent = `# Desktop Icons
 
@@ -65,25 +65,25 @@ convert app-icon.svg -resize 256x256 128x128@2x.png
 
 Last updated: ${new Date().toISOString()}
 `;
-  
-  fs.writeFileSync(path.join(TAURI_ICONS_DIR, 'README.md'), readmeContent);
-  console.log('✅ Generated README.md with conversion instructions');
-  
-  console.log('');
-  console.log('⚠️  Note: PNG, ICO, and ICNS formats need manual generation');
-  console.log('   from the SVG source using design tools or online converters.');
+
+  fs.writeFileSync(path.join(TAURI_ICONS_DIR, "README.md"), readmeContent);
+  console.log("✅ Generated README.md with conversion instructions");
+
+  console.log("");
+  console.log("⚠️  Note: PNG, ICO, and ICNS formats need manual generation");
+  console.log("   from the SVG source using design tools or online converters.");
 }
 
 function main() {
-  console.log('🔄 Desktop Icon Sync');
-  console.log('====================');
-  
+  console.log("🔄 Desktop Icon Sync");
+  console.log("====================");
+
   try {
     syncDesktopIcons();
-    console.log('');
-    console.log('🎉 Desktop icon sync completed!');
+    console.log("");
+    console.log("🎉 Desktop icon sync completed!");
   } catch (error) {
-    console.error('❌ Error syncing desktop icons:', error.message);
+    console.error("❌ Error syncing desktop icons:", error.message);
     process.exit(1);
   }
 }

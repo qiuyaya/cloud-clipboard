@@ -152,7 +152,7 @@ bun run desktop:build
 cloudClipboardDebug.enable();
 
 // 设置日志级别
-cloudClipboardDebug.setLevel('debug'); // debug, info, warn, error
+cloudClipboardDebug.setLevel("debug"); // debug, info, warn, error
 
 // 查看配置
 cloudClipboardDebug.getConfig();
@@ -411,7 +411,7 @@ Use the following commands in the browser console:
 cloudClipboardDebug.enable();
 
 // Set log level
-cloudClipboardDebug.setLevel('debug'); // debug, info, warn, error
+cloudClipboardDebug.setLevel("debug"); // debug, info, warn, error
 
 // Check configuration
 cloudClipboardDebug.getConfig();

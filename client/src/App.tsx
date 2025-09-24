@@ -1,13 +1,13 @@
-import React from 'react';
-import { RoomJoin } from '@/components/RoomJoin';
-import { ClipboardRoom } from '@/components/ClipboardRoom';
-import { Toaster } from '@/components/ui/toaster';
-import { useRoomManager } from '@/hooks/useRoomManager';
-import { useSocketConnection } from '@/hooks/useSocketConnection';
-import { useActivityMonitor } from '@/hooks/useActivityMonitor';
-import { useMessageHandler } from '@/hooks/useMessageHandler';
+import React from "react";
+import { RoomJoin } from "@/components/RoomJoin";
+import { ClipboardRoom } from "@/components/ClipboardRoom";
+import { Toaster } from "@/components/ui/toaster";
+import { useRoomManager } from "@/hooks/useRoomManager";
+import { useSocketConnection } from "@/hooks/useSocketConnection";
+import { useActivityMonitor } from "@/hooks/useActivityMonitor";
+import { useMessageHandler } from "@/hooks/useMessageHandler";
 
-function App(): JSX.Element {
+export function App(): JSX.Element {
   const {
     currentUser,
     setCurrentUser,
@@ -56,7 +56,6 @@ function App(): JSX.Element {
     roomKey,
   });
 
-
   if (!currentUser || !roomKey) {
     return (
       <>
@@ -90,5 +89,3 @@ function App(): JSX.Element {
     </>
   );
 }
-
-export default App;

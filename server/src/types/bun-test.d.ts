@@ -1,4 +1,4 @@
-declare module 'bun:test' {
+declare module "bun:test" {
   export function describe(name: string, fn: () => void): void;
   export function it(name: string, fn: (done?: () => void) => void | Promise<void>): void;
   export function test(name: string, fn: (done?: () => void) => void | Promise<void>): void;
@@ -25,7 +25,7 @@ declare module 'bun:test' {
       toHaveBeenCalled(): void;
     };
   };
-  
+
   export const expect: {
     (actual: any): {
       toBe(expected: any): void;
@@ -59,7 +59,10 @@ declare module 'bun:test' {
   export function afterEach(fn: () => void | Promise<void>): void;
   export function beforeAll(fn: () => void | Promise<void>): void;
   export function afterAll(fn: () => void | Promise<void>): void;
-  export function spyOn(object: any, method: string): {
+  export function spyOn(
+    object: any,
+    method: string,
+  ): {
     mockReturnValue(value: any): any;
     mockImplementation(fn: (...args: any[]) => any): any;
     mockRejectedValue(value: any): any;

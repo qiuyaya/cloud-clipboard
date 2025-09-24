@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
   CARGO_TERM_COLOR: always
@@ -79,7 +79,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
@@ -210,7 +210,7 @@ jobs:
           # Get version from root package.json
           ROOT_VERSION=$(node -p "require('./package.json').version")
           echo "Root version: $ROOT_VERSION"
-          
+
           # Check all package.json files
           PACKAGES=("client" "server" "shared" "desktop")
           for pkg in "${PACKAGES[@]}"; do
@@ -223,7 +223,7 @@ jobs:
               fi
             fi
           done
-          
+
           # Check Cargo.toml
           if [ -f "desktop/src-tauri/Cargo.toml" ]; then
             CARGO_VERSION=$(grep '^version = ' desktop/src-tauri/Cargo.toml | cut -d'"' -f2)
@@ -233,7 +233,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           # Check tauri.conf.json
           if [ -f "desktop/src-tauri/tauri.conf.json" ]; then
             TAURI_VERSION=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
@@ -243,7 +243,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           echo "✅ All versions are consistent: $ROOT_VERSION"
 
   # Build status summary

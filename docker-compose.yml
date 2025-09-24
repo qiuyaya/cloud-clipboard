@@ -10,12 +10,12 @@ services:
       - NODE_ENV=production
       - PORT=6030
       - UPLOAD_DIR=/app/uploads
-      - MAX_FILE_SIZE=104857600  # 100MB in bytes
-      - ROOM_CLEANUP_INTERVAL=3600000  # 1 hour in milliseconds
+      - MAX_FILE_SIZE=104857600 # 100MB in bytes
+      - ROOM_CLEANUP_INTERVAL=3600000 # 1 hour in milliseconds
       - FILE_RETENTION_HOURS=12
-      - RATE_LIMIT_WINDOW_MS=60000  # 1 minute
+      - RATE_LIMIT_WINDOW_MS=60000 # 1 minute
       - RATE_LIMIT_MAX_REQUESTS=100
-      - ALLOW_HTTP=true  # Allow HTTP connections for development
+      - ALLOW_HTTP=true # Allow HTTP connections for development
     volumes:
       - uploads:/app/uploads
     security_opt:

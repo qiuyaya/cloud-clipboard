@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useToast } from '@/hooks/useToast';
-import { useTranslation } from 'react-i18next';
-import type { User } from '@cloud-clipboard/shared';
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/useToast";
+import { useTranslation } from "react-i18next";
+import type { User } from "@cloud-clipboard/shared";
 
 interface UseActivityMonitorProps {
   currentUser: User | null;
@@ -15,14 +15,14 @@ export const useActivityMonitor = ({ currentUser, onLeaveRoom }: UseActivityMoni
 
   useEffect(() => {
     const updateActivity = () => setLastActivity(Date.now());
-    
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    events.forEach(event => {
+
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart", "click"];
+    events.forEach((event) => {
       document.addEventListener(event, updateActivity, { passive: true });
     });
-    
+
     return () => {
-      events.forEach(event => {
+      events.forEach((event) => {
         document.removeEventListener(event, updateActivity);
       });
     };
@@ -34,12 +34,12 @@ export const useActivityMonitor = ({ currentUser, onLeaveRoom }: UseActivityMoni
       if (currentUser && Date.now() - lastActivity > twoHours) {
         onLeaveRoom();
         toast({
-          title: t('toast.autoLogout'),
-          description: t('toast.autoLogoutDesc'),
+          title: t("toast.autoLogout"),
+          description: t("toast.autoLogoutDesc"),
         });
       }
     };
-    
+
     const interval = setInterval(checkInactivity, 60000);
     return () => clearInterval(interval);
   }, [currentUser, lastActivity, onLeaveRoom, toast, t]);

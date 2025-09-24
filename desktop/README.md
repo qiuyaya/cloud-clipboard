@@ -5,6 +5,7 @@
 ## 功能特性
 
 ### 核心功能
+
 - 🌐 **跨平台支持**: Windows、macOS、Linux、iOS、Android
 - 📋 **自动剪切板监听**: 自动检测并同步剪切板内容到云端
 - ⚙️ **灵活配置**: 支持自定义服务器地址、同步设置等
@@ -12,6 +13,7 @@
 - 🎨 **现代界面**: 集成原有 React 界面，支持主题切换
 
 ### 配置选项
+
 - **服务器配置**: 自定义服务器地址
 - **剪切板功能**: 开启/关闭自动监听复制操作
 - **同步设置**: 调整同步频率（500-10000ms）
@@ -21,12 +23,14 @@
 ## 技术架构
 
 ### 技术选型
+
 - **Tauri**: 使用 Rust + WebView，体积小、性能优秀
 - **前端**: 复用现有 React + TypeScript + Vite 技术栈
 - **后端**: Rust，提供原生系统功能接口
 - **插件系统**: Tauri 官方插件生态
 
 ### 项目结构
+
 ```
 desktop/
 ├── src-tauri/           # Rust 后端代码
@@ -46,13 +50,16 @@ desktop/
 ## 开发指南
 
 ### 环境准备
+
 1. **安装 Rust**:
+
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    source $HOME/.cargo/env
    ```
 
 2. **安装 Tauri CLI**:
+
    ```bash
    npm install -g @tauri-apps/cli
    ```
@@ -64,6 +71,7 @@ desktop/
    ```
 
 ### 开发模式
+
 ```bash
 # 构建客户端并启动开发模式
 npm run dev
@@ -73,6 +81,7 @@ node scripts/build-client.js
 ```
 
 ### 生产构建
+
 ```bash
 # 构建所有平台
 npm run build
@@ -85,6 +94,7 @@ npm run tauri build -- --target x86_64-unknown-linux-gnu # Linux
 ```
 
 ### 移动端构建
+
 ```bash
 # 添加移动端支持
 npm run tauri android init
@@ -100,15 +110,16 @@ npm run tauri ios build
 ## API 接口
 
 ### 配置管理
+
 ```typescript
 interface AppConfig {
-  server_url: string;     // 服务器地址
+  server_url: string; // 服务器地址
   auto_clipboard: boolean; // 自动剪切板监听
-  sync_interval: number;   // 同步间隔（毫秒）
-  theme: string;          // 主题（light/dark/system）
-  language: string;       // 语言（zh/en）
-  enable_tray: boolean;   // 系统托盘
-  autostart: boolean;     // 开机启动
+  sync_interval: number; // 同步间隔（毫秒）
+  theme: string; // 主题（light/dark/system）
+  language: string; // 语言（zh/en）
+  enable_tray: boolean; // 系统托盘
+  autostart: boolean; // 开机启动
 }
 
 // 获取配置
@@ -119,6 +130,7 @@ await DesktopAPI.setConfig(newConfig);
 ```
 
 ### 剪切板操作
+
 ```typescript
 // 读取剪切板
 const text = await DesktopAPI.getClipboardText();
@@ -128,28 +140,28 @@ await DesktopAPI.setClipboardText("Hello World");
 
 // 监听剪切板变化
 const monitor = new ClipboardMonitor((text) => {
-  console.log('Clipboard changed:', text);
+  console.log("Clipboard changed:", text);
 });
 monitor.start(1000); // 每秒检查一次
 ```
 
 ### 系统通知
+
 ```typescript
-await DesktopAPI.showNotification(
-  "标题",
-  "通知内容"
-);
+await DesktopAPI.showNotification("标题", "通知内容");
 ```
 
 ## 部署说明
 
 ### 应用签名（生产环境）
+
 1. **Windows**: 需要代码签名证书
 2. **macOS**: 需要 Apple Developer 账号和证书
 3. **Linux**: 支持 AppImage、deb、rpm 等格式
 4. **移动端**: 需要相应平台的开发者账号
 
 ### 自动更新
+
 Tauri 支持内置的自动更新机制，可以配置 GitHub Releases 或自定义更新服务器。
 
 ## 键盘快捷键
@@ -160,11 +172,13 @@ Tauri 支持内置的自动更新机制，可以配置 GitHub Releases 或自定
 ## 故障排除
 
 ### 常见问题
+
 1. **Rust 环境问题**: 确保正确安装 Rust 和 Cargo
 2. **依赖错误**: 检查 Tauri 插件版本兼容性
 3. **构建失败**: 确保所有平台工具链已安装
 
 ### 日志调试
+
 开发模式下会自动打开 DevTools，生产版本可通过日志文件调试。
 
 ## 许可证

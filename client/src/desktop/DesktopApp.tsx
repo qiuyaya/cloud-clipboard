@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { DesktopProvider, useDesktop } from './desktop-integration';
-import { DesktopSettings } from './components/DesktopSettings';
+import React, { useEffect, useState } from "react";
+import { DesktopProvider, useDesktop } from "./desktop-integration";
+import { DesktopSettings } from "./components/DesktopSettings";
 // import { ClipboardMonitor } from './clipboard-monitor'; // TODO: Implement clipboard monitoring
 
 // Import the original web app components
@@ -34,19 +34,19 @@ const DesktopAppContent: React.FC<DesktopAppProps> = ({ WebApp }) => {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Ctrl/Cmd + , to open settings
-      if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+      if ((event.ctrlKey || event.metaKey) && event.key === ",") {
         event.preventDefault();
         setShowSettings(!showSettings);
       }
-      
+
       // Escape to close settings
-      if (event.key === 'Escape' && showSettings) {
+      if (event.key === "Escape" && showSettings) {
         setShowSettings(false);
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isDesktop, showSettings]);
 
   if (showSettings) {
@@ -77,7 +77,7 @@ const DesktopAppContent: React.FC<DesktopAppProps> = ({ WebApp }) => {
           ⚙️
         </button>
       )}
-      
+
       {/* The original web app */}
       <WebApp />
     </div>
@@ -86,7 +86,7 @@ const DesktopAppContent: React.FC<DesktopAppProps> = ({ WebApp }) => {
 
 export const DesktopApp: React.FC<DesktopAppProps> = ({ WebApp }) => {
   const handleClipboardChange = (text: string) => {
-    console.log('Clipboard changed:', text);
+    console.log("Clipboard changed:", text);
     // This will be handled inside DesktopAppContent
   };
 

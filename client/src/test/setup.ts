@@ -1,5 +1,5 @@
-import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import "@testing-library/jest-dom";
+import { vi } from "vitest";
 
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
@@ -16,7 +16,7 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
 }));
 
 // Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query) => ({
     matches: false,
@@ -31,7 +31,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock socket.io-client
-vi.mock('socket.io-client', () => ({
+vi.mock("socket.io-client", () => ({
   io: vi.fn(() => ({
     on: vi.fn(),
     off: vi.fn(),
@@ -42,36 +42,36 @@ vi.mock('socket.io-client', () => ({
     onAny: vi.fn(),
     offAny: vi.fn(),
     connected: false,
-    id: 'mock-socket-id',
+    id: "mock-socket-id",
   })),
 }));
 
 // Mock i18next
-vi.mock('react-i18next', () => ({
+vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
     i18n: {
       changeLanguage: vi.fn(),
-      language: 'en',
+      language: "en",
     },
   }),
   Trans: ({ children }: { children: React.ReactNode }) => children,
   initReactI18next: {
-    type: '3rdParty',
+    type: "3rdParty",
     init: vi.fn(),
   },
 }));
 
 // Mock theme hook
-vi.mock('@/hooks/useTheme', () => ({
+vi.mock("@/hooks/useTheme", () => ({
   useTheme: () => ({
-    theme: 'light',
+    theme: "light",
     setTheme: vi.fn(),
   }),
 }));
 
 // Mock toast hook
-vi.mock('@/hooks/useToast', () => ({
+vi.mock("@/hooks/useToast", () => ({
   useToast: () => ({
     toast: vi.fn(),
   }),

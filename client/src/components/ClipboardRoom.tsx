@@ -1,19 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/useToast';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { LanguageToggle } from '@/components/LanguageToggle';
-import { useTranslation } from 'react-i18next';
-import { formatFileSize, formatTimestamp } from '@cloud-clipboard/shared';
-import type { 
-  User, 
-  TextMessage, 
-  FileMessage, 
-  RoomKey 
-} from '@cloud-clipboard/shared';
-import { Copy, Send, Upload, Users, LogOut, File, Download, Share2, Lock, Unlock } from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/useToast";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { useTranslation } from "react-i18next";
+import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
+import type { User, TextMessage, FileMessage, RoomKey } from "@cloud-clipboard/shared";
+import {
+  Copy,
+  Send,
+  Upload,
+  Users,
+  LogOut,
+  File,
+  Download,
+  Share2,
+  Lock,
+  Unlock,
+} from "lucide-react";
 
 interface ClipboardRoomProps {
   roomKey: RoomKey;
@@ -40,22 +46,22 @@ export function ClipboardRoom({
   onShareRoomLink,
   hasRoomPassword = false,
 }: ClipboardRoomProps): JSX.Element {
-  const [textInput, setTextInput] = useState('');
+  const [textInput, setTextInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSendText = (e: React.FormEvent): void => {
     e.preventDefault();
     if (!textInput.trim()) return;
-    
+
     onSendMessage(textInput.trim());
-    setTextInput('');
+    setTextInput("");
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -64,36 +70,36 @@ export function ClipboardRoom({
 
     if (file.size > 100 * 1024 * 1024) {
       toast({
-        variant: 'destructive',
-        title: t('toast.fileTooLarge'),
-        description: t('toast.fileTooLargeDesc'),
+        variant: "destructive",
+        title: t("toast.fileTooLarge"),
+        description: t("toast.fileTooLargeDesc"),
       });
       return;
     }
 
     onSendFile(file);
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const copyToClipboard = async (text: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: t('toast.copied'),
-        description: t('toast.copiedDesc'),
+        title: t("toast.copied"),
+        description: t("toast.copiedDesc"),
       });
     } catch {
       toast({
-        variant: 'destructive',
-        title: t('toast.failedToCopy'),
-        description: t('toast.failedToCopyDesc'),
+        variant: "destructive",
+        title: t("toast.failedToCopy"),
+        description: t("toast.failedToCopyDesc"),
       });
     }
   };
 
   const downloadFile = (message: FileMessage): void => {
     if (message.downloadUrl) {
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = message.downloadUrl;
       link.download = message.fileInfo.name;
       document.body.appendChild(link);
@@ -110,7 +116,7 @@ export function ClipboardRoom({
     onSetRoomPassword(!hasRoomPassword);
   };
 
-  const onlineUsers = users.filter(user => user.isOnline);
+  const onlineUsers = users.filter((user) => user.isOnline);
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -119,9 +125,9 @@ export function ClipboardRoom({
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">{t('room.title', { roomKey })}</h2>
+              <h2 className="text-lg font-semibold">{t("room.title", { roomKey })}</h2>
               <p className="text-sm text-muted-foreground">
-                {t('room.usersOnline', { count: onlineUsers.length })}
+                {t("room.usersOnline", { count: onlineUsers.length })}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -130,10 +136,10 @@ export function ClipboardRoom({
                 size="sm"
                 onClick={toggleRoomPassword}
                 className="flex items-center gap-2 min-w-fit"
-                title={hasRoomPassword ? t('room.removePassword') : t('room.setPassword')}
+                title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
               >
                 {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                {hasRoomPassword ? t('room.removePassword') : t('room.setPassword')}
+                {hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
               </Button>
               <Button
                 variant="outline"
@@ -142,7 +148,7 @@ export function ClipboardRoom({
                 className="flex items-center gap-2 min-w-fit"
               >
                 <Share2 className="h-4 w-4" />
-                {t('room.share')}
+                {t("room.share")}
               </Button>
               <div className="flex items-center gap-1">
                 <LanguageToggle />
@@ -155,7 +161,7 @@ export function ClipboardRoom({
                 className="flex items-center gap-2 min-w-fit"
               >
                 <LogOut className="h-4 w-4" />
-                {t('room.leave')}
+                {t("room.leave")}
               </Button>
             </div>
           </div>
@@ -165,28 +171,33 @@ export function ClipboardRoom({
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-3">
               <Users className="h-4 w-4" />
-              <span className="font-medium text-sm">{t('room.usersInRoom')}</span>
+              <span className="font-medium text-sm">{t("room.usersInRoom")}</span>
             </div>
             {users.map((user) => (
               <div
                 key={user.id}
                 className={`flex items-center gap-3 p-2 rounded-lg ${
                   user.id === currentUser.id
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                    : 'bg-gray-50 dark:bg-gray-700/50'
+                    ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                    : "bg-gray-50 dark:bg-gray-700/50"
                 }`}
               >
                 <div
                   className={`w-2 h-2 rounded-full ${
-                    user.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                    user.isOnline ? "bg-green-500" : "bg-gray-400"
                   }`}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {user.name} {user.id === currentUser.id && t('room.you')}
+                    {user.name} {user.id === currentUser.id && t("room.you")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {user.deviceType} • {user.isOnline ? t('room.online') : t('room.lastSeen', { time: formatTimestamp(user.lastSeen) })}
+                    {user.deviceType} •{" "}
+                    {user.isOnline
+                      ? t("room.online")
+                      : t("room.lastSeen", {
+                          time: formatTimestamp(user.lastSeen),
+                        })}
                   </p>
                 </div>
               </div>
@@ -201,14 +212,14 @@ export function ClipboardRoom({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
-              <p>{t('room.noMessages')}</p>
+              <p>{t("room.noMessages")}</p>
             </div>
           ) : (
             messages.map((message) => (
               <Card
                 key={message.id}
                 className={`max-w-2xl ${
-                  message.sender.id === currentUser.id ? 'ml-auto' : 'mr-auto'
+                  message.sender.id === currentUser.id ? "ml-auto" : "mr-auto"
                 }`}
               >
                 <CardHeader className="pb-2">
@@ -216,7 +227,7 @@ export function ClipboardRoom({
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">
                         {message.sender.name}
-                        {message.sender.id === currentUser.id && ` ${t('message.you')}`}
+                        {message.sender.id === currentUser.id && ` ${t("message.you")}`}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {formatTimestamp(message.timestamp)}
@@ -225,7 +236,7 @@ export function ClipboardRoom({
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {message.type === 'text' ? (
+                  {message.type === "text" ? (
                     <div className="space-y-2">
                       <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                         <pre className="whitespace-pre-wrap text-sm font-mono">
@@ -239,7 +250,7 @@ export function ClipboardRoom({
                         className="flex items-center gap-2"
                       >
                         <Copy className="h-3 w-3" />
-                        {t('message.copy')}
+                        {t("message.copy")}
                       </Button>
                     </div>
                   ) : (
@@ -247,9 +258,7 @@ export function ClipboardRoom({
                       <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <File className="h-8 w-8 text-blue-500" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {message.fileInfo.name}
-                          </p>
+                          <p className="font-medium text-sm truncate">{message.fileInfo.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {formatFileSize(message.fileInfo.size)} • {message.fileInfo.type}
                           </p>
@@ -263,7 +272,7 @@ export function ClipboardRoom({
                           className="flex items-center gap-2"
                         >
                           <Download className="h-3 w-3" />
-                          {t('message.download')}
+                          {t("message.download")}
                         </Button>
                       )}
                     </div>
@@ -281,16 +290,11 @@ export function ClipboardRoom({
             <Input
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
-              placeholder={t('input.placeholder')}
+              placeholder={t("input.placeholder")}
               className="flex-1"
               maxLength={50000}
             />
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" />
             <Button
               type="button"
               variant="outline"
@@ -298,15 +302,13 @@ export function ClipboardRoom({
               className="flex items-center gap-2"
             >
               <Upload className="h-4 w-4" />
-              {t('input.fileButton')}
+              {t("input.fileButton")}
             </Button>
             <Button type="submit" disabled={!textInput.trim()}>
               <Send className="h-4 w-4" />
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground mt-2">
-            {t('room.maxLimits')}
-          </p>
+          <p className="text-xs text-muted-foreground mt-2">{t("room.maxLimits")}</p>
         </div>
       </div>
     </div>

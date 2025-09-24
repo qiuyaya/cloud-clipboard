@@ -1,6 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import type { RoomKey } from '@cloud-clipboard/shared';
+import * as fs from "fs";
+import * as path from "path";
+import type { RoomKey } from "@cloud-clipboard/shared";
 
 interface FileRecord {
   id: string;
@@ -14,7 +14,7 @@ interface FileRecord {
 export class FileManager {
   private files: Map<string, FileRecord> = new Map();
   private roomFiles: Map<RoomKey, Set<string>> = new Map();
-  private uploadDir = path.join(process.cwd(), 'uploads');
+  private uploadDir = path.join(process.cwd(), "uploads");
   private maxRetentionHours = 12;
   private cleanupInterval: NodeJS.Timeout;
 
@@ -25,9 +25,12 @@ export class FileManager {
     }
 
     // Start cleanup interval (check every hour)
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredFiles();
-    }, 60 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupExpiredFiles();
+      },
+      60 * 60 * 1000,
+    );
 
     // Initial cleanup on startup
     this.cleanupExpiredFiles();
@@ -35,13 +38,13 @@ export class FileManager {
 
   addFile(fileRecord: FileRecord): void {
     this.files.set(fileRecord.id, fileRecord);
-    
+
     // Track file by room
     if (!this.roomFiles.has(fileRecord.roomKey)) {
       this.roomFiles.set(fileRecord.roomKey, new Set());
     }
     this.roomFiles.get(fileRecord.roomKey)!.add(fileRecord.id);
-    
+
     console.log(`File ${fileRecord.filename} tracked for room ${fileRecord.roomKey}`);
   }
 
@@ -52,11 +55,14 @@ export class FileManager {
   getFilesInRoom(roomKey: RoomKey): FileRecord[] {
     const fileIds = this.roomFiles.get(roomKey) || new Set();
     return Array.from(fileIds)
-      .map(id => this.files.get(id))
+      .map((id) => this.files.get(id))
       .filter((file): file is FileRecord => file !== undefined);
   }
 
-  deleteFile(fileId: string, reason: 'room_destroyed' | 'retention_expired' | 'manual'): { filename: string; roomKey: RoomKey } | null {
+  deleteFile(
+    fileId: string,
+    reason: "room_destroyed" | "retention_expired" | "manual",
+  ): { filename: string; roomKey: RoomKey } | null {
     const file = this.files.get(fileId);
     if (!file) return null;
 
@@ -79,7 +85,7 @@ export class FileManager {
       console.log(`File ${file.filename} deleted (reason: ${reason})`);
       return { filename: file.filename, roomKey: file.roomKey };
     } catch (error) {
-      console.error('Failed to delete file %s:', fileId, error);
+      console.error("Failed to delete file %s:", fileId, error);
       return null;
     }
   }
@@ -89,7 +95,7 @@ export class FileManager {
     const deletedFiles: { filename: string }[] = [];
 
     for (const fileId of fileIds) {
-      const result = this.deleteFile(fileId, 'room_destroyed');
+      const result = this.deleteFile(fileId, "room_destroyed");
       if (result) {
         deletedFiles.push({ filename: result.filename });
       }
@@ -113,7 +119,7 @@ export class FileManager {
     }
 
     for (const fileId of expiredFiles) {
-      this.deleteFile(fileId, 'retention_expired');
+      this.deleteFile(fileId, "retention_expired");
     }
 
     if (expiredFiles.length > 0) {
@@ -130,7 +136,7 @@ export class FileManager {
     return {
       totalFiles: this.files.size,
       totalSize,
-      roomCount: this.roomFiles.size
+      roomCount: this.roomFiles.size,
     };
   }
 

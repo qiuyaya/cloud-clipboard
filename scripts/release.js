@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,59 +13,60 @@ const __dirname = path.dirname(__filename);
  * Supports semantic versioning and multi-package version management
  */
 
-const WORKSPACE_ROOT = path.resolve(__dirname, '..');
+const WORKSPACE_ROOT = path.resolve(__dirname, "..");
 const PACKAGES = [
-  { name: 'root', path: WORKSPACE_ROOT },
-  { name: 'client', path: path.join(WORKSPACE_ROOT, 'client') },
-  { name: 'server', path: path.join(WORKSPACE_ROOT, 'server') },
-  { name: 'shared', path: path.join(WORKSPACE_ROOT, 'shared') },
-  { name: 'desktop', path: path.join(WORKSPACE_ROOT, 'desktop') }
+  { name: "root", path: WORKSPACE_ROOT },
+  { name: "client", path: path.join(WORKSPACE_ROOT, "client") },
+  { name: "server", path: path.join(WORKSPACE_ROOT, "server") },
+  { name: "shared", path: path.join(WORKSPACE_ROOT, "shared") },
+  { name: "desktop", path: path.join(WORKSPACE_ROOT, "desktop") },
 ];
 
-function log(message, type = 'info') {
+function log(message, type = "info") {
   const colors = {
-    info: '\x1b[36m',    // cyan
-    success: '\x1b[32m', // green
-    warning: '\x1b[33m', // yellow
-    error: '\x1b[31m'    // red
+    info: "\x1b[36m", // cyan
+    success: "\x1b[32m", // green
+    warning: "\x1b[33m", // yellow
+    error: "\x1b[31m", // red
   };
-  const reset = '\x1b[0m';
-  const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+  const reset = "\x1b[0m";
+  const prefix =
+    type === "error" ? "❌" : type === "success" ? "✅" : type === "warning" ? "⚠️" : "ℹ️";
   console.log(`${colors[type]}${prefix} ${message}${reset}`);
 }
 
 function execCommand(command, cwd = WORKSPACE_ROOT, silent = false) {
   try {
-    const result = execSync(command, { 
-      cwd, 
-      encoding: 'utf8',
-      stdio: silent ? 'pipe' : 'inherit'
+    const result = execSync(command, {
+      cwd,
+      encoding: "utf8",
+      stdio: silent ? "pipe" : "inherit",
     });
     return result?.toString().trim();
   } catch (error) {
-    log(`Command failed: ${command}`, 'error');
-    log(error.message, 'error');
+    log(`Command failed: ${command}`, "error");
+    log(error.message, "error");
     process.exit(1);
   }
 }
 
 function readPackageJson(packagePath) {
-  const packageJsonPath = path.join(packagePath, 'package.json');
+  const packageJsonPath = path.join(packagePath, "package.json");
   if (!fs.existsSync(packageJsonPath)) {
     return null;
   }
-  return JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  return JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 }
 
 function writePackageJson(packagePath, packageJson) {
-  const packageJsonPath = path.join(packagePath, 'package.json');
-  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
+  const packageJsonPath = path.join(packagePath, "package.json");
+  fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
 }
 
 function updateCargoToml(version) {
-  const cargoPath = path.join(WORKSPACE_ROOT, 'desktop/src-tauri/Cargo.toml');
+  const cargoPath = path.join(WORKSPACE_ROOT, "desktop/src-tauri/Cargo.toml");
   if (fs.existsSync(cargoPath)) {
-    let content = fs.readFileSync(cargoPath, 'utf8');
+    let content = fs.readFileSync(cargoPath, "utf8");
     content = content.replace(/^version = ".*"$/m, `version = "${version}"`);
     fs.writeFileSync(cargoPath, content);
     log(`Updated Cargo.toml version to ${version}`);
@@ -73,36 +74,39 @@ function updateCargoToml(version) {
 }
 
 function updateTauriConf(version) {
-  const tauriConfPath = path.join(WORKSPACE_ROOT, 'desktop/src-tauri/tauri.conf.json');
+  const tauriConfPath = path.join(WORKSPACE_ROOT, "desktop/src-tauri/tauri.conf.json");
   if (fs.existsSync(tauriConfPath)) {
-    const config = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
+    const config = JSON.parse(fs.readFileSync(tauriConfPath, "utf8"));
     config.version = version;
-    fs.writeFileSync(tauriConfPath, JSON.stringify(config, null, 2) + '\n');
+    fs.writeFileSync(tauriConfPath, JSON.stringify(config, null, 2) + "\n");
     log(`Updated tauri.conf.json version to ${version}`);
   }
 }
 
 function validateVersion(version) {
   if (!version.match(/^\d+\.\d+\.\d+/)) {
-    log(`Invalid version format: ${version}. Must be semantic version (e.g., 1.0.0, 1.0.0-beta.1)`, 'error');
+    log(
+      `Invalid version format: ${version}. Must be semantic version (e.g., 1.0.0, 1.0.0-beta.1)`,
+      "error",
+    );
     process.exit(1);
   }
 }
 
 function getCurrentVersion() {
   const rootPackage = readPackageJson(WORKSPACE_ROOT);
-  return rootPackage ? rootPackage.version : '1.0.0';
+  return rootPackage ? rootPackage.version : "1.0.0";
 }
 
 function incrementVersion(currentVersion, type) {
-  const [major, minor, patch] = currentVersion.split('-')[0].split('.').map(Number);
-  
+  const [major, minor, patch] = currentVersion.split("-")[0].split(".").map(Number);
+
   switch (type) {
-    case 'major':
+    case "major":
       return `${major + 1}.0.0`;
-    case 'minor':
+    case "minor":
       return `${major}.${minor + 1}.0`;
-    case 'patch':
+    case "patch":
       return `${major}.${minor}.${patch + 1}`;
     default:
       return currentVersion;
@@ -111,9 +115,9 @@ function incrementVersion(currentVersion, type) {
 
 function updateAllVersions(newVersion) {
   log(`Updating all package versions to ${newVersion}...`);
-  
+
   // Update package.json files
-  PACKAGES.forEach(pkg => {
+  PACKAGES.forEach((pkg) => {
     const packageJson = readPackageJson(pkg.path);
     if (packageJson) {
       packageJson.version = newVersion;
@@ -121,17 +125,17 @@ function updateAllVersions(newVersion) {
       log(`Updated ${pkg.name}/package.json`);
     }
   });
-  
+
   // Update Rust/Tauri files
   updateCargoToml(newVersion);
   updateTauriConf(newVersion);
 }
 
 function checkWorkingDirectory() {
-  const status = execCommand('git status --porcelain', WORKSPACE_ROOT, true);
+  const status = execCommand("git status --porcelain", WORKSPACE_ROOT, true);
   if (status.trim()) {
-    log('Working directory is not clean. Please commit or stash changes first.', 'error');
-    log('Uncommitted changes:', 'warning');
+    log("Working directory is not clean. Please commit or stash changes first.", "error");
+    log("Uncommitted changes:", "warning");
     console.log(status);
     process.exit(1);
   }
@@ -149,49 +153,61 @@ function createGitTag(version) {
 
 Generated by release script"`);
   execCommand(`git tag v${version}`);
-  log(`Created tag v${version}`, 'success');
+  log(`Created tag v${version}`, "success");
 }
 
 function generateChangelog(version) {
-  log('Generating changelog...');
-  
+  log("Generating changelog...");
+
   try {
     // Get commits since last tag
-    const lastTag = execCommand('git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo ""', WORKSPACE_ROOT, true);
-    const range = lastTag ? `${lastTag}..HEAD` : '';
-    const commits = execCommand(`git log ${range} --pretty=format:"%s" --no-merges`, WORKSPACE_ROOT, true);
-    
+    const lastTag = execCommand(
+      'git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo ""',
+      WORKSPACE_ROOT,
+      true,
+    );
+    const range = lastTag ? `${lastTag}..HEAD` : "";
+    const commits = execCommand(
+      `git log ${range} --pretty=format:"%s" --no-merges`,
+      WORKSPACE_ROOT,
+      true,
+    );
+
     if (commits) {
-      const changelogPath = path.join(WORKSPACE_ROOT, 'CHANGELOG.md');
-      let changelog = '';
-      
+      const changelogPath = path.join(WORKSPACE_ROOT, "CHANGELOG.md");
+      let changelog = "";
+
       if (fs.existsSync(changelogPath)) {
-        changelog = fs.readFileSync(changelogPath, 'utf8');
+        changelog = fs.readFileSync(changelogPath, "utf8");
       } else {
-        changelog = '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n';
+        changelog =
+          "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n";
       }
-      
-      const date = new Date().toISOString().split('T')[0];
-      const newEntry = `## [${version}] - ${date}\n\n${commits.split('\n').map(line => `- ${line}`).join('\n')}\n\n`;
-      
+
+      const date = new Date().toISOString().split("T")[0];
+      const newEntry = `## [${version}] - ${date}\n\n${commits
+        .split("\n")
+        .map((line) => `- ${line}`)
+        .join("\n")}\n\n`;
+
       // Insert new entry after the header
-      const lines = changelog.split('\n');
-      const insertIndex = lines.findIndex(line => line.startsWith('## [')) || 3;
+      const lines = changelog.split("\n");
+      const insertIndex = lines.findIndex((line) => line.startsWith("## [")) || 3;
       lines.splice(insertIndex === -1 ? 3 : insertIndex, 0, newEntry);
-      
-      fs.writeFileSync(changelogPath, lines.join('\n'));
-      log('Updated CHANGELOG.md', 'success');
+
+      fs.writeFileSync(changelogPath, lines.join("\n"));
+      log("Updated CHANGELOG.md", "success");
     }
   } catch {
-    log('Could not generate changelog automatically', 'warning');
+    log("Could not generate changelog automatically", "warning");
   }
 }
 
 function pushRelease(version) {
-  log('Pushing release to remote...');
-  execCommand('git push origin main');
+  log("Pushing release to remote...");
+  execCommand("git push origin main");
   execCommand(`git push origin v${version}`);
-  log('Pushed release to remote', 'success');
+  log("Pushed release to remote", "success");
 }
 
 function showHelp() {
@@ -224,24 +240,24 @@ Examples:
 
 function main() {
   const args = process.argv.slice(2);
-  
-  if (args.includes('--help') || args.length === 0) {
+
+  if (args.includes("--help") || args.length === 0) {
     showHelp();
     return;
   }
-  
+
   const versionArg = args[0];
-  const isDryRun = args.includes('--dry-run');
-  const noGit = args.includes('--no-git');
-  const noPush = args.includes('--no-push');
-  
-  log('🚀 Cloud Clipboard Release Process Started');
-  
+  const isDryRun = args.includes("--dry-run");
+  const noGit = args.includes("--no-git");
+  const noPush = args.includes("--no-push");
+
+  log("🚀 Cloud Clipboard Release Process Started");
+
   const currentVersion = getCurrentVersion();
   log(`Current version: ${currentVersion}`);
-  
+
   let newVersion;
-  if (['patch', 'minor', 'major'].includes(versionArg)) {
+  if (["patch", "minor", "major"].includes(versionArg)) {
     newVersion = incrementVersion(currentVersion, versionArg);
     log(`Auto-incrementing ${versionArg} version: ${currentVersion} -> ${newVersion}`);
   } else {
@@ -249,12 +265,12 @@ function main() {
     validateVersion(newVersion);
     log(`Setting specific version: ${newVersion}`);
   }
-  
+
   if (isDryRun) {
-    log('🔍 DRY RUN MODE - No changes will be made', 'warning');
+    log("🔍 DRY RUN MODE - No changes will be made", "warning");
     log(`Would update version to: ${newVersion}`);
-    log('Packages that would be updated:');
-    PACKAGES.forEach(pkg => {
+    log("Packages that would be updated:");
+    PACKAGES.forEach((pkg) => {
       const packageJson = readPackageJson(pkg.path);
       if (packageJson) {
         console.log(`  - ${pkg.name}: ${packageJson.version} -> ${newVersion}`);
@@ -262,44 +278,44 @@ function main() {
     });
     return;
   }
-  
+
   // Pre-flight checks
   if (!noGit) {
     checkWorkingDirectory();
   }
-  
+
   // Update versions
   updateAllVersions(newVersion);
-  
+
   // Generate changelog
   generateChangelog(newVersion);
-  
+
   // Git operations
   if (!noGit) {
     createGitTag(newVersion);
-    
+
     if (!noPush) {
       pushRelease(newVersion);
     } else {
-      log('Skipping push to remote (--no-push flag)', 'warning');
+      log("Skipping push to remote (--no-push flag)", "warning");
       log(`To push manually: git push origin main && git push origin v${newVersion}`);
     }
   } else {
-    log('Skipping git operations (--no-git flag)', 'warning');
+    log("Skipping git operations (--no-git flag)", "warning");
   }
-  
-  log(`🎉 Release v${newVersion} completed successfully!`, 'success');
-  
+
+  log(`🎉 Release v${newVersion} completed successfully!`, "success");
+
   if (!noGit && !noPush) {
-    log('🔄 GitHub Actions will now build and publish the release automatically');
+    log("🔄 GitHub Actions will now build and publish the release automatically");
     log(`📋 Monitor progress at: https://github.com/your-username/cloud-clipboard/actions`);
   }
-  
-  log('\n📝 Next steps:');
-  log('1. Monitor GitHub Actions build status');
-  log('2. Verify release assets are published');
-  log('3. Update documentation if needed');
-  log('4. Announce the release');
+
+  log("\n📝 Next steps:");
+  log("1. Monitor GitHub Actions build status");
+  log("2. Verify release assets are published");
+  log("3. Update documentation if needed");
+  log("4. Announce the release");
 }
 
 main();

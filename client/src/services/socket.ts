@@ -1,4 +1,4 @@
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from "socket.io-client";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -11,8 +11,8 @@ import type {
   LeaveRoomRequest,
   SetRoomPasswordRequest,
   ShareRoomLinkRequest,
-} from '@cloud-clipboard/shared';
-import { debug } from '../utils/debug';
+} from "@cloud-clipboard/shared";
+import { debug } from "../utils/debug";
 
 class SocketService {
   private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
@@ -20,19 +20,22 @@ class SocketService {
 
   connect(): Socket<ServerToClientEvents, ClientToServerEvents> {
     if (this.socket && this.isConnected) {
-      debug.info('Reusing existing socket connection', {
+      debug.info("Reusing existing socket connection", {
         connected: this.socket.connected,
-        id: this.socket.id
+        id: this.socket.id,
       });
       return this.socket;
     }
 
     // In production, use the same origin; in development, use environment variable or default
-    const serverUrl = import.meta.env.PROD 
-      ? window.location.origin 
-      : (import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
-    debug.info('Attempting to connect to server', { serverUrl, isProd: import.meta.env.PROD });
-    
+    const serverUrl = import.meta.env.PROD
+      ? window.location.origin
+      : import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+    debug.info("Attempting to connect to server", {
+      serverUrl,
+      isProd: import.meta.env.PROD,
+    });
+
     this.socket = io(serverUrl, {
       autoConnect: true,
       reconnection: true,
@@ -41,35 +44,35 @@ class SocketService {
       timeout: 20000,
     });
 
-    this.socket.on('connect', () => {
-      debug.info('Connected to server', {
+    this.socket.on("connect", () => {
+      debug.info("Connected to server", {
         id: this.socket?.id,
         url: serverUrl,
-        transport: this.socket?.io.engine.transport.name
+        transport: this.socket?.io.engine.transport.name,
       });
       this.isConnected = true;
     });
 
-    this.socket.on('disconnect', (reason) => {
-      debug.warn('Disconnected from server', { reason });
+    this.socket.on("disconnect", (reason) => {
+      debug.warn("Disconnected from server", { reason });
       this.isConnected = false;
     });
 
-    this.socket.on('connect_error', (error) => {
-      debug.error('Socket connection error', { error });
+    this.socket.on("connect_error", (error) => {
+      debug.error("Socket connection error", { error });
       this.isConnected = false;
     });
 
     // Add debugging for all outgoing events
     const originalEmit = this.socket.emit.bind(this.socket);
-    this.socket.emit = function(event: any, ...args: any[]) {
-      debug.debug('Socket sending event', { event, args });
+    this.socket.emit = function (event: any, ...args: any[]) {
+      debug.debug("Socket sending event", { event, args });
       return originalEmit(event, ...args);
     } as typeof this.socket.emit;
 
     // Add debugging for all incoming events
     this.socket.onAny((event: string, ...args: any[]) => {
-      debug.debug('Socket received event', { event, args });
+      debug.debug("Socket received event", { event, args });
     });
 
     return this.socket;
@@ -84,95 +87,87 @@ class SocketService {
   }
 
   joinRoom(data: JoinRoomRequest): void {
-    debug.info('Attempting to join room', {
+    debug.info("Attempting to join room", {
       hasSocket: !!this.socket,
       isConnected: this.isConnected,
       socketConnected: this.socket?.connected,
-      data: data
+      data: data,
     });
-    
+
     if (this.socket) {
       if (!this.socket.connected) {
-        debug.error('Socket exists but not connected, cannot join room');
+        debug.error("Socket exists but not connected, cannot join room");
         return;
       }
-      
-      debug.debug('Emitting joinRoom event', { data });
-      this.socket.emit('joinRoom', data);
+
+      debug.debug("Emitting joinRoom event", { data });
+      this.socket.emit("joinRoom", data);
     } else {
-      debug.error('No socket available, cannot join room');
+      debug.error("No socket available, cannot join room");
     }
   }
 
   joinRoomWithPassword(data: JoinRoomWithPasswordRequest): void {
-    debug.info('Attempting to join room with password');
-    
+    debug.info("Attempting to join room with password");
+
     if (this.socket) {
       if (!this.socket.connected) {
-        debug.error('Socket exists but not connected, cannot join room');
+        debug.error("Socket exists but not connected, cannot join room");
         return;
       }
-      
-      debug.debug('Emitting joinRoomWithPassword event');
-      this.socket.emit('joinRoomWithPassword', data);
+
+      debug.debug("Emitting joinRoomWithPassword event");
+      this.socket.emit("joinRoomWithPassword", data);
     } else {
-      debug.error('No socket available, cannot join room');
+      debug.error("No socket available, cannot join room");
     }
   }
 
   setRoomPassword(data: SetRoomPasswordRequest): void {
     if (this.socket) {
-      this.socket.emit('setRoomPassword', data);
+      this.socket.emit("setRoomPassword", data);
     }
   }
 
   shareRoomLink(data: ShareRoomLinkRequest): void {
     if (this.socket) {
-      this.socket.emit('shareRoomLink', data);
+      this.socket.emit("shareRoomLink", data);
     }
   }
 
   leaveRoom(data: LeaveRoomRequest): void {
-    if (this.socket) {
-      this.socket.emit('leaveRoom', data);
-    }
+    this.socket?.emit("leaveRoom", data);
   }
 
   sendMessage(message: TextMessage | FileMessage): void {
-    if (this.socket) {
-      this.socket.emit('sendMessage', message);
-    }
+    this.socket?.emit("sendMessage", message);
   }
 
   requestUserList(roomKey: string): void {
-    if (this.socket) {
-      this.socket.emit('requestUserList', roomKey);
-    }
+    this.socket?.emit("requestUserList", roomKey);
   }
 
   sendP2POffer(data: { to: string; offer: string }): void {
-    if (this.socket) {
-      this.socket.emit('p2pOffer', data);
-    }
+    this.socket?.emit("p2pOffer", data);
   }
 
   sendP2PAnswer(data: { to: string; answer: string }): void {
     if (this.socket) {
-      this.socket.emit('p2pAnswer', data);
+      this.socket.emit("p2pAnswer", data);
     }
   }
 
   sendP2PIceCandidate(data: { to: string; candidate: string }): void {
     if (this.socket) {
-      this.socket.emit('p2pIceCandidate', data);
+      this.socket.emit("p2pIceCandidate", data);
     }
   }
 
   onMessage(callback: (message: TextMessage | FileMessage) => void): void {
     if (this.socket) {
-      this.socket.on('message', (message: WebSocketMessage) => {
+      this.socket.on("message", (message: WebSocketMessage) => {
         // Only pass text and file messages to the callback
-        if (message.type === 'text' || message.type === 'file') {
+        if (message.type === "text" || message.type === "file") {
           callback(message);
         }
       });
@@ -181,73 +176,78 @@ class SocketService {
 
   onUserJoined(callback: (user: User) => void): void {
     if (this.socket) {
-      this.socket.on('userJoined', callback);
+      this.socket.on("userJoined", callback);
     }
   }
 
   onUserLeft(callback: (userId: string) => void): void {
     if (this.socket) {
-      this.socket.on('userLeft', callback);
+      this.socket.on("userLeft", callback);
     }
   }
 
   onUserList(callback: (users: User[]) => void): void {
     if (this.socket) {
-      this.socket.on('userList', callback);
+      this.socket.on("userList", callback);
     }
   }
 
-  onSystemMessage(callback: (message: { type: 'file_deleted' | 'room_destroyed' | 'file_expired'; data: any }) => void): void {
+  onSystemMessage(
+    callback: (message: {
+      type: "file_deleted" | "room_destroyed" | "file_expired";
+      data: any;
+    }) => void,
+  ): void {
     if (this.socket) {
-      this.socket.on('systemMessage', callback);
+      this.socket.on("systemMessage", callback);
     }
   }
 
   onRoomDestroyed(callback: (data: { roomKey: string; deletedFiles: string[] }) => void): void {
     if (this.socket) {
-      this.socket.on('roomDestroyed', callback);
+      this.socket.on("roomDestroyed", callback);
     }
   }
 
   onError(callback: (error: string) => void): void {
     if (this.socket) {
-      this.socket.on('error', callback);
+      this.socket.on("error", callback);
     }
   }
 
   onP2POffer(callback: (data: { from: string; offer: string }) => void): void {
     if (this.socket) {
-      this.socket.on('p2pOffer', callback);
+      this.socket.on("p2pOffer", callback);
     }
   }
 
   onP2PAnswer(callback: (data: { from: string; answer: string }) => void): void {
     if (this.socket) {
-      this.socket.on('p2pAnswer', callback);
+      this.socket.on("p2pAnswer", callback);
     }
   }
 
   onP2PIceCandidate(callback: (data: { from: string; candidate: string }) => void): void {
     if (this.socket) {
-      this.socket.on('p2pIceCandidate', callback);
+      this.socket.on("p2pIceCandidate", callback);
     }
   }
 
   onPasswordRequired(callback: (data: { roomKey: string }) => void): void {
     if (this.socket) {
-      this.socket.on('passwordRequired', callback);
+      this.socket.on("passwordRequired", callback);
     }
   }
 
   onRoomPasswordSet(callback: (data: { roomKey: string; hasPassword: boolean }) => void): void {
     if (this.socket) {
-      this.socket.on('roomPasswordSet', callback);
+      this.socket.on("roomPasswordSet", callback);
     }
   }
 
   onRoomLinkGenerated(callback: (data: { roomKey: string; shareLink: string }) => void): void {
     if (this.socket) {
-      this.socket.on('roomLinkGenerated', callback);
+      this.socket.on("roomLinkGenerated", callback);
     }
   }
 

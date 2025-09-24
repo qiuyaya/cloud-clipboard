@@ -15,7 +15,9 @@
 ### 生产环境部署
 
 #### 默认部署（推荐）
+
 **单一容器部署，前端后端统一：**
+
 ```bash
 # 创建数据目录
 mkdir -p data/uploads logs
@@ -30,7 +32,9 @@ docker-compose logs -f
 ```
 
 #### 完整部署（带Nginx代理）
+
 **使用Nginx反向代理的完整部署：**
+
 ```bash
 # 创建数据目录
 mkdir -p data/uploads logs
@@ -43,7 +47,9 @@ docker-compose -f docker-compose.nginx.yml logs -f
 ```
 
 #### 手动 Docker 构建
+
 **单一容器手动部署：**
+
 ```bash
 # 构建镜像
 docker build -t cloud-clipboard:latest .
@@ -70,17 +76,17 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ### 环境变量
 
-| 变量 | 默认值 | 描述 |
-|----------|---------|-------------|
-| `NODE_ENV` | `production` | 环境模式 |
-| `PORT` | `3001` | 服务器端口 |
-| `CLIENT_URL` | `http://localhost:3000` | 允许的客户端 URL（逗号分隔） |
-| `UPLOAD_DIR` | `/app/uploads` | 文件上传目录 |
-| `MAX_FILE_SIZE` | `104857600` | 最大文件大小 (100MB) |
-| `ROOM_CLEANUP_INTERVAL` | `3600000` | 房间清理间隔（1小时） |
-| `FILE_RETENTION_HOURS` | `12` | 文件保留时间 |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | 速率限制窗口 |
-| `RATE_LIMIT_MAX_REQUESTS` | `100` | 每窗口最大请求数 |
+| 变量                      | 默认值                  | 描述                         |
+| ------------------------- | ----------------------- | ---------------------------- |
+| `NODE_ENV`                | `production`            | 环境模式                     |
+| `PORT`                    | `3001`                  | 服务器端口                   |
+| `CLIENT_URL`              | `http://localhost:3000` | 允许的客户端 URL（逗号分隔） |
+| `UPLOAD_DIR`              | `/app/uploads`          | 文件上传目录                 |
+| `MAX_FILE_SIZE`           | `104857600`             | 最大文件大小 (100MB)         |
+| `ROOM_CLEANUP_INTERVAL`   | `3600000`               | 房间清理间隔（1小时）        |
+| `FILE_RETENTION_HOURS`    | `12`                    | 文件保留时间                 |
+| `RATE_LIMIT_WINDOW_MS`    | `60000`                 | 速率限制窗口                 |
+| `RATE_LIMIT_MAX_REQUESTS` | `100`                   | 每窗口最大请求数             |
 
 ### 卷挂载
 
@@ -134,10 +140,10 @@ cp .env.production .env
 server {
     listen 443 ssl http2;
     server_name your-domain.com;
-    
+
     ssl_certificate /etc/nginx/ssl/cert.pem;
     ssl_certificate_key /etc/nginx/ssl/key.pem;
-    
+
     # ... 其余配置
 }
 ```
@@ -182,6 +188,7 @@ curl http://localhost/health
 ### 健康检查
 
 应用程序包含内置的健康检查：
+
 - HTTP 端点：`/health`
 - Docker 健康检查：每 30 秒
 - Nginx 上游健康监控
@@ -242,10 +249,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: "1.0"
           memory: 1G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
 ```
 
@@ -307,7 +314,9 @@ This guide covers deploying the Cloud Clipboard application using Docker with se
 ### Production Deployment
 
 #### Default Deployment (Recommended)
+
 **Single container deployment with unified frontend and backend:**
+
 ```bash
 # Create data directory
 mkdir -p data/uploads logs
@@ -322,7 +331,9 @@ docker-compose logs -f
 ```
 
 #### Full Deployment (with Nginx Proxy)
+
 **Complete deployment with Nginx reverse proxy:**
+
 ```bash
 # Create data directory
 mkdir -p data/uploads logs
@@ -335,7 +346,9 @@ docker-compose -f docker-compose.nginx.yml logs -f
 ```
 
 #### Manual Docker Build
+
 **Single container manual deployment:**
+
 ```bash
 # Build the image
 docker build -t cloud-clipboard:latest .
@@ -362,17 +375,17 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | `production` | Environment mode |
-| `PORT` | `3001` | Server port |
-| `CLIENT_URL` | `http://localhost:3000` | Allowed client URLs (comma-separated) |
-| `UPLOAD_DIR` | `/app/uploads` | File upload directory |
-| `MAX_FILE_SIZE` | `104857600` | Max file size (100MB) |
-| `ROOM_CLEANUP_INTERVAL` | `3600000` | Room cleanup interval (1 hour) |
-| `FILE_RETENTION_HOURS` | `12` | File retention period |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit window |
-| `RATE_LIMIT_MAX_REQUESTS` | `100` | Max requests per window |
+| Variable                  | Default                 | Description                           |
+| ------------------------- | ----------------------- | ------------------------------------- |
+| `NODE_ENV`                | `production`            | Environment mode                      |
+| `PORT`                    | `3001`                  | Server port                           |
+| `CLIENT_URL`              | `http://localhost:3000` | Allowed client URLs (comma-separated) |
+| `UPLOAD_DIR`              | `/app/uploads`          | File upload directory                 |
+| `MAX_FILE_SIZE`           | `104857600`             | Max file size (100MB)                 |
+| `ROOM_CLEANUP_INTERVAL`   | `3600000`               | Room cleanup interval (1 hour)        |
+| `FILE_RETENTION_HOURS`    | `12`                    | File retention period                 |
+| `RATE_LIMIT_WINDOW_MS`    | `60000`                 | Rate limit window                     |
+| `RATE_LIMIT_MAX_REQUESTS` | `100`                   | Max requests per window               |
 
 ### Volume Mounts
 
@@ -426,10 +439,10 @@ Update `nginx.conf` for HTTPS:
 server {
     listen 443 ssl http2;
     server_name your-domain.com;
-    
+
     ssl_certificate /etc/nginx/ssl/cert.pem;
     ssl_certificate_key /etc/nginx/ssl/key.pem;
-    
+
     # ... rest of configuration
 }
 ```
@@ -474,6 +487,7 @@ curl http://localhost/health
 ### Health Checks
 
 The application includes built-in health checks:
+
 - HTTP endpoint: `/health`
 - Docker health check: Every 30 seconds
 - Nginx upstream health monitoring
@@ -534,10 +548,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: "1.0"
           memory: 1G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
 ```
 

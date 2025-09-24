@@ -1,8 +1,8 @@
-import { DesktopAPI } from './desktop-api';
+import { DesktopAPI } from "./desktop-api";
 
 export class ClipboardMonitor {
   private intervalId: number | null = null;
-  private lastClipboardText = '';
+  private lastClipboardText = "";
   private onClipboardChange?: (text: string) => void;
 
   constructor(onClipboardChange?: (text: string) => void) {
@@ -11,7 +11,7 @@ export class ClipboardMonitor {
 
   async start(intervalMs: number = 1000) {
     if (!DesktopAPI.isDesktop()) {
-      console.warn('Clipboard monitoring is only available in desktop app');
+      console.warn("Clipboard monitoring is only available in desktop app");
       return;
     }
 
@@ -21,7 +21,7 @@ export class ClipboardMonitor {
     try {
       this.lastClipboardText = await DesktopAPI.getClipboardText();
     } catch (error) {
-      console.error('Failed to get initial clipboard text:', error);
+      console.error("Failed to get initial clipboard text:", error);
     }
 
     this.intervalId = window.setInterval(async () => {
@@ -34,7 +34,7 @@ export class ClipboardMonitor {
           }
         }
       } catch (error) {
-        console.error('Failed to monitor clipboard:', error);
+        console.error("Failed to monitor clipboard:", error);
       }
     }, intervalMs);
   }

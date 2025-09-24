@@ -13,13 +13,16 @@
 ## 🛠️ 准备工作
 
 ### 环境要求
-- Node.js 18+ 
+
+- Node.js 18+
 - Git 配置完整
 - GitHub 仓库访问权限
 - 干净的工作目录（无未提交的更改）
 
 ### 权限检查
+
 确保 GitHub Actions 有以下权限：
+
 - `contents: write` - 创建 releases
 - `actions: read` - 访问工作流
 - `packages: write` - 发布包（如果需要）
@@ -27,6 +30,7 @@
 ## 🎯 发布类型
 
 ### 语义化版本
+
 我们遵循 [Semantic Versioning](https://semver.org/) 规范：
 
 - **MAJOR** (x.0.0): 不兼容的 API 更改
@@ -34,6 +38,7 @@
 - **PATCH** (0.0.x): 向后兼容的 bug 修复
 
 ### 版本类型示例
+
 ```bash
 # 补丁版本（bug 修复）
 node scripts/release.js patch      # 1.0.0 → 1.0.1
@@ -81,6 +86,7 @@ node scripts/release.js patch --dry-run
 ```
 
 发布脚本会自动：
+
 - ✅ 检查工作目录状态
 - ✅ 更新所有包的版本号
 - ✅ 更新 Cargo.toml 和 tauri.conf.json
@@ -99,6 +105,7 @@ node scripts/release.js patch --dry-run
 ### 4. 验证发布
 
 构建完成后：
+
 1. 检查 [Releases 页面](https://github.com/your-username/cloud-clipboard/releases)
 2. 验证所有平台的文件都已上传
 3. 测试下载链接
@@ -107,11 +114,12 @@ node scripts/release.js patch --dry-run
 ## 🎨 发布脚本选项
 
 ### 基本使用
+
 ```bash
 # 自动递增补丁版本
 node scripts/release.js patch
 
-# 自动递增次要版本  
+# 自动递增次要版本
 node scripts/release.js minor
 
 # 自动递增主要版本
@@ -122,6 +130,7 @@ node scripts/release.js 1.5.0
 ```
 
 ### 高级选项
+
 ```bash
 # 预览模式（不做实际更改）
 node scripts/release.js patch --dry-run
@@ -141,16 +150,19 @@ node scripts/release.js --help
 ### Release 工作流 (`.github/workflows/release.yml`)
 
 触发条件：
-- 推送标签 `v*` 
+
+- 推送标签 `v*`
 - 手动触发（workflow_dispatch）
 
 构建矩阵：
+
 - **Windows**: `x86_64-pc-windows-msvc` (.exe, .msi)
 - **macOS Intel**: `x86_64-apple-darwin` (.dmg, .tar.gz)
 - **macOS Apple Silicon**: `aarch64-apple-darwin` (.dmg, .tar.gz)
 - **Linux**: `x86_64-unknown-linux-gnu` (binary, .deb, .AppImage)
 
 输出文件：
+
 - `cloud-clipboard-windows-x64.exe/msi`
 - `cloud-clipboard-macos-x64.dmg/tar.gz`
 - `cloud-clipboard-macos-arm64.dmg/tar.gz`
@@ -160,6 +172,7 @@ node scripts/release.js --help
 ### CI 工作流 (`.github/workflows/ci.yml`)
 
 在每个 PR 和推送时运行：
+
 - 代码检查和类型检查
 - Web 应用构建测试
 - 桌面应用构建测试
@@ -171,11 +184,13 @@ node scripts/release.js --help
 ### 常见问题
 
 #### 1. 版本不一致错误
+
 ```bash
 ❌ Version mismatch: desktop has 1.0.0, expected 1.0.1
 ```
 
 **解决方案**:
+
 ```bash
 # 检查所有版本
 node scripts/version-sync.js check
@@ -185,11 +200,13 @@ node scripts/release.js patch
 ```
 
 #### 2. 工作目录不干净
+
 ```bash
 ❌ Working directory is not clean
 ```
 
 **解决方案**:
+
 ```bash
 # 查看未提交的更改
 git status
@@ -204,6 +221,7 @@ git stash
 #### 3. 构建失败
 
 **检查步骤**:
+
 1. 查看 GitHub Actions 日志
 2. 本地重现构建问题
 3. 检查依赖项更新
@@ -212,11 +230,13 @@ git stash
 #### 4. 发布资产缺失
 
 **可能原因**:
+
 - 构建脚本路径错误
 - 文件名模式不匹配
 - 权限问题
 
 **解决方案**:
+
 1. 检查工作流文件中的路径
 2. 验证构建输出结构
 3. 重新触发工作流
@@ -240,6 +260,7 @@ node scripts/release.js 1.0.1
 ## 📊 发布检查清单
 
 ### 发布前
+
 - [ ] 所有测试通过
 - [ ] 代码审查完成
 - [ ] 版本号遵循语义化规范
@@ -247,12 +268,14 @@ node scripts/release.js 1.0.1
 - [ ] 工作目录清洁
 
 ### 发布中
+
 - [ ] 发布脚本执行成功
 - [ ] GitHub Actions 构建开始
 - [ ] 所有平台构建完成
 - [ ] 发布资产上传成功
 
 ### 发布后
+
 - [ ] 验证下载链接
 - [ ] 测试关键平台
 - [ ] 更新文档
@@ -262,15 +285,17 @@ node scripts/release.js 1.0.1
 ## 🎁 发布资产详情
 
 ### 桌面应用
-| 平台 | 文件格式 | 说明 |
-|------|----------|------|
-| Windows | .exe, .msi | 便携版和安装包 |
-| macOS | .dmg, .tar.gz | 磁盘镜像和压缩包 |
-| Linux | binary, .deb, .AppImage | 二进制、Debian 包、便携版 |
+
+| 平台    | 文件格式                | 说明                      |
+| ------- | ----------------------- | ------------------------- |
+| Windows | .exe, .msi              | 便携版和安装包            |
+| macOS   | .dmg, .tar.gz           | 磁盘镜像和压缩包          |
+| Linux   | binary, .deb, .AppImage | 二进制、Debian 包、便携版 |
 
 ### Web 应用
-| 文件 | 内容 | 用途 |
-|------|------|------|
+
+| 文件                       | 内容          | 用途       |
+| -------------------------- | ------------- | ---------- |
 | cloud-clipboard-web.tar.gz | 完整 web 应用 | 自托管部署 |
 
 ## 🔄 回滚发布

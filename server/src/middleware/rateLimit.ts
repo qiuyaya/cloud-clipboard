@@ -1,6 +1,6 @@
-import type { Request, Response, NextFunction } from 'express';
-import type { APIResponse } from '@cloud-clipboard/shared';
-import { HTTP_RATE_LIMITS, CLEANUP_INTERVALS } from '@cloud-clipboard/shared';
+import type { Request, Response, NextFunction } from "express";
+import type { APIResponse } from "@cloud-clipboard/shared";
+import { HTTP_RATE_LIMITS, CLEANUP_INTERVALS } from "@cloud-clipboard/shared";
 
 interface RateLimitRecord {
   requests: number;
@@ -16,7 +16,7 @@ class RateLimiter {
   constructor(
     windowMs: number = HTTP_RATE_LIMITS.GENERAL.WINDOW_MS,
     maxRequests: number = HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS,
-    keyGenerator: (req: Request) => string = (req) => req.ip || 'unknown'
+    keyGenerator: (req: Request) => string = (req) => req.ip || "unknown",
   ) {
     this.windowMs = windowMs;
     this.maxRequests = maxRequests;
@@ -41,7 +41,7 @@ class RateLimiter {
       const now = Date.now();
 
       let record = this.records.get(key);
-      
+
       // Create new record or reset if window expired
       if (!record || now > record.resetTime) {
         record = {
@@ -55,15 +55,15 @@ class RateLimiter {
 
       // Set rate limit headers
       res.set({
-        'X-RateLimit-Limit': this.maxRequests.toString(),
-        'X-RateLimit-Remaining': Math.max(0, this.maxRequests - record.requests).toString(),
-        'X-RateLimit-Reset': new Date(record.resetTime).toISOString(),
+        "X-RateLimit-Limit": this.maxRequests.toString(),
+        "X-RateLimit-Remaining": Math.max(0, this.maxRequests - record.requests).toString(),
+        "X-RateLimit-Reset": new Date(record.resetTime).toISOString(),
       });
 
       if (record.requests > this.maxRequests) {
         res.status(429).json({
           success: false,
-          message: 'Too many requests. Please try again later.',
+          message: "Too many requests. Please try again later.",
         });
         return;
       }
@@ -76,27 +76,27 @@ class RateLimiter {
 // Different rate limiters for different endpoints
 export const generalRateLimit = new RateLimiter(
   HTTP_RATE_LIMITS.GENERAL.WINDOW_MS,
-  HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS
+  HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS,
 );
 
 export const uploadRateLimit = new RateLimiter(
   HTTP_RATE_LIMITS.UPLOAD.WINDOW_MS,
-  HTTP_RATE_LIMITS.UPLOAD.MAX_REQUESTS
+  HTTP_RATE_LIMITS.UPLOAD.MAX_REQUESTS,
 );
 
 export const authRateLimit = new RateLimiter(
   HTTP_RATE_LIMITS.AUTH.WINDOW_MS,
-  HTTP_RATE_LIMITS.AUTH.MAX_REQUESTS
+  HTTP_RATE_LIMITS.AUTH.MAX_REQUESTS,
 );
 
 export const strictRateLimit = new RateLimiter(
   HTTP_RATE_LIMITS.STRICT.WINDOW_MS,
-  HTTP_RATE_LIMITS.STRICT.MAX_REQUESTS
+  HTTP_RATE_LIMITS.STRICT.MAX_REQUESTS,
 );
 
 // IP + Room based rate limiter for room-specific actions
 export const roomActionRateLimit = new RateLimiter(
   HTTP_RATE_LIMITS.ROOM_ACTION.WINDOW_MS,
   HTTP_RATE_LIMITS.ROOM_ACTION.MAX_REQUESTS,
-  (req) => `${req.ip}:${req.roomKey || 'no-room'}`
+  (req) => `${req.ip}:${req.roomKey || "no-room"}`,
 );

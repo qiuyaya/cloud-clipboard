@@ -1,4 +1,4 @@
-import { User } from './types';
+import { User } from "./types";
 
 export const generateUserId = (): string => {
   return crypto.randomUUID();
@@ -9,71 +9,74 @@ export const generateRoomKey = (): string => {
   // - At least 6 characters
   // - Contains both letters and numbers
   // - Only alphanumeric, underscores, and hyphens
-  const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const numbers = '0123456789';
+  const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const numbers = "0123456789";
   const allChars = letters + numbers;
-  
-  let result = '';
-  
+
+  let result = "";
+
   // Ensure at least one letter and one number
   result += letters.charAt(Math.floor(Math.random() * letters.length));
   result += numbers.charAt(Math.floor(Math.random() * numbers.length));
-  
+
   // Add remaining characters (total length: 8 characters)
   for (let i = 2; i < 8; i++) {
     result += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
-  
+
   // Shuffle the result to avoid predictable patterns
-  return result.split('').sort(() => Math.random() - 0.5).join('');
+  return result
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
 };
 
 export const generateDefaultUsername = (): string => {
   // Generate a random 6-character alphanumeric string
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
   for (let i = 0; i < 6; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return `用户${result}`;
 };
 
-export const detectDeviceType = (userAgent: string): User['deviceType'] => {
+export const detectDeviceType = (userAgent: string): User["deviceType"] => {
   const ua = userAgent.toLowerCase();
-  
+
   // Check tablet first (before mobile) since tablets often contain mobile keywords
   if (/tablet|ipad/i.test(ua)) {
-    return 'tablet';
+    return "tablet";
   }
-  
+
   // Check for Android tablets by model number patterns
   if (/android/i.test(ua) && /sm-t\d+/i.test(ua)) {
-    return 'tablet';
+    return "tablet";
   }
-  
+
   // Then check mobile devices
   if (/mobile|android|iphone|phone/i.test(ua)) {
-    return 'mobile';
+    return "mobile";
   }
-  
+
   // Check desktop/laptop devices
   if (/desktop|windows|mac|linux/i.test(ua)) {
-    return 'desktop';
+    return "desktop";
   }
-  
-  return 'unknown';
+
+  return "unknown";
 };
 
 export const formatFileSize = (bytes: number): string => {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let size = bytes;
   let unitIndex = 0;
-  
+
   while (size >= 1024 && unitIndex < units.length - 1) {
     size /= 1024;
     unitIndex++;
   }
-  
+
   return `${size.toFixed(unitIndex > 0 ? 2 : 0)} ${units[unitIndex]}`;
 };
 
@@ -82,38 +85,38 @@ export const isValidRoomKey = (key: string): boolean => {
 };
 
 export const sanitizeFileName = (fileName: string): string => {
-  if (!fileName || typeof fileName !== 'string') {
-    return 'unnamed_file';
+  if (!fileName || typeof fileName !== "string") {
+    return "unnamed_file";
   }
 
   // Remove any directory traversal attempts
-  let sanitized = fileName.replace(/\.\./g, '');
-  
+  let sanitized = fileName.replace(/\.\./g, "");
+
   // Remove path separators
-  sanitized = sanitized.replace(/[/\\]/g, '_');
-  
+  sanitized = sanitized.replace(/[/\\]/g, "_");
+
   // Remove potentially dangerous characters and control characters
   // eslint-disable-next-line no-control-regex
-  sanitized = sanitized.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-  sanitized = sanitized.replace(/[<>:"|?*]/g, '_');
-  
+  sanitized = sanitized.replace(/[\x00-\x1f\x7f-\x9f]/g, "");
+  sanitized = sanitized.replace(/[<>:"|?*]/g, "_");
+
   // Replace sequences of unsafe characters with single underscore
-  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_');
-  
+  sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, "_");
+
   // Remove multiple consecutive underscores
-  sanitized = sanitized.replace(/_+/g, '_');
-  
+  sanitized = sanitized.replace(/_+/g, "_");
+
   // Remove leading/trailing underscores and dots
-  sanitized = sanitized.replace(/^[._-]+|[._-]+$/g, '');
-  
+  sanitized = sanitized.replace(/^[._-]+|[._-]+$/g, "");
+
   // Ensure we have a valid filename
   if (!sanitized || sanitized.length === 0) {
-    sanitized = 'unnamed_file';
+    sanitized = "unnamed_file";
   }
-  
+
   // Limit filename length (keep extension if present)
   if (sanitized.length > 100) {
-    const lastDotIndex = sanitized.lastIndexOf('.');
+    const lastDotIndex = sanitized.lastIndexOf(".");
     if (lastDotIndex > 0 && lastDotIndex > sanitized.length - 10) {
       // Keep extension
       const name = sanitized.substring(0, lastDotIndex).substring(0, 90);
@@ -123,53 +126,72 @@ export const sanitizeFileName = (fileName: string): string => {
       sanitized = sanitized.substring(0, 100);
     }
   }
-  
+
   // Prevent reserved Windows filenames
   const reservedNames = [
-    'CON', 'PRN', 'AUX', 'NUL', 
-    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
   ];
-  
-  const nameWithoutExt = sanitized.replace(/\.[^.]*$/, '');
+
+  const nameWithoutExt = sanitized.replace(/\.[^.]*$/, "");
   if (reservedNames.includes(nameWithoutExt.toUpperCase())) {
-    sanitized = '_' + sanitized;
+    sanitized = "_" + sanitized;
   }
-  
+
   return sanitized;
 };
 
 export const formatTimestamp = (date: Date | string): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+
   // Check if the date is valid
   if (isNaN(dateObj.getTime())) {
-    return 'Invalid Date';
+    return "Invalid Date";
   }
-  
-  return new Intl.DateTimeFormat('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   }).format(dateObj);
 };
 
 // Browser fingerprinting utilities (client-side only)
-export const generateBrowserFingerprint = (): import('./types').BrowserFingerprint => {
-  if (typeof globalThis === 'undefined' || !(globalThis as any).window) {
+export const generateBrowserFingerprint = (): import("./types").BrowserFingerprint => {
+  if (typeof globalThis === "undefined" || !(globalThis as any).window) {
     // Server-side fallback - generate a random hash
     const randomHash = Math.random().toString(36).substring(2) + Date.now().toString(36);
     return {
-      userAgent: '',
-      language: 'en',
-      timezone: 'UTC',
-      screen: '0x0',
+      userAgent: "",
+      language: "en",
+      timezone: "UTC",
+      screen: "0x0",
       colorDepth: 24,
       cookieEnabled: false,
-      hash: secureHash('server-side-' + randomHash),
+      hash: secureHash("server-side-" + randomHash),
     };
   }
 
@@ -177,32 +199,32 @@ export const generateBrowserFingerprint = (): import('./types').BrowserFingerpri
   const win = (globalThis as any).window;
   const screen = win.screen;
   const navigator = win.navigator;
-  
+
   try {
     // Collect more detailed fingerprint data
-    const canvas = win.document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.textBaseline = 'top';
-    ctx.font = '14px Arial';
-    ctx.fillText('Browser fingerprint canvas test 🔒', 2, 2);
+    const canvas = win.document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.textBaseline = "top";
+    ctx.font = "14px Arial";
+    ctx.fillText("Browser fingerprint canvas test 🔒", 2, 2);
     const canvasFingerprint = canvas.toDataURL().substring(0, 50); // First 50 chars only
-    
+
     const fingerprint = {
       userAgent: navigator.userAgent.substring(0, 200), // Limit length
-      language: navigator.language || 'unknown',
-      languages: (navigator.languages || []).join(',').substring(0, 100),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
+      language: navigator.language || "unknown",
+      languages: (navigator.languages || []).join(",").substring(0, 100),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown",
       screen: `${screen.width}x${screen.height}x${screen.availWidth}x${screen.availHeight}`,
       colorDepth: screen.colorDepth || 24,
       pixelRatio: win.devicePixelRatio || 1,
       cookieEnabled: navigator.cookieEnabled,
-      doNotTrack: navigator.doNotTrack || 'unknown',
-      platform: navigator.platform?.substring(0, 50) || 'unknown',
+      doNotTrack: navigator.doNotTrack || "unknown",
+      platform: navigator.platform?.substring(0, 50) || "unknown",
       hardwareConcurrency: navigator.hardwareConcurrency || 0,
       maxTouchPoints: navigator.maxTouchPoints || 0,
       canvas: canvasFingerprint,
-      localStorage: typeof win.localStorage !== 'undefined',
-      sessionStorage: typeof win.sessionStorage !== 'undefined',
+      localStorage: typeof win.localStorage !== "undefined",
+      sessionStorage: typeof win.sessionStorage !== "undefined",
       webGL: !!win.WebGLRenderingContext,
       // Remove timestamp to ensure consistent fingerprints across page reloads
     };
@@ -210,7 +232,7 @@ export const generateBrowserFingerprint = (): import('./types').BrowserFingerpri
     // Create more secure hash from all fingerprint data
     const fingerprintString = JSON.stringify(fingerprint);
     const hash = secureHash(fingerprintString);
-    
+
     return {
       userAgent: fingerprint.userAgent,
       language: fingerprint.language,
@@ -225,16 +247,16 @@ export const generateBrowserFingerprint = (): import('./types').BrowserFingerpri
     // Fallback in case of errors
     const basicFingerprint = {
       userAgent: navigator.userAgent.substring(0, 200),
-      language: navigator.language || 'unknown',
-      timezone: 'unknown',
+      language: navigator.language || "unknown",
+      timezone: "unknown",
       screen: `${screen.width}x${screen.height}`,
       colorDepth: screen.colorDepth || 24,
       cookieEnabled: navigator.cookieEnabled,
-      doNotTrack: 'unknown',
+      doNotTrack: "unknown",
     };
-    
+
     const fallbackHash = secureHash(JSON.stringify(basicFingerprint));
-    
+
     return {
       ...basicFingerprint,
       hash: fallbackHash,
@@ -244,48 +266,48 @@ export const generateBrowserFingerprint = (): import('./types').BrowserFingerpri
 
 export const generateUserIdFromFingerprint = (fingerprint: string): string => {
   // Use more secure hashing for user ID generation
-  const hash1 = secureHash(fingerprint + '-salt-primary');
-  const hash2 = secureHash(fingerprint + '-salt-secondary');
-  
+  const hash1 = secureHash(fingerprint + "-salt-primary");
+  const hash2 = secureHash(fingerprint + "-salt-secondary");
+
   // Create UUID from the secure hashes
   const combined = hash1 + hash2;
-  
+
   // Format as proper UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
   const uuid = [
     combined.slice(0, 8),
     combined.slice(8, 12),
-    '4' + combined.slice(13, 16), // Version 4 UUID
+    "4" + combined.slice(13, 16), // Version 4 UUID
     ((parseInt(combined.charAt(16), 16) & 0x3) | 0x8).toString(16) + combined.slice(17, 20), // Variant bits
-    combined.slice(20, 32)
-  ].join('-');
-  
+    combined.slice(20, 32),
+  ].join("-");
+
   return uuid;
 };
 
 // Improved cryptographic hash function for fingerprinting
 const secureHash = (str: string): string => {
-  if (str.length === 0) return '0';
-  
+  if (str.length === 0) return "0";
+
   // Use a more secure hashing approach
   let hash1 = 0x811c9dc5; // FNV-1a 32-bit offset basis
   let hash2 = 0x1000193; // FNV-1a 32-bit prime
-  
+
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     // FNV-1a hash algorithm
     hash1 ^= char;
     hash1 = Math.imul(hash1, 0x01000193);
-    
+
     // Additional mixing for better distribution
     hash2 = Math.imul(hash2 ^ char, 0x85ebca77);
     hash2 ^= hash2 >>> 13;
     hash2 = Math.imul(hash2, 0xc2b2ae3d);
     hash2 ^= hash2 >>> 16;
   }
-  
+
   // Combine both hashes and convert to hex
-  const combined = ((hash1 >>> 0) * 0x100000000) + (hash2 >>> 0);
-  return combined.toString(16).padStart(16, '0');
+  const combined = (hash1 >>> 0) * 0x100000000 + (hash2 >>> 0);
+  return combined.toString(16).padStart(16, "0");
 };
 
 // Fallback simple hash for compatibility (exported for potential future use)
@@ -294,7 +316,7 @@ export const simpleHash = (str: string): number => {
   if (str.length === 0) return hash;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
   return Math.abs(hash);

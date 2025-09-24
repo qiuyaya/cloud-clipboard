@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v1.0.0)'
+        description: "Tag to release (e.g., v1.0.0)"
         required: true
         type: string
 
@@ -30,27 +30,27 @@ jobs:
             platform: windows
             arch: x64
             ext: .exe
-            
+
           # macOS Intel
           - os: macos-latest
             target: x86_64-apple-darwin
             platform: macos
             arch: x64
-            ext: ''
-            
+            ext: ""
+
           # macOS Apple Silicon
           - os: macos-latest
             target: aarch64-apple-darwin
             platform: macos
             arch: arm64
-            ext: ''
-            
+            ext: ""
+
           # Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-            ext: ''
+            ext: ""
 
     steps:
       - name: Checkout repository
@@ -60,7 +60,7 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      
+
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
@@ -119,7 +119,7 @@ jobs:
         run: |
           cd desktop
           bun run tauri build -- --target ${{ matrix.target }}
-      
+
       # Diagnose build output
       - name: Diagnose build output
         shell: bash
@@ -147,7 +147,7 @@ jobs:
           else
             cd desktop/src-tauri/target/release
           fi
-          
+
           if [[ "${{ matrix.platform }}" == "windows" ]]; then
             # Windows: .exe and .msi
             mv "cloud-clipboard-desktop${{ matrix.ext }}" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
@@ -194,7 +194,7 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-      
+
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
@@ -225,7 +225,7 @@ jobs:
           cp -r server/package*.json dist/server/
           cp package.json dist/
           cp README.md dist/
-          
+
           # Create deployment package
           tar -czf cloud-clipboard-web.tar.gz -C dist .
 
@@ -326,25 +326,25 @@ jobs:
           else
             COMMITS=$(git log --pretty=format:"- %s" --no-merges -10)
           fi
-          
+
           # Create release notes
           cat > release_notes.md << EOF
           ## 🚀 Cloud Clipboard ${{ steps.get_version.outputs.version }}
-          
+
           ### 📋 What's New
           ${COMMITS}
-          
+
           ### 📦 Downloads
-          
+
           #### 🖥️ Desktop Applications
           - **Windows**: Download \`cloud-clipboard-windows-x64.exe\` or \`cloud-clipboard-windows-x64.msi\`
           - **macOS**: Download \`cloud-clipboard-macos-x64.dmg\` (Intel) or \`cloud-clipboard-macos-arm64.dmg\` (Apple Silicon)
           - **Linux**: Download \`cloud-clipboard-linux-x64\`, \`cloud-clipboard-linux-x64.deb\`, or \`cloud-clipboard-linux-x64.AppImage\`
-          
+
           #### 🌐 Web Application
           - **Full Package**: Download \`cloud-clipboard-web.tar.gz\` for self-hosting
           - **Docker**: Pull image with \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
-          
+
           ### ✨ Features
           - 🔄 **Auto clipboard sync**: Automatically sync clipboard content across devices
           - ⚙️ **Configurable settings**: Customize server URL, sync interval, and more
@@ -352,30 +352,30 @@ jobs:
           - 📱 **Cross-platform**: Windows, macOS, Linux, iOS, Android support
           - 🔔 **Native notifications**: System notifications for clipboard changes
           - 🏠 **Self-hosted**: Run your own cloud clipboard server
-          
+
           ### 🛠️ Installation
-          
+
           #### Desktop App
           1. Download the appropriate file for your platform
           2. Install and run the application
           3. Configure your server URL in settings
           4. Start syncing your clipboard!
-          
+
           #### Web App (Self-hosting)
           1. Download \`cloud-clipboard-web.tar.gz\`
           2. Extract and follow the README for deployment instructions
           3. Access via web browser
-          
+
           #### Docker (Recommended for self-hosting)
           1. Pull the image: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
           2. Run with: \`docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
           3. Access at http://localhost:3001
-          
+
           ---
-          
+
           **Full Changelog**: https://github.com/\${{ github.repository }}/compare/\${PREVIOUS_TAG}...${{ steps.get_version.outputs.version }}
           EOF
-          
+
           echo "Generated release notes"
 
       - name: Download all artifacts
@@ -386,10 +386,10 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release_assets
-          
+
           # Copy desktop artifacts
           find artifacts -name "cloud-clipboard-*" -type f -exec cp {} release_assets/ \;
-          
+
           # List all assets
           echo "Release assets:"
           ls -la release_assets/

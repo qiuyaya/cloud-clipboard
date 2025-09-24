@@ -1,6 +1,6 @@
-import type { Request, Response, NextFunction } from 'express';
-import { RoomKeySchema } from '@cloud-clipboard/shared';
-import type { APIResponse } from '@cloud-clipboard/shared';
+import type { Request, Response, NextFunction } from "express";
+import { RoomKeySchema } from "@cloud-clipboard/shared";
+import type { APIResponse } from "@cloud-clipboard/shared";
 
 declare global {
   namespace Express {
@@ -10,13 +10,17 @@ declare global {
   }
 }
 
-export const authenticateRoom = (req: Request, res: Response<APIResponse>, next: NextFunction): void => {
-  const roomKey = req.headers['x-room-key'] as string || req.body?.roomKey || req.query?.roomKey;
+export const authenticateRoom = (
+  req: Request,
+  res: Response<APIResponse>,
+  next: NextFunction,
+): void => {
+  const roomKey = (req.headers["x-room-key"] as string) || req.body?.roomKey || req.query?.roomKey;
 
   if (!roomKey) {
     res.status(401).json({
       success: false,
-      message: 'Room key is required',
+      message: "Room key is required",
     });
     return;
   }
@@ -28,13 +32,17 @@ export const authenticateRoom = (req: Request, res: Response<APIResponse>, next:
   } catch {
     res.status(401).json({
       success: false,
-      message: 'Invalid room key format',
+      message: "Invalid room key format",
     });
   }
 };
 
-export const optionalRoomAuth = (req: Request, _res: Response<APIResponse>, next: NextFunction): void => {
-  const roomKey = req.headers['x-room-key'] as string || req.body?.roomKey || req.query?.roomKey;
+export const optionalRoomAuth = (
+  req: Request,
+  _res: Response<APIResponse>,
+  next: NextFunction,
+): void => {
+  const roomKey = (req.headers["x-room-key"] as string) || req.body?.roomKey || req.query?.roomKey;
 
   if (roomKey) {
     try {
