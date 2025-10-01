@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "vitest run --grep integration"
+    "test:integration": "vitest run src/__tests__/integration.test.ts"
   },
   "dependencies": {
     "@cloud-clipboard/shared": "workspace:*",

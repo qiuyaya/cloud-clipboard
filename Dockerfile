@@ -13,10 +13,6 @@ RUN bun install --frozen-lockfile
 ENV NODE_ENV=production
 RUN bun run build
 
-# 清理dev依赖
-RUN rm -rf node_modules
-RUN bun install --production --frozen-lockfile
-
 # Stage 2: 极简运行时
 FROM oven/bun:alpine AS runtime
 
@@ -26,10 +22,14 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# 复制构建产物和生产依赖
+# 复制构建产物
 COPY --from=builder --chown=cloudclipboard:nodejs /app/server/dist ./server/dist
 COPY --from=builder --chown=cloudclipboard:nodejs /app/server/public ./server/public
+
+# 复制依赖（包含所有工作区依赖）
 COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=cloudclipboard:nodejs /app/shared ./shared
+COPY --from=builder --chown=cloudclipboard:nodejs /app/server/node_modules ./server/node_modules
 
 # 创建必要目录
 RUN mkdir -p /app/uploads && \
