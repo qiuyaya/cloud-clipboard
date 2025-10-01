@@ -35,6 +35,7 @@
     "test:coverage": "bun run shared:test:coverage && bun run server:test:coverage && bun run client:test:coverage && node scripts/coverage-report.js",
     "test:integration": "bun run server:test:integration",
     "test:e2e": "bun run client:test:e2e",
+    "shared:build": "echo 'Shared package does not require build step'",
     "shared:test": "cd shared && bun test",
     "shared:test:watch": "cd shared && bun test --watch",
     "shared:test:coverage": "cd shared && bun test --coverage",
