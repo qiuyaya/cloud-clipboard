@@ -14,9 +14,9 @@ import type {
 } from "@cloud-clipboard/shared";
 
 interface UseSocketConnectionProps {
-  onSetCurrentUser: (user: User | null) => void;
-  onSetUsers: (users: User[]) => void;
-  onSetMessages: (messages: (TextMessage | FileMessage)[]) => void;
+  onSetCurrentUser: (user: User | null | ((prev: User | null) => User | null)) => void;
+  onSetUsers: (users: User[] | ((prev: User[]) => User[])) => void;
+  onSetMessages: (messages: (TextMessage | FileMessage)[] | ((prev: (TextMessage | FileMessage)[]) => (TextMessage | FileMessage)[])) => void;
   onSetIsConnecting: (connecting: boolean) => void;
   onSetShowPasswordInput: (show: boolean) => void;
   onSetHasRoomPassword: (hasPassword: boolean) => void;
