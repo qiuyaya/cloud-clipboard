@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2025-10-01
+
+- fix: 修复房间密码验证后的状态管理问题
+- refactor: 重构测试目录结构并优化代码质量
+- refactor: 重构测试目录结构，添加pre-commit hooks和代码格式化
+- feat: 新增房间密码保护功能
+- feat: 新增分享功能
+
 ## [1.1.1] - 2025-09-20
 
 - fix: 修复ESLint配置彻底解决CI lint错误
