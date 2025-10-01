@@ -161,6 +161,15 @@ export const useRoomManager = () => {
 
       setIsConnecting(true);
       setShowPasswordInput(false);
+      setRoomKey(data.roomKey);
+
+      // Clear user-related state to ensure proper room join flow
+      setCurrentUser(null);
+      setUsers([]);
+      setMessages([]);
+
+      // Save room key to localStorage for persistence
+      saveToLocalStorage("cloudClipboard_roomKey", data.roomKey);
 
       socketService.joinRoomWithPassword(data);
     },
