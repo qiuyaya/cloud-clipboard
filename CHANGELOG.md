@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [1.2.0] - 2025-10-02
 
 - feat: 新增 PWA 支持
+- fix: 修复桌面构建和E2E测试中的PWA相关问题
+- fix: 修复 TypeScript useEffect 返回值错误
 
 ## [1.1.3] - 2025-10-02
 
