@@ -34,18 +34,18 @@ export const DesktopProvider: React.FC<DesktopProviderProps> = ({
   const isDesktop = DesktopAPI.isDesktop();
 
   useEffect(() => {
-    if (isDesktop) {
-      // Load initial config
-      DesktopAPI.getConfig().then(setConfig).catch(console.error);
+    if (!isDesktop) return;
 
-      // Initialize clipboard monitor
-      const monitor = new ClipboardMonitor(onClipboardChange);
-      setClipboardMonitor(monitor);
+    // Load initial config
+    DesktopAPI.getConfig().then(setConfig).catch(console.error);
 
-      return () => {
-        monitor.stop();
-      };
-    }
+    // Initialize clipboard monitor
+    const monitor = new ClipboardMonitor(onClipboardChange);
+    setClipboardMonitor(monitor);
+
+    return () => {
+      monitor.stop();
+    };
   }, [isDesktop, onClipboardChange]);
 
   useEffect(() => {

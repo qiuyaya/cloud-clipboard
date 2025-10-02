@@ -23,17 +23,17 @@ export function PWAUpdatePrompt(): JSX.Element | null {
   });
 
   useEffect(() => {
-    if (offlineReady) {
-      console.log("App ready to work offline");
+    if (!offlineReady) return;
 
-      // Auto-close "offline ready" notification after 3 seconds
-      // This prevents it from blocking UI elements in tests
-      const timer = setTimeout(() => {
-        setOfflineReady(false);
-      }, 3000);
+    console.log("App ready to work offline");
 
-      return () => clearTimeout(timer);
-    }
+    // Auto-close "offline ready" notification after 3 seconds
+    // This prevents it from blocking UI elements in tests
+    const timer = setTimeout(() => {
+      setOfflineReady(false);
+    }, 3000);
+
+    return () => clearTimeout(timer);
   }, [offlineReady, setOfflineReady]);
 
   useEffect(() => {
