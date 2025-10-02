@@ -42,6 +42,14 @@ test.describe("Basic Functionality", () => {
   });
 
   test("should handle theme switching", async ({ page }) => {
+    // Wait for PWA notification to disappear if present
+    const pwaNotification = page.getByText(/Ready for Offline|offline/i);
+    if (await pwaNotification.isVisible().catch(() => false)) {
+      await pwaNotification.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {
+        // Notification might not exist or already hidden, continue
+      });
+    }
+
     // Look for theme toggle button
     const themeToggle = page
       .getByRole("button")

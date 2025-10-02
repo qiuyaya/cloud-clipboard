@@ -106,6 +106,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Mock PWA virtual module for desktop builds
+      'virtual:pwa-register/react': path.resolve(__dirname, './src/__mocks__/pwa-register.ts'),
     },
   },
   build: {
