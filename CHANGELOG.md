@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2025-10-02
+
+- fix: 修复分享链接在生产环境使用localhost的问题
+- fix: 修复客户端测试覆盖率配置
+- fix: 修复GitHub Actions构建失败问题
+- fix: 修复useSocketConnection中的TypeScript类型定义
+- fix: 为App组件添加默认导出以支持桌面应用构建
+- fix: 添加shared:build脚本以修复CI构建失败
+- chore: release v1.1.2
+- fix: 修复房间密码验证后的状态管理问题
+- refactor: 重构测试目录结构并优化代码质量
+- refactor: 重构测试目录结构，添加pre-commit hooks和代码格式化
+- feat: 新增房间密码保护功能
+- feat: 新增分享功能
+
 ## [1.1.2] - 2025-10-01
 
 - fix: 修复房间密码验证后的状态管理问题
