@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-10-02
+
+- feat: 新增 PWA 支持
+
 ## [1.1.3] - 2025-10-02
 
 - fix: 修复分享链接在生产环境使用localhost的问题
