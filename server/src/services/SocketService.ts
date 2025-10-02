@@ -627,7 +627,11 @@ export class SocketService {
       }
 
       // Generate share link with password if room is password protected
-      let shareLink = `${process.env.CLIENT_URL || "http://localhost:3000"}/?room=${validatedData.roomKey}`;
+      // Try to get the client origin from the socket handshake, fallback to CLIENT_URL env var
+      const clientOrigin = process.env.CLIENT_URL || socket.handshake.headers.origin ||
+                          socket.handshake.headers.referer?.split('?')[0].replace(/\/$/, '') ||
+                          "http://localhost:3000";
+      let shareLink = `${clientOrigin}/?room=${validatedData.roomKey}`;
 
       if (room.hasPassword()) {
         shareLink += `&password=${room.password}`;
