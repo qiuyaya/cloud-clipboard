@@ -15,4 +15,4 @@ playwright-report
 client/public/favicon-*.svg
 server/public/
 desktop/src-tauri/icons/app-icon.svg
-desktop/src-tauri/icons/README.md
+desktop/src-tauri/icons/README.mdclient/dev-dist/

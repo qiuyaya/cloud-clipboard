@@ -24,6 +24,7 @@ _中文 | [English](#english)_
 - 🌍 **多语言** - 支持中文和英文界面
 - 🔒 **房间密码** - 可选的房间密码保护功能
 - 🧪 **全面测试** - 单元测试、集成测试和E2E测试覆盖
+- 📲 **PWA 支持** - 可安装为应用，支持离线使用，自动更新
 
 ## 🏗️ 架构
 
@@ -53,6 +54,7 @@ _中文 | [English](#english)_
 - **UI组件**: shadcn/ui (Radix UI)
 - **WebSocket客户端**: Socket.IO Client
 - **验证**: Zod schemas
+- **PWA**: Vite PWA Plugin + Workbox
 
 ### 共享
 
@@ -283,6 +285,7 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 🌍 **Multilingual** - Support for Chinese and English interfaces
 - 🔒 **Room Password** - Optional room password protection feature
 - 🧪 **Comprehensive Testing** - Unit tests, integration tests, and E2E test coverage
+- 📲 **PWA Support** - Installable as an app, offline support, auto-update
 
 ## 🏗️ Architecture
 
@@ -312,6 +315,7 @@ This project is built as a monorepo with four main packages:
 - **UI Components**: shadcn/ui (Radix UI)
 - **WebSocket Client**: Socket.IO Client
 - **Validation**: Zod schemas
+- **PWA**: Vite PWA Plugin + Workbox
 
 ### Shared
 

@@ -125,5 +125,17 @@
   "language": {
     "zh": "中文",
     "en": "English"
+  },
+  "pwa": {
+    "installTitle": "安装应用",
+    "installDescription": "安装云剪切板以便快速访问和离线使用",
+    "install": "安装",
+    "updateTitle": "有可用更新",
+    "updateDescription": "新版本已可用，是否重新加载以更新？",
+    "reload": "重新加载",
+    "later": "稍后",
+    "offlineTitle": "离线就绪",
+    "offlineDescription": "应用已准备好离线工作",
+    "close": "关闭"
   }
 }

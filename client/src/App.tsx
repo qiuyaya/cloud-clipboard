@@ -1,6 +1,8 @@
 import React from "react";
 import { RoomJoin } from "@/components/RoomJoin";
 import { ClipboardRoom } from "@/components/ClipboardRoom";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { Toaster } from "@/components/ui/toaster";
 import { useRoomManager } from "@/hooks/useRoomManager";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
@@ -66,6 +68,8 @@ export function App(): JSX.Element {
           showPasswordInput={showPasswordInput}
           onCancelPassword={handleCancelPassword}
         />
+        <PWAInstallPrompt />
+        <PWAUpdatePrompt />
         <Toaster />
       </>
     );
@@ -85,6 +89,8 @@ export function App(): JSX.Element {
         onShareRoomLink={handleShareRoomLink}
         hasRoomPassword={hasRoomPassword}
       />
+      <PWAInstallPrompt />
+      <PWAUpdatePrompt />
       <Toaster />
     </>
   );

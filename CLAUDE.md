@@ -168,6 +168,19 @@ const userWithDate = {
 - PWA manifest (`/client/public/site.webmanifest`) with proper theme colors
 - HTML files updated with proper favicon references and meta tags
 
+**PWA Support**: Progressive Web App capabilities for enhanced user experience:
+
+- Service Worker with Workbox for offline caching
+- Runtime caching strategies:
+  - CacheFirst for static assets and fonts
+  - NetworkFirst for API calls
+- Automatic cache cleanup and updates
+- Install prompt component with localStorage persistence
+- Update notification component for new versions
+- Offline-ready message for users
+- Manifest configuration for app installation
+- Support for both development and production modes
+
 ## 文档维护指南
 
 ### 需要更新文档的场景
