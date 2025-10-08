@@ -9,6 +9,10 @@ COPY ./ ./
 # 安装依赖
 RUN bun install --frozen-lockfile
 
+# 构建参数
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+
 # 构建
 ENV NODE_ENV=production
 RUN bun run build

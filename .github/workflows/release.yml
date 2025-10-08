@@ -268,7 +268,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for Docker
+      - name: Extract metadata for Docker (root path)
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -280,7 +280,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (root path)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -289,6 +289,34 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Docker (clipboard subpath)
+        id: meta_clipboard
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            suffix=-clipboard
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push Docker image (clipboard subpath)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: |
+            VITE_BASE_PATH=/clipboard/
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta_clipboard.outputs.tags }}
+          labels: ${{ steps.meta_clipboard.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -343,7 +371,8 @@ jobs:
 
           #### 🌐 Web Application
           - **Full Package**: Download \`cloud-clipboard-web.tar.gz\` for self-hosting
-          - **Docker**: Pull image with \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
+          - **Docker (根路径)**: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
+          - **Docker (子路径 /clipboard/)**: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}-clipboard\`
 
           ### ✨ Features
           - 🔄 **Auto clipboard sync**: Automatically sync clipboard content across devices
@@ -367,9 +396,20 @@ jobs:
           3. Access via web browser
 
           #### Docker (Recommended for self-hosting)
-          1. Pull the image: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
-          2. Run with: \`docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
-          3. Access at http://localhost:3001
+
+          **根路径部署 (默认)**:
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}
+          docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}
+          \`\`\`
+          访问: http://localhost:3001
+
+          **子路径部署 (/clipboard/)**:
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}-clipboard
+          docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}-clipboard
+          \`\`\`
+          访问: http://localhost:3001 (配合 Nginx 反向代理到 /clipboard/ 路径)
 
           ---
 

@@ -1,7 +1,7 @@
 services:
   # Main application service - unified deployment
   cloud-clipboard:
-    images: ghcr.io/qiuyaya/cloud-clipboard:latest
+    build: .
     container_name: cloud-clipboard-app
     restart: unless-stopped
     ports:
