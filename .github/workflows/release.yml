@@ -10,6 +10,11 @@ on:
         description: "Tag to release (e.g., v1.0.0)"
         required: true
         type: string
+      build_desktop:
+        description: "Build desktop applications"
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,6 +23,7 @@ jobs:
   # Build desktop applications for all platforms
   build-desktop:
     name: Build Desktop App
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_desktop == 'true')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -323,7 +329,8 @@ jobs:
   # Create GitHub release
   create-release:
     name: Create Release
-    needs: [build-desktop, build-web, build-docker]
+    needs: [build-web, build-docker]
+    if: always() && needs.build-web.result == 'success' && needs.build-docker.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -355,6 +362,9 @@ jobs:
             COMMITS=$(git log --pretty=format:"- %s" --no-merges -10)
           fi
 
+          # Check if desktop was built
+          DESKTOP_BUILT="${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_desktop == 'true') }}"
+
           # Create release notes
           cat > release_notes.md << EOF
           ## 🚀 Cloud Clipboard ${{ steps.get_version.outputs.version }}
@@ -364,11 +374,20 @@ jobs:
 
           ### 📦 Downloads
 
+          EOF
+
+          # Add desktop section only if built
+          if [[ "$DESKTOP_BUILT" == "true" ]]; then
+            cat >> release_notes.md << EOF
           #### 🖥️ Desktop Applications
           - **Windows**: Download \`cloud-clipboard-windows-x64.exe\` or \`cloud-clipboard-windows-x64.msi\`
           - **macOS**: Download \`cloud-clipboard-macos-x64.dmg\` (Intel) or \`cloud-clipboard-macos-arm64.dmg\` (Apple Silicon)
           - **Linux**: Download \`cloud-clipboard-linux-x64\`, \`cloud-clipboard-linux-x64.deb\`, or \`cloud-clipboard-linux-x64.AppImage\`
 
+          EOF
+          fi
+
+          cat >> release_notes.md << EOF
           #### 🌐 Web Application
           - **Full Package**: Download \`cloud-clipboard-web.tar.gz\` for self-hosting
           - **Docker (根路径)**: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
@@ -427,12 +446,14 @@ jobs:
         run: |
           mkdir -p release_assets
 
-          # Copy desktop artifacts
-          find artifacts -name "cloud-clipboard-*" -type f -exec cp {} release_assets/ \;
+          # Copy desktop artifacts if they exist
+          if [ -d "artifacts" ]; then
+            find artifacts -name "cloud-clipboard-*" -type f -exec cp {} release_assets/ \; || true
+          fi
 
           # List all assets
           echo "Release assets:"
-          ls -la release_assets/
+          ls -la release_assets/ || echo "No assets found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1

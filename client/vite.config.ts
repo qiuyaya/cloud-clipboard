@@ -26,13 +26,13 @@ export default defineConfig({
         start_url: process.env.VITE_BASE_PATH || "/",
         icons: [
           {
-            src: "/favicon-192x192.svg",
+            src: "favicon-192x192.svg",
             sizes: "192x192",
             type: "image/svg+xml",
             purpose: "any maskable",
           },
           {
-            src: "/favicon-512x512.svg",
+            src: "favicon-512x512.svg",
             sizes: "512x512",
             type: "image/svg+xml",
             purpose: "any maskable",

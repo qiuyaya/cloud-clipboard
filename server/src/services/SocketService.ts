@@ -46,7 +46,12 @@ export class SocketService {
       ? process.env.CLIENT_URL.split(",")
       : ["http://localhost:3000", "http://localhost:3002"];
 
+    // Support subpath deployment for Socket.IO
+    const basePath = process.env.BASE_PATH || '/';
+    const socketPath = basePath === '/' ? '/socket.io' : `${basePath}/socket.io`;
+
     this.io = new SocketIOServer(server, {
+      path: socketPath,
       cors: {
         origin: allowedOrigins,
         methods: ["GET", "POST"],
