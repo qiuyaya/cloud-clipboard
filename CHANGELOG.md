@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2025-10-08
+
+- feat: 支持子路径部署和双镜像发布策略
+
 ## [1.2.0] - 2025-10-02
 
 - feat: 新增 PWA 支持
