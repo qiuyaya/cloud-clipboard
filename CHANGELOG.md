@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.2] - 2025-10-08
+
+- fix: 修复子路径部署中 Socket.IO 和资源路径问题；优化 CI 默认不构建桌面应用
+
 ## [1.2.1] - 2025-10-08
 
 - feat: 支持子路径部署和双镜像发布策略
