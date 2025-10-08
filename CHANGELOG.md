@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.3] - 2025-10-08
+
+- fix: 修复子路径部署中的 API 请求和 PWA manifest 路径问题
+
 ## [1.2.2] - 2025-10-08
 
 - fix: 修复子路径部署中 Socket.IO 和资源路径问题；优化 CI 默认不构建桌面应用
