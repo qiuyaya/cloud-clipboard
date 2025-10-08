@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { socketService } from "@/services/socket";
 import { debug } from "@/utils/debug";
+import { getApiPath } from "@/utils/api";
 import { generateBrowserFingerprint } from "@cloud-clipboard/shared";
 import { saveToLocalStorage, loadFromLocalStorage } from "@/utils/localStorage";
 import type {
@@ -68,7 +69,7 @@ export const useRoomManager = () => {
 
   const fetchRoomMessages = useCallback(async (roomKey: string) => {
     try {
-      const response = await fetch(`/api/rooms/messages?limit=50`, {
+      const response = await fetch(getApiPath(`/api/rooms/messages?limit=50`), {
         headers: {
           "X-Room-Key": roomKey,
         },

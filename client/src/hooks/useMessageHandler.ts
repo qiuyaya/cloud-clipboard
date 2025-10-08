@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { socketService } from "@/services/socket";
 import { debug } from "@/utils/debug";
+import { getApiPath } from "@/utils/api";
 import { generateUserId, FileMessageSchema } from "@cloud-clipboard/shared";
 import type { User, FileMessage, RoomKey } from "@cloud-clipboard/shared";
 
@@ -54,7 +55,7 @@ export const useMessageHandler = ({ currentUser, roomKey }: UseMessageHandlerPro
       formData.append("roomKey", roomKey);
 
       try {
-        const response = await fetch("/api/files/upload", {
+        const response = await fetch(getApiPath("/api/files/upload"), {
           method: "POST",
           headers: {
             "X-Room-Key": roomKey,
