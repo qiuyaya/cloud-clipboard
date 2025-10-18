@@ -1,10 +1,12 @@
 node_modules
 uploads/
 dist/
+dev-dist/
 .DS_Store
 .env
 desktop/src-tauri/target/
 .claude/log/
+.history/
 
 # Tests
 coverage

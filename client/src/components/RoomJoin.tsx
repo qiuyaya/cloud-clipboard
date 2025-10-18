@@ -298,13 +298,13 @@ export function RoomJoin({
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="absolute top-4 right-4 flex gap-2">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 safe-area-inset">
+      <div className="absolute top-4 right-4 flex gap-2 z-10">
         <LanguageToggle />
         <ThemeToggle />
       </div>
 
-      <Card className="w-full max-w-md mx-4">
+      <Card className="w-full max-w-md mx-4 mt-8">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             {t("roomJoin.title")}
@@ -349,7 +349,7 @@ export function RoomJoin({
               <p className="text-xs text-muted-foreground">{t("roomJoin.hints.usernameFormat")}</p>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isConnecting || !roomKey.trim()}>
+            <Button type="submit" className="w-full mobile-touch" size="mobile" disabled={isConnecting || !roomKey.trim()}>
               {isConnecting ? t("roomJoin.joining") : t("roomJoin.joinButton")}
             </Button>
           </form>
@@ -362,7 +362,8 @@ export function RoomJoin({
 
           <Button
             variant="outline"
-            className="w-full mt-4"
+            className="w-full mt-4 mobile-touch"
+            size="mobile"
             onClick={handleQuickCreate}
             disabled={isConnecting}
           >
