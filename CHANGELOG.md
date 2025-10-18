@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-10-18
+
+- feat: 优化移动端使用体验
+
 ## [1.2.3] - 2025-10-08
 
 - fix: 修复子路径部署中的 API 请求和 PWA manifest 路径问题
