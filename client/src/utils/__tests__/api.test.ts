@@ -34,7 +34,7 @@ describe("getApiPath", () => {
   it("should handle query parameters", () => {
     (import.meta.env as any).BASE_URL = "/clipboard/";
     expect(getApiPath("/api/rooms/messages?limit=50")).toBe(
-      "/clipboard/api/rooms/messages?limit=50"
+      "/clipboard/api/rooms/messages?limit=50",
     );
   });
 

@@ -47,8 +47,8 @@ export class SocketService {
       : ["http://localhost:3000", "http://localhost:3002"];
 
     // Support subpath deployment for Socket.IO
-    const basePath = process.env.BASE_PATH || '/';
-    const socketPath = basePath === '/' ? '/socket.io' : `${basePath}/socket.io`;
+    const basePath = process.env.BASE_PATH || "/";
+    const socketPath = basePath === "/" ? "/socket.io" : `${basePath}/socket.io`;
 
     this.io = new SocketIOServer(server, {
       path: socketPath,
@@ -633,9 +633,11 @@ export class SocketService {
 
       // Generate share link with password if room is password protected
       // Try to get the client origin from the socket handshake, fallback to CLIENT_URL env var
-      const clientOrigin = process.env.CLIENT_URL || socket.handshake.headers.origin ||
-                          socket.handshake.headers.referer?.split('?')[0].replace(/\/$/, '') ||
-                          "http://localhost:3000";
+      const clientOrigin =
+        process.env.CLIENT_URL ||
+        socket.handshake.headers.origin ||
+        socket.handshake.headers.referer?.split("?")[0].replace(/\/$/, "") ||
+        "http://localhost:3000";
       let shareLink = `${clientOrigin}/?room=${validatedData.roomKey}`;
 
       if (room.hasPassword()) {

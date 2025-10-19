@@ -4,16 +4,12 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
 export default defineConfig({
-  base: process.env.VITE_BASE_PATH || '/',
+  base: process.env.VITE_BASE_PATH || "/",
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [
-        "favicon.svg",
-        "favicon-*.svg",
-        "icon.svg",
-      ],
+      includeAssets: ["favicon.svg", "favicon-*.svg", "icon.svg"],
       manifest: {
         name: "Cloud Clipboard",
         short_name: "CloudClip",

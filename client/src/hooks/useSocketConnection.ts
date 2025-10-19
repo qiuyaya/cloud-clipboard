@@ -17,7 +17,11 @@ import type {
 interface UseSocketConnectionProps {
   onSetCurrentUser: (user: User | null | ((prev: User | null) => User | null)) => void;
   onSetUsers: (users: User[] | ((prev: User[]) => User[])) => void;
-  onSetMessages: (messages: (TextMessage | FileMessage)[] | ((prev: (TextMessage | FileMessage)[]) => (TextMessage | FileMessage)[])) => void;
+  onSetMessages: (
+    messages:
+      | (TextMessage | FileMessage)[]
+      | ((prev: (TextMessage | FileMessage)[]) => (TextMessage | FileMessage)[]),
+  ) => void;
   onSetIsConnecting: (connecting: boolean) => void;
   onSetShowPasswordInput: (show: boolean) => void;
   onSetHasRoomPassword: (hasPassword: boolean) => void;
@@ -227,7 +231,8 @@ export const useSocketConnection = ({
           callbacksRef.current.onSetIsConnecting(false);
           saveToLocalStorage("cloudClipboard_user", userWithDate);
 
-          const currentRoomKey = roomKeyRef.current || loadFromLocalStorage("cloudClipboard_roomKey");
+          const currentRoomKey =
+            roomKeyRef.current || loadFromLocalStorage("cloudClipboard_roomKey");
           if (currentRoomKey) {
             socketService.requestUserList(currentRoomKey);
             callbacksRef.current.fetchRoomMessages(currentRoomKey);

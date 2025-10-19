@@ -189,9 +189,7 @@ export function ClipboardRoom({
               }`}
             >
               <div
-                className={`w-2 h-2 rounded-full ${
-                  user.isOnline ? "bg-green-500" : "bg-gray-400"
-                }`}
+                className={`w-2 h-2 rounded-full ${user.isOnline ? "bg-green-500" : "bg-gray-400"}`}
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
@@ -369,7 +367,12 @@ export function ClipboardRoom({
               <Upload className="h-4 w-4" />
               <span className="lg:inline hidden">{t("input.fileButton")}</span>
             </Button>
-            <Button type="submit" size="mobile-sm" disabled={!textInput.trim()} className="mobile-touch">
+            <Button
+              type="submit"
+              size="mobile-sm"
+              disabled={!textInput.trim()}
+              className="mobile-touch"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </form>

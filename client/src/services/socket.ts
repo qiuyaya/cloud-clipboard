@@ -33,8 +33,8 @@ class SocketService {
       : import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
     // Support subpath deployment for Socket.IO
-    const basePath = import.meta.env.BASE_URL || '/';
-    const socketPath = basePath === '/' ? '/socket.io' : `${basePath}/socket.io`;
+    const basePath = import.meta.env.BASE_URL || "/";
+    const socketPath = basePath === "/" ? "/socket.io" : `${basePath}/socket.io`;
 
     debug.info("Attempting to connect to server", {
       serverUrl,

@@ -48,6 +48,7 @@ export default [
       "coverage/**",
       "**/*.d.ts",
       "client/dist/**",
+      "client/dev-dist/**",
       "server/dist/**",
       "shared/dist/**",
       "desktop/dist/**",

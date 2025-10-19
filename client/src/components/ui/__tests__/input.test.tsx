@@ -208,7 +208,9 @@ describe("Input Component", () => {
 
     const input = screen.getByRole("textbox");
     // Check for base Tailwind classes that should be applied
-    expect(input).toHaveClass("flex", "h-10", "w-full", "rounded-md", "border");
+    expect(input).toHaveClass("flex", "w-full", "rounded-md", "border");
+    // Check for responsive height classes
+    expect(input).toHaveClass("lg:h-10", "h-12");
   });
 
   it("should apply focus styles on focus", async () => {

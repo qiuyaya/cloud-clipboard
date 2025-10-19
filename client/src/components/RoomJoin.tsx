@@ -349,7 +349,12 @@ export function RoomJoin({
               <p className="text-xs text-muted-foreground">{t("roomJoin.hints.usernameFormat")}</p>
             </div>
 
-            <Button type="submit" className="w-full mobile-touch" size="mobile" disabled={isConnecting || !roomKey.trim()}>
+            <Button
+              type="submit"
+              className="w-full mobile-touch"
+              size="mobile"
+              disabled={isConnecting || !roomKey.trim()}
+            >
               {isConnecting ? t("roomJoin.joining") : t("roomJoin.joinButton")}
             </Button>
           </form>

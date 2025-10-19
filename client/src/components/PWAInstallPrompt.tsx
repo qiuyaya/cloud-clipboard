@@ -71,9 +71,7 @@ export function PWAInstallPrompt(): JSX.Element | null {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sm mb-1">{t("pwa.installTitle")}</h3>
-              <p className="text-xs text-muted-foreground mb-3">
-                {t("pwa.installDescription")}
-              </p>
+              <p className="text-xs text-muted-foreground mb-3">{t("pwa.installDescription")}</p>
               <div className="flex gap-2">
                 <Button onClick={handleInstall} size="sm" className="flex-1">
                   {t("pwa.install")}

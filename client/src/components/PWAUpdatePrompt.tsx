@@ -69,9 +69,7 @@ export function PWAUpdatePrompt(): JSX.Element | null {
               {showReload ? (
                 <>
                   <h3 className="font-semibold text-sm mb-1">{t("pwa.updateTitle")}</h3>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {t("pwa.updateDescription")}
-                  </p>
+                  <p className="text-xs text-muted-foreground mb-3">{t("pwa.updateDescription")}</p>
                   <div className="flex gap-2">
                     <Button onClick={handleUpdate} size="sm" className="flex-1">
                       {t("pwa.reload")}

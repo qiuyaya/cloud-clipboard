@@ -19,4 +19,3 @@ export function MobileNav({ onOpenSidebar }: MobileNavProps): JSX.Element {
     </Button>
   );
 }
-
