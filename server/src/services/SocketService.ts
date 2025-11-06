@@ -11,6 +11,7 @@ import {
   FileMessageSchema,
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
+  sanitizeMessageContent,
   generateUserId,
   generateUserIdFromFingerprint,
   generateDefaultUsername,
@@ -521,8 +522,11 @@ export class SocketService {
       let validatedMessage: TextMessage | FileMessage;
 
       if (message.type === "text") {
+        // 在验证前对消息内容进行XSS过滤
+        const sanitizedContent = sanitizeMessageContent(message.content);
         validatedMessage = TextMessageSchema.parse({
           ...message,
+          content: sanitizedContent, // 使用过滤后的内容
           id: generateUserId(),
           sender: user,
           timestamp: new Date(),

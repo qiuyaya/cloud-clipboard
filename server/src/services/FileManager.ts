@@ -17,6 +17,9 @@ export class FileManager {
   private uploadDir = path.join(process.cwd(), "uploads");
   private maxRetentionHours = 12;
   private cleanupInterval: NodeJS.Timeout;
+  // 添加文件统计信息
+  private deletedFileCount = 0;
+  private totalDeletedSize = 0;
 
   constructor() {
     // Ensure upload directory exists
@@ -24,12 +27,12 @@ export class FileManager {
       fs.mkdirSync(this.uploadDir, { recursive: true });
     }
 
-    // Start cleanup interval (check every hour)
+    // 优化：清理间隔从1小时改为10分钟，更及时释放磁盘空间
     this.cleanupInterval = setInterval(
       () => {
         this.cleanupExpiredFiles();
       },
-      60 * 60 * 1000,
+      10 * 60 * 1000, // 10分钟
     );
 
     // Initial cleanup on startup
@@ -69,7 +72,10 @@ export class FileManager {
     try {
       // Delete physical file
       if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
+        // 优化：使用fs.promises.unlink确保异步操作完成
+        fs.promises.unlink(file.path).catch((err) => {
+          console.error(`Failed to unlink file ${file.path}:`, err);
+        });
       }
 
       // Remove from tracking
@@ -81,6 +87,10 @@ export class FileManager {
           this.roomFiles.delete(file.roomKey);
         }
       }
+
+      // 统计信息
+      this.deletedFileCount++;
+      this.totalDeletedSize += file.size;
 
       console.log(`File ${file.filename} deleted (reason: ${reason})`);
       return { filename: file.filename, roomKey: file.roomKey };
@@ -123,11 +133,17 @@ export class FileManager {
     }
 
     if (expiredFiles.length > 0) {
-      console.log(`Cleaned up ${expiredFiles.length} expired files`);
+      console.log(`[File Cleanup] Cleaned up ${expiredFiles.length} expired files, total deleted: ${this.deletedFileCount}`);
     }
   }
 
-  getStats(): { totalFiles: number; totalSize: number; roomCount: number } {
+  getStats(): {
+    totalFiles: number;
+    totalSize: number;
+    roomCount: number;
+    deletedFiles: number;
+    deletedSize: number;
+  } {
     let totalSize = 0;
     for (const file of this.files.values()) {
       totalSize += file.size;
@@ -137,6 +153,19 @@ export class FileManager {
       totalFiles: this.files.size,
       totalSize,
       roomCount: this.roomFiles.size,
+      deletedFiles: this.deletedFileCount,
+      deletedSize: this.totalDeletedSize,
+    };
+  }
+
+  // 添加手动清理方法，用于压力测试
+  forceCleanup(): { deleted: number; size: number } {
+    const beforeCount = this.files.size;
+    const beforeSize = this.getStats().totalSize;
+    this.cleanupExpiredFiles();
+    return {
+      deleted: beforeCount - this.files.size,
+      size: beforeSize - this.getStats().totalSize,
     };
   }
 

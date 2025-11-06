@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SafeTextContentSchema, sanitizeUsername } from "./utils/sanitize";
 
 export const RoomKeySchema = z
   .string()
@@ -43,6 +44,7 @@ export const UserSchema = z.object({
       const trimmed = name.trim();
       return trimmed.length > 0 && trimmed === name;
     }, "Name cannot start or end with whitespace")
+    .transform((name) => sanitizeUsername(name)) // 自动清理用户名
     .optional(),
   isOnline: z.boolean(),
   lastSeen: z.date(),
@@ -57,19 +59,7 @@ export const UserSchema = z.object({
 export const TextMessageSchema = z.object({
   id: z.string().uuid(),
   type: z.literal("text"),
-  content: z
-    .string()
-    .min(1, "Message content is required")
-    .max(50000, "Message content too long (max 50,000 characters)")
-    .refine((content) => {
-      // Prevent excessively long lines that could cause display issues
-      const lines = content.split("\n");
-      return lines.every((line) => line.length <= 10000);
-    }, "Individual lines cannot exceed 10,000 characters")
-    .refine((content) => {
-      // Prevent too many lines
-      return content.split("\n").length <= 1000;
-    }, "Message cannot exceed 1,000 lines"),
+  content: SafeTextContentSchema, // 使用安全的文本内容验证器
   sender: UserSchema,
   timestamp: z.date(),
   roomKey: RoomKeySchema,

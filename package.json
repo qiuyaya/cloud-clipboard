@@ -72,5 +72,9 @@
     "supertest": "^7.1.4",
     "typescript": "^5.9.2",
     "vite": "^7.1.2"
+  },
+  "dependencies": {
+    "@types/dompurify": "^3.2.0",
+    "dompurify": "^3.3.0"
   }
 }

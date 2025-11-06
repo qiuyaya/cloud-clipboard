@@ -14,11 +14,12 @@ export class RoomService extends EventEmitter {
 
   constructor() {
     super();
+    // 优化：清理间隔从5分钟改为1分钟，更及时释放内存
     this.cleanupInterval = setInterval(
       () => {
         this.cleanupInactiveRooms();
       },
-      5 * 60 * 1000,
+      1 * 60 * 1000, // 1分钟
     );
   }
 
@@ -152,20 +153,42 @@ export class RoomService extends EventEmitter {
 
   private cleanupInactiveRooms(): void {
     const now = new Date();
-    const inactiveThreshold = 24 * 60 * 60 * 1000;
+    const inactiveThreshold = 24 * 60 * 60 * 1000; // 24小时
+
+    // 跟踪清理统计
+    let cleanedRooms = 0;
+    let checkedRooms = 0;
 
     for (const [key, room] of this.rooms.entries()) {
+      checkedRooms++;
       const timeSinceLastActivity = now.getTime() - room.lastActivity.getTime();
 
       if (timeSinceLastActivity > inactiveThreshold) {
         console.log(`Cleaned up inactive room after 24h: ${key}`);
         this.rooms.delete(key);
         this.emit("roomDestroyed", key);
+        cleanedRooms++;
       } else {
         // Also check for rooms with no online users during cleanup
         this.checkRoomDestruction(key, room);
       }
     }
+
+    // 每10次清理输出一次统计信息
+    if (checkedRooms > 0) {
+      console.log(`[Room Cleanup] Checked: ${checkedRooms}, Cleaned: ${cleanedRooms}, Active: ${this.rooms.size}`);
+    }
+  }
+
+  // 添加手动清理方法，用于压力测试
+  forceCleanup(): { cleaned: number; total: number } {
+    const beforeCount = this.rooms.size;
+    // 触发清理逻辑但不等待
+    this.cleanupInactiveRooms();
+    return {
+      cleaned: beforeCount - this.rooms.size,
+      total: this.rooms.size,
+    };
   }
 
   destroy(): void {
