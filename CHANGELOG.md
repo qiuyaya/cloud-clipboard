@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2025-11-07
+
+- fix: 修复GitHub Actions构建错误
+- fix: 修复构建脚本和依赖解析问题
+- chore: 优化CI工作流构建流程
+
 ## [1.2.3] - 2025-10-08
 
 - fix: 修复子路径部署中的 API 请求和 PWA manifest 路径问题
