@@ -97,6 +97,35 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // 构建性能优化
+    target: "es2015",
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    // 启用多核并行构建
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          ui: [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-dropdown-menu",
+          ],
+          socket: ["socket.io-client"],
+        },
+      },
+    },
+    // 调整chunk大小警告限制
+    chunkSizeWarningLimit: 1000,
+    // 启用Source Map（生产环境）
+    sourcemap: false,
+  },
   server: {
     port: 3000,
     proxy: {
