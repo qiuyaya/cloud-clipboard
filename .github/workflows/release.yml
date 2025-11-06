@@ -11,8 +11,6 @@ on:
         required: true
         type: string
 
-env:
-
 jobs:
   # Build web client
   build-web:
@@ -40,11 +38,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build client
-        run: bun run client:build
-
-      - name: Build server
-        run: bun run server:build
+      - name: Build application
+        run: bun run build
 
       - name: Create web distribution
         run: |

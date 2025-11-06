@@ -6,8 +6,6 @@ on:
   pull_request:
     branches: [main, develop]
 
-env:
-
 jobs:
   # Lint and type check
   lint-and-check:
@@ -47,11 +45,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build client
-        run: bun run client:build
-
-      - name: Build server
-        run: bun run server:build
+      - name: Build application
+        run: bun run build
 
       # Add tests here when available
       # - name: Run tests
