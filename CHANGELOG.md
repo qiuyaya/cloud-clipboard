@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2025-11-06
+
+- fix: 修复GitHub Actions构建错误
+- fix: 修复构建错误
+- fix: 修复失败的脚本
+
 ## [1.3.0] - 2025-10-18
 
 - feat: 优化移动端使用体验
