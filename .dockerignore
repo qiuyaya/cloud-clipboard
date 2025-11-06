@@ -12,7 +12,6 @@ build
 # 但保留shared/dist，因为其他包可能需要引用构建好的类型定义
 
 # 运行时不需要的构建脚本
-scripts/sync-desktop-icons.js  
 scripts/build-client.js
 scripts/release.js
 scripts/version-sync.js

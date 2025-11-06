@@ -59,6 +59,7 @@ export default [
       "server/uploads/**",
       "server/public/**",
       "uploads/**",
+      ".history/**",
       "*.config.js",
       "*.config.ts",
       "client/public/**",

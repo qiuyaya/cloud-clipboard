@@ -18,7 +18,6 @@ const PACKAGES = [
   { name: "client", path: path.join(WORKSPACE_ROOT, "client") },
   { name: "server", path: path.join(WORKSPACE_ROOT, "server") },
   { name: "shared", path: path.join(WORKSPACE_ROOT, "shared") },
-  { name: "desktop", path: path.join(WORKSPACE_ROOT, "desktop") },
 ];
 
 function log(message, type = "info") {
@@ -42,23 +41,6 @@ function readPackageJson(packagePath) {
   return JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 }
 
-function readCargoToml(cargoPath) {
-  if (!fs.existsSync(cargoPath)) {
-    return null;
-  }
-  const content = fs.readFileSync(cargoPath, "utf8");
-  const versionMatch = content.match(/^version\s*=\s*"(.+)"$/m);
-  return versionMatch ? versionMatch[1] : null;
-}
-
-function readTauriConf(tauriConfPath) {
-  if (!fs.existsSync(tauriConfPath)) {
-    return null;
-  }
-  const config = JSON.parse(fs.readFileSync(tauriConfPath, "utf8"));
-  return config.version;
-}
-
 function checkVersionConsistency() {
   log("🔍 Checking version consistency across all packages...");
 
@@ -73,22 +55,6 @@ function checkVersionConsistency() {
       log(`  ${pkg.name}/package.json: ${packageJson.version}`);
     }
   });
-
-  // Check Cargo.toml
-  const cargoPath = path.join(WORKSPACE_ROOT, "desktop/src-tauri/Cargo.toml");
-  const cargoVersion = readCargoToml(cargoPath);
-  if (cargoVersion) {
-    versions["cargo"] = cargoVersion;
-    log(`  desktop/src-tauri/Cargo.toml: ${cargoVersion}`);
-  }
-
-  // Check tauri.conf.json
-  const tauriConfPath = path.join(WORKSPACE_ROOT, "desktop/src-tauri/tauri.conf.json");
-  const tauriVersion = readTauriConf(tauriConfPath);
-  if (tauriVersion) {
-    versions["tauri"] = tauriVersion;
-    log(`  desktop/src-tauri/tauri.conf.json: ${tauriVersion}`);
-  }
 
   // Find the reference version (from root package.json)
   const referenceVersion = versions["root"];
@@ -132,7 +98,7 @@ function listOutdatedDependencies() {
     }
 
     // Check workspace dependencies
-    ["client", "server", "shared", "desktop"].forEach((workspace) => {
+    ["client", "server", "shared"].forEach((workspace) => {
       const workspacePath = path.join(WORKSPACE_ROOT, workspace);
       if (fs.existsSync(path.join(workspacePath, "package.json"))) {
         log(`  ${workspace} dependencies:`);
@@ -183,17 +149,7 @@ function generateVersionReport() {
   });
 
   // Add Rust versions
-  const cargoVersion = readCargoToml(path.join(WORKSPACE_ROOT, "desktop/src-tauri/Cargo.toml"));
-  if (cargoVersion) {
-    report.versions.cargo = { version: cargoVersion };
-  }
-
-  const tauriVersion = readTauriConf(
-    path.join(WORKSPACE_ROOT, "desktop/src-tauri/tauri.conf.json"),
-  );
-  if (tauriVersion) {
-    report.versions.tauri = { version: tauriVersion };
-  }
+  // Note: Desktop app removed, no Rust versions to check
 
   const reportPath = path.join(WORKSPACE_ROOT, "version-report.json");
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));

@@ -14,7 +14,6 @@ _中文 | [English](#english)_
 - 🎨 **现代UI** - 使用React、Tailwind CSS和shadcn/ui构建的精美界面
 - ⚡ **快速可靠** - 使用Bun、TypeScript构建，具有严格的类型检查
 - 📱 **跨平台** - 适用于桌面、平板和移动设备
-- 🖥️ **桌面应用** - 基于Tauri的原生桌面应用，支持自动剪切板监听
 - 🔄 **持久会话** - 浏览器刷新后自动重新加入房间
 - ⏰ **智能管理** - 2小时无活动自动登出，房间自动销毁和文件清理
 - 👤 **用户名去重** - 自动处理重复用户名，添加随机后缀
@@ -33,7 +32,6 @@ _中文 | [English](#english)_
 - **`shared/`** - 公共类型、模式和工具（TypeScript + Zod）
 - **`server/`** - 后端API和WebSocket服务器（Node.js + Express + Socket.IO）
 - **`client/`** - 前端React应用程序（React + Vite + Tailwind CSS）
-- **`desktop/`** - 桌面应用程序（Tauri + Rust，支持Windows、macOS、Linux）
 
 ## 🛠️ 技术栈
 
@@ -62,19 +60,11 @@ _中文 | [English](#english)_
 - **验证**: Zod schemas
 - **工具**: 共享工具函数
 
-### 桌面
-
-- **框架**: Tauri (Rust + WebView)
-- **前端集成**: React + TypeScript 复用
-- **系统功能**: 剪切板监听、系统通知、自动启动
-- **跨平台**: Windows、macOS、Linux 支持
-
 ## 🚀 快速开始
 
 ### 前置条件
 
 - 系统中安装了 [Bun](https://bun.sh)
-- （可选）桌面应用需要 [Rust](https://rustup.rs/) 环境
 
 ### 安装
 
@@ -106,12 +96,6 @@ bun run server:dev
 bun run client:dev
 ```
 
-**桌面应用**：
-
-```bash
-bun run desktop:dev
-```
-
 ### 生产环境
 
 构建所有包（包含统一部署）：
@@ -124,12 +108,6 @@ bun run build
 
 ```bash
 bun run start
-```
-
-构建桌面应用：
-
-```bash
-bun run desktop:build
 ```
 
 > **注意**: 生产环境下，前端和后端会运行在同一个端口（默认3001），无需分别部署。
@@ -233,16 +211,13 @@ bun run lint
 # 构建单个包
 bun run server:build
 bun run client:build
-bun run desktop:build
 
 # 启动单个服务
 bun run server:dev
 bun run client:dev
-bun run desktop:dev
 
 # 图标管理
 bun run icons:generate         # 生成Web图标
-bun run icons:sync-desktop     # 同步桌面图标
 ```
 
 ## 🤝 贡献
@@ -275,7 +250,6 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 🎨 **Modern UI** - Beautiful interface built with React, Tailwind CSS, and shadcn/ui
 - ⚡ **Fast & Reliable** - Built with Bun, TypeScript, and strict type checking
 - 📱 **Cross-Platform** - Works on desktop, tablet, and mobile devices
-- 🖥️ **Desktop Application** - Native Tauri-based desktop app with automatic clipboard monitoring
 - 🔄 **Session Persistence** - Automatically rejoin rooms after browser refresh
 - ⏰ **Smart Management** - 2-hour inactivity auto-logout, room auto-destruction and file cleanup
 - 👤 **Username Deduplication** - Automatic handling of duplicate usernames with random suffixes
@@ -294,7 +268,6 @@ This project is built as a monorepo with four main packages:
 - **`shared/`** - Common types, schemas, and utilities (TypeScript + Zod)
 - **`server/`** - Backend API and WebSocket server (Node.js + Express + Socket.IO)
 - **`client/`** - Frontend React application (React + Vite + Tailwind CSS)
-- **`desktop/`** - Desktop application (Tauri + Rust, supports Windows, macOS, Linux)
 
 ## 🛠️ Tech Stack
 
@@ -322,11 +295,6 @@ This project is built as a monorepo with four main packages:
 - **Type System**: TypeScript with strict mode
 - **Validation**: Zod schemas
 - **Utilities**: Shared utility functions
-
-### Desktop
-
-- **Framework**: Tauri (Rust + WebView)
-- **Frontend Integration**: React + TypeScript reuse
 - **System Features**: Clipboard monitoring, system notifications, autostart
 - **Cross-Platform**: Windows, macOS, Linux support
 
@@ -335,7 +303,6 @@ This project is built as a monorepo with four main packages:
 ### Prerequisites
 
 - [Bun](https://bun.sh) installed on your system
-- (Optional) [Rust](https://rustup.rs/) environment for desktop application
 
 ### Installation
 
@@ -367,12 +334,6 @@ bun run server:dev
 bun run client:dev
 ```
 
-**Desktop Application**:
-
-```bash
-bun run desktop:dev
-```
-
 ### Production
 
 Build all packages (with unified deployment):
@@ -385,12 +346,6 @@ Start unified service (frontend + backend):
 
 ```bash
 bun run start
-```
-
-Build desktop application:
-
-```bash
-bun run desktop:build
 ```
 
 > **Note**: In production, frontend and backend run on the same port (default 3001), no separate deployment needed.
@@ -494,16 +449,13 @@ bun run lint
 # Build individual packages
 bun run server:build
 bun run client:build
-bun run desktop:build
 
 # Start individual services
 bun run server:dev
 bun run client:dev
-bun run desktop:dev
 
 # Icon management
 bun run icons:generate         # Generate web icons
-bun run icons:sync-desktop     # Sync desktop icons
 ```
 
 ## 🤝 Contributing

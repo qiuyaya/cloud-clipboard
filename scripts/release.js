@@ -19,7 +19,6 @@ const PACKAGES = [
   { name: "client", path: path.join(WORKSPACE_ROOT, "client") },
   { name: "server", path: path.join(WORKSPACE_ROOT, "server") },
   { name: "shared", path: path.join(WORKSPACE_ROOT, "shared") },
-  { name: "desktop", path: path.join(WORKSPACE_ROOT, "desktop") },
 ];
 
 function log(message, type = "info") {
@@ -61,26 +60,6 @@ function readPackageJson(packagePath) {
 function writePackageJson(packagePath, packageJson) {
   const packageJsonPath = path.join(packagePath, "package.json");
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
-}
-
-function updateCargoToml(version) {
-  const cargoPath = path.join(WORKSPACE_ROOT, "desktop/src-tauri/Cargo.toml");
-  if (fs.existsSync(cargoPath)) {
-    let content = fs.readFileSync(cargoPath, "utf8");
-    content = content.replace(/^version = ".*"$/m, `version = "${version}"`);
-    fs.writeFileSync(cargoPath, content);
-    log(`Updated Cargo.toml version to ${version}`);
-  }
-}
-
-function updateTauriConf(version) {
-  const tauriConfPath = path.join(WORKSPACE_ROOT, "desktop/src-tauri/tauri.conf.json");
-  if (fs.existsSync(tauriConfPath)) {
-    const config = JSON.parse(fs.readFileSync(tauriConfPath, "utf8"));
-    config.version = version;
-    fs.writeFileSync(tauriConfPath, JSON.stringify(config, null, 2) + "\n");
-    log(`Updated tauri.conf.json version to ${version}`);
-  }
 }
 
 function validateVersion(version) {
@@ -125,10 +104,6 @@ function updateAllVersions(newVersion) {
       log(`Updated ${pkg.name}/package.json`);
     }
   });
-
-  // Update Rust/Tauri files
-  updateCargoToml(newVersion);
-  updateTauriConf(newVersion);
 }
 
 function checkWorkingDirectory() {

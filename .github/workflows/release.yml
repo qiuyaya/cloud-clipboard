@@ -10,184 +10,10 @@ on:
         description: "Tag to release (e.g., v1.0.0)"
         required: true
         type: string
-      build_desktop:
-        description: "Build desktop applications"
-        required: false
-        type: boolean
-        default: false
 
 env:
-  CARGO_TERM_COLOR: always
 
 jobs:
-  # Build desktop applications for all platforms
-  build-desktop:
-    name: Build Desktop App
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_desktop == 'true')
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Windows
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            platform: windows
-            arch: x64
-            ext: .exe
-
-          # macOS Intel
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            platform: macos
-            arch: x64
-            ext: ""
-
-          # macOS Apple Silicon
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            platform: macos
-            arch: arm64
-            ext: ""
-
-          # Linux
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            platform: linux
-            arch: x64
-            ext: ""
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: desktop/src-tauri
-          cache-targets: true
-          cache-directories: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            target
-
-      # Linux-specific dependencies
-      - name: Install Linux dependencies
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
-      # Install dependencies for all packages
-      - name: Install dependencies
-        run: |
-          bun install --frozen-lockfile
-
-      # Build shared package
-      - name: Build shared package
-        run: bun run shared:build
-
-      # Build client for desktop
-      - name: Build client for desktop
-        run: |
-          cd desktop
-          bun run build-client
-
-      # Build desktop app
-      - name: Build desktop app
-        run: |
-          cd desktop
-          bun run tauri build -- --target ${{ matrix.target }}
-
-      # Diagnose build output
-      - name: Diagnose build output
-        shell: bash
-        run: |
-          echo "=== Diagnosing build output ==="
-          echo "Looking for binary in target/${{ matrix.target }}/release/:"
-          if [ -d "desktop/src-tauri/target/${{ matrix.target }}/release" ]; then
-            ls -la desktop/src-tauri/target/${{ matrix.target }}/release/cloud-clipboard-desktop* || echo "No cloud-clipboard-desktop* found in target-specific dir"
-          fi
-          echo "Looking for binary in target/release/:"
-          if [ -d "desktop/src-tauri/target/release" ]; then
-            ls -la desktop/src-tauri/target/release/cloud-clipboard-desktop* || echo "No cloud-clipboard-desktop* found in general release dir"
-          fi
-          echo "Looking for any cloud-clipboard-desktop files:"
-          find desktop/src-tauri/target -name "cloud-clipboard-desktop*" -type f 2>/dev/null || echo "No cloud-clipboard-desktop* files found anywhere"
-          echo "=== End diagnosis ==="
-
-      # Prepare artifacts
-      - name: Prepare artifacts
-        shell: bash
-        run: |
-          # Try to find the correct release directory
-          if [ -d "desktop/src-tauri/target/${{ matrix.target }}/release" ]; then
-            cd desktop/src-tauri/target/${{ matrix.target }}/release
-          else
-            cd desktop/src-tauri/target/release
-          fi
-
-          if [[ "${{ matrix.platform }}" == "windows" ]]; then
-            # Windows: .exe and .msi
-            mv "cloud-clipboard-desktop${{ matrix.ext }}" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}"
-            if [ -f "bundle/msi/cloud-clipboard-desktop_*.msi" ]; then
-              mv bundle/msi/cloud-clipboard-desktop_*.msi "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.msi"
-            fi
-          elif [[ "${{ matrix.platform }}" == "macos" ]]; then
-            # macOS: .app bundle and .dmg
-            if [ -d "bundle/macos/Cloud Clipboard.app" ]; then
-              tar -czf "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz" -C bundle/macos "Cloud Clipboard.app"
-            fi
-            if [ -f "bundle/dmg/Cloud Clipboard_*.dmg" ]; then
-              mv "bundle/dmg/Cloud Clipboard_*.dmg" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.dmg"
-            fi
-          else
-            # Linux: binary and .deb/.appimage
-            mv "cloud-clipboard-desktop" "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}"
-            if [ -f "bundle/deb/cloud-clipboard-desktop_*.deb" ]; then
-              mv bundle/deb/cloud-clipboard-desktop_*.deb "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.deb"
-            fi
-            if [ -f "bundle/appimage/cloud-clipboard-desktop_*.AppImage" ]; then
-              mv bundle/appimage/cloud-clipboard-desktop_*.AppImage "cloud-clipboard-${{ matrix.platform }}-${{ matrix.arch }}.AppImage"
-            fi
-          fi
-
-      # Upload artifacts
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            desktop/src-tauri/target/${{ matrix.target }}/release/cloud-clipboard-*
-          retention-days: 5
-
   # Build web client
   build-web:
     name: Build Web Client
@@ -213,9 +39,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Build shared package
-        run: bun run shared:build
 
       - name: Build client
         run: bun run client:build
@@ -363,7 +186,7 @@ jobs:
           fi
 
           # Check if desktop was built
-          DESKTOP_BUILT="${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_desktop == 'true') }}"
+          DESKTOP_BUILT="false"
 
           # Create release notes
           cat > release_notes.md << EOF
@@ -375,17 +198,6 @@ jobs:
           ### 📦 Downloads
 
           EOF
-
-          # Add desktop section only if built
-          if [[ "$DESKTOP_BUILT" == "true" ]]; then
-            cat >> release_notes.md << EOF
-          #### 🖥️ Desktop Applications
-          - **Windows**: Download \`cloud-clipboard-windows-x64.exe\` or \`cloud-clipboard-windows-x64.msi\`
-          - **macOS**: Download \`cloud-clipboard-macos-x64.dmg\` (Intel) or \`cloud-clipboard-macos-arm64.dmg\` (Apple Silicon)
-          - **Linux**: Download \`cloud-clipboard-linux-x64\`, \`cloud-clipboard-linux-x64.deb\`, or \`cloud-clipboard-linux-x64.AppImage\`
-
-          EOF
-          fi
 
           cat >> release_notes.md << EOF
           #### 🌐 Web Application
@@ -402,12 +214,6 @@ jobs:
           - 🏠 **Self-hosted**: Run your own cloud clipboard server
 
           ### 🛠️ Installation
-
-          #### Desktop App
-          1. Download the appropriate file for your platform
-          2. Install and run the application
-          3. Configure your server URL in settings
-          4. Start syncing your clipboard!
 
           #### Web App (Self-hosting)
           1. Download \`cloud-clipboard-web.tar.gz\`
@@ -445,11 +251,6 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release_assets
-
-          # Copy desktop artifacts if they exist
-          if [ -d "artifacts" ]; then
-            find artifacts -name "cloud-clipboard-*" -type f -exec cp {} release_assets/ \; || true
-          fi
 
           # List all assets
           echo "Release assets:"

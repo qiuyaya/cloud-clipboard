@@ -32,7 +32,6 @@ COPY --from=builder --chown=cloudclipboard:nodejs /app/server/public ./server/pu
 
 # 复制依赖（包含所有工作区依赖）
 COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=cloudclipboard:nodejs /app/shared ./shared
 COPY --from=builder --chown=cloudclipboard:nodejs /app/server/node_modules ./server/node_modules
 
 # 创建必要目录

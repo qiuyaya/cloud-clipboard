@@ -4,7 +4,6 @@ dist/
 dev-dist/
 .DS_Store
 .env
-desktop/src-tauri/target/
 .claude/log/
 .history/
 
@@ -16,5 +15,4 @@ playwright-report
 # Generated icons (keep source in assets/icons)
 client/public/favicon-*.svg
 server/public/
-desktop/src-tauri/icons/app-icon.svg
-desktop/src-tauri/icons/README.mdclient/dev-dist/
+site.webmanifest

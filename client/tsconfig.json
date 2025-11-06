@@ -25,6 +25,6 @@
     }
   },
   "include": ["src", "src/types"],
-  "exclude": ["src/desktop/**/*"],
+  "exclude": [],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

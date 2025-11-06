@@ -14,7 +14,6 @@ const __dirname = path.dirname(__filename);
 
 const ASSETS_DIR = path.join(__dirname, "../assets/icons");
 const CLIENT_PUBLIC_DIR = path.join(__dirname, "../client/public");
-// const TAURI_ICONS_DIR = path.join(__dirname, '../desktop/src-tauri/icons');
 
 // Main SVG content for the app icon
 const mainIconSVG = `<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -159,8 +158,7 @@ function main() {
     console.log(`   • ${ASSETS_DIR}/app-icon.svg`);
     console.log(`   • ${ASSETS_DIR}/favicon.svg`);
     console.log("");
-    console.log("💡 Note: Desktop icons in Tauri format need to be generated manually");
-    console.log("   using design tools or online converters from the SVG source.");
+    console.log("💡 Note: All web icons have been generated successfully.");
   } catch (error) {
     console.error("❌ Error generating icons:", error.message);
     process.exit(1);

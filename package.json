@@ -1,7 +1,7 @@
 {
   "name": "cloud-clipboard",
   "version": "1.3.0",
-  "description": "A real-time cloud clipboard application with secure room-based sharing, desktop app support, automatic file management, and modern PWA features",
+  "description": "A real-time cloud clipboard application with secure room-based sharing, automatic file management, and modern PWA features",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -16,10 +16,6 @@
     "server:start": "cd server && NODE_ENV=production bun run start",
     "client:dev": "cd client && bun run dev",
     "client:build": "cd client && bun run build",
-    "desktop:dev": "cd desktop && npm run dev",
-    "desktop:build": "bun run icons:sync-desktop && cd desktop && node scripts/build-client.js && npm run build",
-    "desktop:build-client": "cd desktop && node scripts/build-client.js",
-    "icons:sync-desktop": "node scripts/sync-desktop-icons.js",
     "release": "node scripts/release.js",
     "release:patch": "node scripts/release.js patch",
     "release:minor": "node scripts/release.js minor",
@@ -28,14 +24,11 @@
     "version:check": "node scripts/version-sync.js check",
     "version:report": "node scripts/version-sync.js report",
     "version:outdated": "node scripts/version-sync.js outdated",
-    "docs:sync": "node scripts/sync-docs.js",
-    "docs:setup": "node scripts/setup-git-hooks.js",
     "test": "bun run shared:test && bun run server:test && bun run client:test",
     "test:watch": "concurrently \"bun run shared:test:watch\" \"bun run server:test:watch\" \"bun run client:test:watch\"",
     "test:coverage": "bun run shared:test:coverage && bun run server:test:coverage && bun run client:test:coverage && node scripts/coverage-report.js",
     "test:integration": "bun run server:test:integration",
     "test:e2e": "bun run client:test:e2e",
-    "shared:build": "echo 'Shared package does not require build step'",
     "shared:test": "cd shared && bun test",
     "shared:test:watch": "cd shared && bun test --watch",
     "shared:test:coverage": "cd shared && bun test --coverage",
@@ -60,8 +53,7 @@
   "workspaces": [
     "server",
     "client",
-    "shared",
-    "desktop"
+    "shared"
   ],
   "devDependencies": {
     "@eslint/js": "^9.35.0",

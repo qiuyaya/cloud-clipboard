@@ -16,9 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run dev` - Start both server and client in development mode (server on port 3001, client on port 3000)
 - `bun run server:dev` - Start only the server (port 3001)
 - `bun run client:dev` - Start only the client (port 3000)
-- `bun run desktop:dev` - Start desktop application in development mode
 - `bun run build` - Build all packages for production
-- `bun run desktop:build` - Build desktop application for production
 
 ### Code Quality
 
@@ -36,7 +34,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Icon Management
 
 - `bun run icons:generate` - Generate web icons from source
-- `bun run icons:sync-desktop` - Sync icons to desktop application
 
 ### Release Management
 
@@ -60,7 +57,6 @@ This is a Bun-based monorepo with four workspaces that must be built in dependen
 1. **`shared/`** - Core types and validation schemas using Zod
 2. **`server/`** - Express.js + Socket.IO backend
 3. **`client/`** - React + Vite frontend
-4. **`desktop/`** - Tauri-based cross-platform desktop application
 
 ### Key Architectural Patterns
 
@@ -138,14 +134,6 @@ const userWithDate = {
 **System Notifications**: Clear messages for file uploads, deletions, room destruction, and auto-logout events in both English and Chinese.
 
 **Room Password Protection**: Optional password protection for rooms with secure sharing functionality.
-
-**Desktop Application**: Cross-platform desktop app with:
-
-- Automatic clipboard monitoring
-- System notifications
-- Native file system integration
-- Auto-startup support
-- Window state persistence
 
 **Testing Framework**: Comprehensive test coverage with:
 
