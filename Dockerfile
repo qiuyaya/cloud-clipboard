@@ -1,5 +1,5 @@
 # Stage 1: 构建阶段
-FROM oven/bun AS builder
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
