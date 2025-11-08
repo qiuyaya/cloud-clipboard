@@ -18,7 +18,7 @@ ENV NODE_ENV=production
 RUN bun run build
 
 # Stage 2: 极简运行时
-FROM oven/bun:1.3.6-alpine AS runtime
+FROM oven/bun:alpine AS runtime
 
 # 创建用户
 RUN addgroup -g 1001 -S nodejs && \
