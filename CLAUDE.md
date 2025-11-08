@@ -29,7 +29,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run format:check` - Check code formatting
 - `bun run type-check` - Run TypeScript compiler without emitting files
 - `bun run validate` - Run all validation checks (format, lint, type-check, tests)
-- `bun run validate:ci` - Run CI-optimized validation (type-check, test coverage)
+- `bun run validate:ci` - Run CI-optimized validation (type-check, tests)
 - `bun run validate:quick` - Run quick validation (format, lint, type-check only)
 
 ### Automated Workflows
@@ -54,14 +54,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `test.yml` - Comprehensive test suite:
   - Quick validation on lint-and-typecheck job
-  - CI validation with coverage on test-coverage job
+  - CI validation on unit-tests job
   - Unit, integration, E2E, performance, and matrix tests
 
 ### Testing
 
 - `bun run test` - Run all tests across all packages
 - `bun run test:watch` - Run tests in watch mode
-- `bun run test:coverage` - Generate test coverage reports
 - `bun run test:integration` - Run integration tests
 - `bun run test:e2e` - Run end-to-end tests
 

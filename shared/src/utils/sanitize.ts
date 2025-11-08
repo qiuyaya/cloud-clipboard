@@ -59,15 +59,15 @@ export function basicSanitize(input: string): string {
 export function sanitizeWithDOMPurify(dirty: string): string {
   // 在服务端或不支持DOMPurify的环境中使用basicSanitize
   if (
-    typeof global === "undefined" ||
-    typeof (global as any).window === "undefined" ||
-    !(global as any).window.document ||
-    !(global as any).DOMPurify
+    typeof globalThis === "undefined" ||
+    typeof (globalThis as any).window === "undefined" ||
+    !(globalThis as any).window.document ||
+    !(globalThis as any).DOMPurify
   ) {
     return basicSanitize(dirty);
   }
 
-  const DOMPurify = (global as any).DOMPurify;
+  const DOMPurify = (globalThis as any).DOMPurify;
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS: XSS_ALLOWED_TAGS,
     ALLOWED_ATTR: XSS_ALLOWED_ATTR,

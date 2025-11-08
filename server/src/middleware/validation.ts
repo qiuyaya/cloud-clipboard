@@ -12,7 +12,7 @@ export const validateBody = <T>(schema: ZodSchema<T>) => {
         res.status(400).json({
           success: false,
           message: "Validation error",
-          data: error.errors,
+          data: error.issues,
         });
       } else {
         res.status(500).json({
@@ -34,7 +34,7 @@ export const validateQuery = <T>(schema: ZodSchema<T>) => {
         res.status(400).json({
           success: false,
           message: "Query validation error",
-          data: error.errors,
+          data: error.issues,
         });
       } else {
         res.status(500).json({
@@ -56,7 +56,7 @@ export const validateParams = <T>(schema: ZodSchema<T>) => {
         res.status(400).json({
           success: false,
           message: "Parameter validation error",
-          data: error.errors,
+          data: error.issues,
         });
       } else {
         res.status(500).json({

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+// @ts-ignore
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

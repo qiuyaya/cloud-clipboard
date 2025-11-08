@@ -45,7 +45,6 @@ export default [
       "node_modules/**",
       "dist/**",
       "build/**",
-      "coverage/**",
       "**/*.d.ts",
       "client/dist/**",
       "client/dev-dist/**",

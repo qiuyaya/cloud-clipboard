@@ -287,7 +287,7 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 🐛 **Debug Logging** - Configurable frontend and backend debug logging system
 - 🌍 **Multilingual** - Support for Chinese and English interfaces
 - 🔒 **Room Password** - Optional room password protection feature
-- 🧪 **Comprehensive Testing** - Unit tests, integration tests, and E2E test coverage
+- 🧪 **Comprehensive Testing** - Unit tests, integration tests, and E2E tests
 - 📲 **PWA Support** - Installable as an app, offline support, auto-update
 
 ## 🏗️ Architecture
