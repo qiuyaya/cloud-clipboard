@@ -1,7 +1,10 @@
 # Stage 1: 构建阶段
-FROM oven/bun:1.3.6 AS builder
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
+
+# 升级Node.js到22.12+
+RUN /usr/local/bin/bun install -g n && n 22.12
 
 # 复制依赖文件
 COPY ./ ./
