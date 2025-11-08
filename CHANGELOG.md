@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2025-11-08
+
+- chore: 更新依赖到最新版本，调整CI
+- feat: 添加自动化校验脚本和流程
+- fix: 修复Security Scan中的esbuild误报
+- perf: 阶段1 - 内存和安全优化
+- perf: 优化构建速度
+- release: v1.3.0
+- revert: 回退v1.3.x版本到v1.2.3
+- fix: 修复GitHub Actions构建错误
+- chore: release v1.3.1
+- fix: 修复GitHub Actions构建错误
+- fix: 修复构建错误
+- fix: 修复失败的脚本
+- chore: release v1.3.0
+- feat: 优化移动端使用体验
+
 ## [1.3.0] - 2025-11-07
 
 - fix: 修复GitHub Actions构建错误
