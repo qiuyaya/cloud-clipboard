@@ -33,11 +33,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint code
-        run: bun run lint
+      - name: Run validation
+        run: bun run validate:quick
 
-      - name: Type check
-        run: bun run type-check
+      - name: Check code formatting
+        run: bun run format:check
 
   # Test web components
   test-web:

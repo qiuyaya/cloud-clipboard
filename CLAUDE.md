@@ -17,11 +17,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run server:dev` - Start only the server (port 3001)
 - `bun run client:dev` - Start only the client (port 3000)
 - `bun run build` - Build all packages for production
+- `bun run build:production` - Build server with production optimizations
+- `bun run copy-client` - Copy client build to server public directory
+- `bun run start` - Start production server (runs on port 3001)
 
 ### Code Quality
 
 - `bun run lint` - Run ESLint on all TypeScript files
+- `bun run lint:fix` - Auto-fix ESLint errors
+- `bun run format` - Format code with Prettier
+- `bun run format:check` - Check code formatting
 - `bun run type-check` - Run TypeScript compiler without emitting files
+- `bun run validate` - Run all validation checks (format, lint, type-check, tests)
+- `bun run validate:ci` - Run CI-optimized validation (type-check, test coverage)
+- `bun run validate:quick` - Run quick validation (format, lint, type-check only)
+
+### Automated Workflows
+
+**Pre-commit Hooks (Git)**:
+
+- `pre-commit` - Runs automatically before each commit:
+  - Auto-format and fix code with lint-staged
+  - Run quick validation (format, lint, type-check)
+  - If test files modified, runs relevant tests
+
+- `pre-push` - Runs automatically before each push:
+  - Run full validation (all checks + tests)
+  - Run build test to ensure production build works
+
+**GitHub Actions (CI/CD)**:
+
+- `ci.yml` - Runs on push/PR to main or develop:
+  - Lint & Type Check job uses `validate:quick`
+  - Includes security audit and version consistency checks
+  - Parallel execution for faster results
+
+- `test.yml` - Comprehensive test suite:
+  - Quick validation on lint-and-typecheck job
+  - CI validation with coverage on test-coverage job
+  - Unit, integration, E2E, performance, and matrix tests
 
 ### Testing
 
@@ -41,12 +75,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run release:patch` - Create a patch release
 - `bun run release:minor` - Create a minor release
 - `bun run release:major` - Create a major release
+- `bun run release:dry-run` - Preview release changes without publishing
 - `bun run version:check` - Check version consistency across packages
+- `bun run version:report` - Generate version consistency report
+- `bun run version:outdated` - Check for outdated package versions
 
 ### Documentation Management
 
-- `bun run docs:sync` - Check documentation consistency with code
-- `bun run docs:setup` - Setup Git hooks for automatic documentation checking
+- `bun run docs:sync` - Check documentation consistency with code (if available)
+- `bun run docs:setup` - Setup Git hooks for automatic documentation checking (if available)
 
 ## Architecture
 

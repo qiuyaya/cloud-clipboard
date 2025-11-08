@@ -176,7 +176,9 @@ export class RoomService extends EventEmitter {
 
     // 每10次清理输出一次统计信息
     if (checkedRooms > 0) {
-      console.log(`[Room Cleanup] Checked: ${checkedRooms}, Cleaned: ${cleanedRooms}, Active: ${this.rooms.size}`);
+      console.log(
+        `[Room Cleanup] Checked: ${checkedRooms}, Cleaned: ${cleanedRooms}, Active: ${this.rooms.size}`,
+      );
     }
   }
 

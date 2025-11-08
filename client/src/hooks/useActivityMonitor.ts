@@ -16,7 +16,7 @@ export const useActivityMonitor = ({ currentUser, onLeaveRoom }: UseActivityMoni
   useEffect(() => {
     const updateActivity = () => setLastActivity(Date.now());
 
-    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart", "click"];
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
     events.forEach((event) => {
       document.addEventListener(event, updateActivity, { passive: true });
     });

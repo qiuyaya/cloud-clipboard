@@ -1,5 +1,15 @@
-# 运行lint-staged（代码格式化和linting）
+# 运行 lint-staged（代码格式化和 linting）
 echo "Running code formatting and linting..."
 npx lint-staged
+
+# 运行快速校验（包含格式、linting 和类型检查）
+echo "Running quick validation..."
+bun run validate:quick
+
+# 如果有测试文件被修改，运行相关测试
+if git diff --cached --name-only | grep -E '\.(test|spec)\.(ts|tsx|js|jsx)$' > /dev/null; then
+  echo "Test files modified, running tests..."
+  bun run test
+fi
 
 echo "Pre-commit checks completed!"

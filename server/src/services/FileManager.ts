@@ -133,7 +133,9 @@ export class FileManager {
     }
 
     if (expiredFiles.length > 0) {
-      console.log(`[File Cleanup] Cleaned up ${expiredFiles.length} expired files, total deleted: ${this.deletedFileCount}`);
+      console.log(
+        `[File Cleanup] Cleaned up ${expiredFiles.length} expired files, total deleted: ${this.deletedFileCount}`,
+      );
     }
   }
 

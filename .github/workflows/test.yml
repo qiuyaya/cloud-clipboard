@@ -33,10 +33,8 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Lint code
-        run: bun run lint
-
-      # Type check is already done in CI workflow, skip here to avoid duplication
+      - name: Run quick validation
+        run: bun run validate:quick
 
   unit-tests:
     name: Unit Tests
@@ -128,8 +126,8 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run tests with coverage
-        run: bun run test:coverage
+      - name: Run CI validation with coverage
+        run: bun run validate:ci
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

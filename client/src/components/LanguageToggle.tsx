@@ -28,7 +28,7 @@ export function LanguageToggle(): JSX.Element {
         {languages.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
-            onClick={() => i18n.changeLanguage(lang.code)}
+            onSelect={() => i18n.changeLanguage(lang.code)}
             className={i18n.language === lang.code ? "bg-accent" : ""}
           >
             <span>{lang.name}</span>

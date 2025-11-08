@@ -5,24 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/useToast";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MobileNav } from "@/components/MobileNav";
+import { SidebarContent } from "./SidebarContent";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { MobileNav } from "@/components/MobileNav";
 import { useTranslation } from "react-i18next";
 import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
 import type { User, TextMessage, FileMessage, RoomKey } from "@cloud-clipboard/shared";
-import {
-  Copy,
-  Send,
-  Upload,
-  Users,
-  LogOut,
-  File,
-  Download,
-  Share2,
-  Lock,
-  Unlock,
-} from "lucide-react";
+import { Copy, Send, Upload, File, Download, Share2, Lock, Unlock, LogOut } from "lucide-react";
 
 interface ClipboardRoomProps {
   roomKey: RoomKey;
@@ -121,102 +111,21 @@ export function ClipboardRoom({
     onSetRoomPassword(!hasRoomPassword);
   };
 
-  const onlineUsers = users.filter((user) => user.isOnline);
-
-  // 侧边栏内容组件
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">{t("room.title", { roomKey })}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t("room.usersOnline", { count: onlineUsers.length })}
-            </p>
-          </div>
-          {!isMobile && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleRoomPassword}
-                className="flex items-center gap-2 min-w-fit"
-                title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
-              >
-                {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                {hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={shareRoom}
-                className="flex items-center gap-2 min-w-fit"
-              >
-                <Share2 className="h-4 w-4" />
-                {t("room.share")}
-              </Button>
-              <div className="flex items-center gap-1">
-                <LanguageToggle />
-                <ThemeToggle />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onLeaveRoom}
-                className="flex items-center gap-2 min-w-fit"
-              >
-                <LogOut className="h-4 w-4" />
-                {t("room.leave")}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 mobile-scroll">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="h-4 w-4" />
-            <span className="font-medium text-sm">{t("room.usersInRoom")}</span>
-          </div>
-          {users.map((user) => (
-            <div
-              key={user.id}
-              className={`flex items-center gap-3 p-2 rounded-lg ${
-                user.id === currentUser.id
-                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                  : "bg-gray-50 dark:bg-gray-700/50"
-              }`}
-            >
-              <div
-                className={`w-2 h-2 rounded-full ${user.isOnline ? "bg-green-500" : "bg-gray-400"}`}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user.name} {user.id === currentUser.id && t("room.you")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {user.deviceType} •{" "}
-                  {user.isOnline
-                    ? t("room.online")
-                    : t("room.lastSeen", {
-                        time: formatTimestamp(user.lastSeen),
-                      })}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 safe-area-inset">
       {/* 桌面端侧边栏 */}
       {!isMobile && (
         <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-          <SidebarContent />
+          <SidebarContent
+            roomKey={roomKey}
+            currentUser={currentUser}
+            users={users}
+            onLeaveRoom={onLeaveRoom}
+            onSetRoomPassword={onSetRoomPassword}
+            onShareRoomLink={onShareRoomLink}
+            hasRoomPassword={hasRoomPassword}
+            isMobile={isMobile}
+          />
         </div>
       )}
 
@@ -227,7 +136,16 @@ export function ClipboardRoom({
             <SheetHeader className="sr-only">
               <SheetTitle>房间信息</SheetTitle>
             </SheetHeader>
-            <SidebarContent />
+            <SidebarContent
+              roomKey={roomKey}
+              currentUser={currentUser}
+              users={users}
+              onLeaveRoom={onLeaveRoom}
+              onSetRoomPassword={onSetRoomPassword}
+              onShareRoomLink={onShareRoomLink}
+              hasRoomPassword={hasRoomPassword}
+              isMobile={isMobile}
+            />
           </SheetContent>
         </Sheet>
       )}

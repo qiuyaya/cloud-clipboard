@@ -2,8 +2,26 @@ import { z } from "zod";
 
 // XSS防护配置
 const XSS_ALLOWED_TAGS = [
-  "b", "i", "em", "strong", "a", "code", "pre", "br", "div", "span", "p",
-  "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+  "b",
+  "i",
+  "em",
+  "strong",
+  "a",
+  "code",
+  "pre",
+  "br",
+  "div",
+  "span",
+  "p",
+  "ul",
+  "ol",
+  "li",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
 ];
 
 const XSS_ALLOWED_ATTR = ["href", "title", "class"];
@@ -14,31 +32,38 @@ export function basicSanitize(input: string): string {
     return "";
   }
 
-  return input
-    // 移除script标签
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    // 移除javascript:协议
-    .replace(/javascript:/gi, "")
-    // 移除on事件处理器
-    .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+='[^']*'/gi, "")
-    .replace(/\son\w+=\w+/gi, "")
-    // 移除iframe标签
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-    // 移除object/embed标签
-    .replace(/<(object|embed)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, "")
-    // 移除style属性中的expression
-    .replace(/style="[^"]*expression\([^)]*\)"/gi, "")
-    .replace(/style='[^']*expression\([^)]*\)'/gi, "")
-    // 移除危险的CSS属性
-    .replace(/style="[^"]*(?:behavior|ms-behavior|activex-object)[^"]*"/gi, "")
-    .replace(/style='[^']*(?:behavior|ms-behavior|activex-object)[^']*'/gi, "");
+  return (
+    input
+      // 移除script标签
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+      // 移除javascript:协议
+      .replace(/javascript:/gi, "")
+      // 移除on事件处理器
+      .replace(/\son\w+="[^"]*"/gi, "")
+      .replace(/\son\w+='[^']*'/gi, "")
+      .replace(/\son\w+=\w+/gi, "")
+      // 移除iframe标签
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+      // 移除object/embed标签
+      .replace(/<(object|embed)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, "")
+      // 移除style属性中的expression
+      .replace(/style="[^"]*expression\([^)]*\)"/gi, "")
+      .replace(/style='[^']*expression\([^)]*\)'/gi, "")
+      // 移除危险的CSS属性
+      .replace(/style="[^"]*(?:behavior|ms-behavior|activex-object)[^"]*"/gi, "")
+      .replace(/style='[^']*(?:behavior|ms-behavior|activex-object)[^']*'/gi, "")
+  );
 }
 
 // DOMPurify包装函数（仅客户端使用）
 export function sanitizeWithDOMPurify(dirty: string): string {
   // 在服务端或不支持DOMPurify的环境中使用basicSanitize
-  if (typeof global === "undefined" || typeof (global as any).window === "undefined" || !(global as any).window.document || !(global as any).DOMPurify) {
+  if (
+    typeof global === "undefined" ||
+    typeof (global as any).window === "undefined" ||
+    !(global as any).window.document ||
+    !(global as any).DOMPurify
+  ) {
     return basicSanitize(dirty);
   }
 

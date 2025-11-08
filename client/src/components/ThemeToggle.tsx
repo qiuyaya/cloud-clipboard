@@ -23,15 +23,15 @@ export function ThemeToggle(): JSX.Element {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onSelect={() => setTheme("light")}>
           <Sun className="mr-2 h-4 w-4" />
           <span>{t("theme.light")}</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onSelect={() => setTheme("dark")}>
           <Moon className="mr-2 h-4 w-4" />
           <span>{t("theme.dark")}</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onSelect={() => setTheme("system")}>
           <Monitor className="mr-2 h-4 w-4" />
           <span>{t("theme.system")}</span>
         </DropdownMenuItem>

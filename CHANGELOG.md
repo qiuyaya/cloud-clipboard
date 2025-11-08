@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2025-11-07
+
+- docs: 整理和完善项目文档
+  - 更新 CLAUDE.md，添加所有缺失的开发命令说明
+  - 完善 README.md，补充环境变量、测试和代码质量工具说明
+  - 整理 docs 目录结构，新增 docs/README.md 作为文档中心
+  - 统一中英文文档的开发命令和功能说明
+  - 优化文档导航和分类结构
+
 ## [1.3.0] - 2025-11-07
 
 - fix: 修复GitHub Actions构建错误

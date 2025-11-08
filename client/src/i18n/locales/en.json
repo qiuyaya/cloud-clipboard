@@ -1,8 +1,4 @@
 {
-  "app": {
-    "title": "Cloud Clipboard",
-    "description": "Enter a room key to share text and files across your devices"
-  },
   "roomJoin": {
     "title": "Cloud Clipboard",
     "description": "Enter a room key to share text and files across your devices",
@@ -55,7 +51,9 @@
     "online": "Online",
     "lastSeen": "Last seen {{time}}",
     "noMessages": "No messages yet. Send a text or file to get started!",
-    "maxLimits": "Max text: 100k chars • Max file: 100MB"
+    "maxLimits": "Max text: 100k chars • Max file: 100MB",
+    "doubleClickToCopy": "Double-click to copy room key",
+    "copied": "Copied!"
   },
   "message": {
     "you": "(You)",
@@ -111,11 +109,6 @@
     "linkCopyFailed": "Failed to copy link",
     "sessionExpired": "Session Expired",
     "sessionExpiredDesc": "Room or user no longer exists, please rejoin the room"
-  },
-  "share": {
-    "title": "Join Cloud Clipboard Room",
-    "text": "I invite you to join room: {{roomKey}}",
-    "manualCopy": "Please manually copy this link"
   },
   "theme": {
     "light": "Light",

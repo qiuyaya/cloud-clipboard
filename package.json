@@ -48,6 +48,9 @@
     "shared:type-check": "cd shared && tsc --noEmit",
     "server:type-check": "cd server && tsc --noEmit",
     "client:type-check": "cd client && tsc --noEmit",
+    "validate": "npm run format:check && npm run lint && npm run type-check && npm run test",
+    "validate:ci": "npm run type-check && npm run test:coverage",
+    "validate:quick": "npm run format:check && npm run lint && npm run type-check",
     "prepare": "husky"
   },
   "workspaces": [
@@ -56,18 +59,18 @@
     "shared"
   ],
   "devDependencies": {
-    "@eslint/js": "^9.35.0",
+    "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.54.2",
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.10.0",
     "@types/supertest": "^6.0.3",
-    "@typescript-eslint/eslint-plugin": "^8.39.1",
-    "@typescript-eslint/parser": "^8.39.1",
-    "@vitejs/plugin-react": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "@vitejs/plugin-react": "^5.1.0",
     "concurrently": "^9.2.0",
-    "esbuild": "^0.25.9",
-    "eslint": "^9.33.0",
+    "esbuild": "^0.25.12",
+    "eslint": "^9.39.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.0",
+    "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
     "supertest": "^7.1.4",
     "typescript": "^5.9.2",
@@ -75,6 +78,7 @@
   },
   "dependencies": {
     "@types/dompurify": "^3.2.0",
-    "dompurify": "^3.3.0"
+    "dompurify": "^3.3.0",
+    "zustand": "^5.0.8"
   }
 }

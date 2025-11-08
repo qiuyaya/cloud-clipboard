@@ -112,11 +112,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ["react", "react-dom"],
-          ui: [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-dropdown-menu",
-          ],
+          ui: ["@radix-ui/react-dialog", "@radix-ui/react-toast", "@radix-ui/react-dropdown-menu"],
           socket: ["socket.io-client"],
         },
       },

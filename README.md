@@ -43,6 +43,7 @@ _中文 | [English](#english)_
 - **验证**: Zod schemas
 - **安全**: Helmet, CORS
 - **文件上传**: Multer
+- **日志**: 结构化日志系统，支持多级别输出
 
 ### 前端
 
@@ -53,6 +54,9 @@ _中文 | [English](#english)_
 - **WebSocket客户端**: Socket.IO Client
 - **验证**: Zod schemas
 - **PWA**: Vite PWA Plugin + Workbox
+- **测试**: Vitest + Playwright
+- **代码质量**: ESLint + Prettier
+- **国际化**: react-i18next
 
 ### 共享
 
@@ -185,6 +189,12 @@ bun run server:dev
 - `LOG_COLORS` - 彩色日志输出（true/false）
 - `LOG_TIMESTAMPS` - 时间戳（true/false）
 - `LOG_CONTEXT` - 上下文标签（true/false）
+- `UPLOAD_DIR` - 文件上传目录（默认：/app/uploads）
+- `MAX_FILE_SIZE` - 最大文件大小（默认：104857600 = 100MB）
+- `ROOM_CLEANUP_INTERVAL` - 房间清理间隔（默认：3600000 = 1小时）
+- `FILE_RETENTION_HOURS` - 文件保留时间（默认：12小时）
+- `RATE_LIMIT_WINDOW_MS` - 速率限制窗口（默认：60000 = 1分钟）
+- `RATE_LIMIT_MAX_REQUESTS` - 每窗口最大请求数（默认：100）
 
 ### 客户端
 
@@ -207,6 +217,11 @@ bun run type-check
 
 # 运行代码检查
 bun run lint
+bun run lint:fix               # 自动修复ESLint错误
+
+# 代码格式化
+bun run format                 # 使用Prettier格式化代码
+bun run format:check           # 检查代码格式
 
 # 构建单个包
 bun run server:build
@@ -216,8 +231,22 @@ bun run client:build
 bun run server:dev
 bun run client:dev
 
+# 启动生产服务器
+bun run start                  # 前端和后端统一运行在端口3001
+
 # 图标管理
 bun run icons:generate         # 生成Web图标
+
+# 版本管理
+bun run version:check          # 检查版本一致性
+bun run version:report         # 生成版本报告
+bun run version:outdated       # 检查过期依赖
+
+# 发布管理
+bun run release:patch          # 发布补丁版本
+bun run release:minor          # 发布次要版本
+bun run release:major          # 发布主要版本
+bun run release:dry-run        # 预览发布更改
 ```
 
 ## 🤝 贡献
@@ -295,8 +324,9 @@ This project is built as a monorepo with four main packages:
 - **Type System**: TypeScript with strict mode
 - **Validation**: Zod schemas
 - **Utilities**: Shared utility functions
-- **System Features**: Clipboard monitoring, system notifications, autostart
-- **Cross-Platform**: Windows, macOS, Linux support
+- **Testing**: Vitest + Playwright
+- **Code Quality**: ESLint + Prettier
+- **Internationalization**: react-i18next
 
 ## 🚀 Getting Started
 
@@ -423,6 +453,12 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 - `LOG_COLORS` - Colored log output (true/false)
 - `LOG_TIMESTAMPS` - Timestamps (true/false)
 - `LOG_CONTEXT` - Context labels (true/false)
+- `UPLOAD_DIR` - File upload directory (default: /app/uploads)
+- `MAX_FILE_SIZE` - Max file size (default: 104857600 = 100MB)
+- `ROOM_CLEANUP_INTERVAL` - Room cleanup interval (default: 3600000 = 1 hour)
+- `FILE_RETENTION_HOURS` - File retention period (default: 12 hours)
+- `RATE_LIMIT_WINDOW_MS` - Rate limit window (default: 60000 = 1 minute)
+- `RATE_LIMIT_MAX_REQUESTS` - Max requests per window (default: 100)
 
 ### Client
 
@@ -445,6 +481,11 @@ bun run type-check
 
 # Run linting
 bun run lint
+bun run lint:fix               # Auto-fix ESLint errors
+
+# Code formatting
+bun run format                 # Format code with Prettier
+bun run format:check           # Check code formatting
 
 # Build individual packages
 bun run server:build
@@ -454,8 +495,22 @@ bun run client:build
 bun run server:dev
 bun run client:dev
 
+# Start production server
+bun run start                  # Frontend and backend unified on port 3001
+
 # Icon management
 bun run icons:generate         # Generate web icons
+
+# Version management
+bun run version:check          # Check version consistency
+bun run version:report         # Generate version report
+bun run version:outdated       # Check outdated dependencies
+
+# Release management
+bun run release:patch          # Create patch release
+bun run release:minor          # Create minor release
+bun run release:major          # Create major release
+bun run release:dry-run        # Preview release changes
 ```
 
 ## 🤝 Contributing
