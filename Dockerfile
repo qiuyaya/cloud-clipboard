@@ -1,5 +1,5 @@
 # Stage 1: 构建阶段
-FROM oven/bun:1.2.17 AS builder
+FROM oven/bun:1.3.6 AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ ENV NODE_ENV=production
 RUN bun run build
 
 # Stage 2: 极简运行时
-FROM oven/bun:1.2.17-alpine AS runtime
+FROM oven/bun:1.3.6-alpine AS runtime
 
 # 创建用户
 RUN addgroup -g 1001 -S nodejs && \
