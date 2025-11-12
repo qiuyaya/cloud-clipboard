@@ -22,7 +22,7 @@ const router = Router();
  * POST /api/share
  * Create a new share link
  */
-router.post("/", rateLimitCreateShare, async (req, res) => {
+router.post("/", rateLimitCreateShare, async (req, res): Promise<void> => {
   try {
     // Validate request body
     const validatedData = CreateShareSchema.parse(req.body);
@@ -65,7 +65,7 @@ router.post("/", rateLimitCreateShare, async (req, res) => {
     }
 
     // Handle password validation errors
-    if (error.message.includes("Password validation failed")) {
+    if (error instanceof Error && error.message.includes("Password validation failed")) {
       return res.status(400).json({
         success: false,
         error: "WEAK_PASSWORD",
@@ -90,7 +90,7 @@ router.post("/", rateLimitCreateShare, async (req, res) => {
  * GET /api/share
  * List user's share links
  */
-router.get("/", rateLimitListShare, async (req, res) => {
+router.get("/", rateLimitListShare, async (req, res): Promise<void> => {
   try {
     // TODO: In a real implementation, verify user authentication
     // const userId = req.user?.id;
@@ -167,7 +167,7 @@ router.get("/", rateLimitListShare, async (req, res) => {
  * GET /api/share/:shareId
  * Get share link details
  */
-router.get("/:shareId", rateLimitListShare, async (req, res) => {
+router.get("/:shareId", rateLimitListShare, async (req, res): Promise<void> => {
   try {
     const { shareId } = req.params;
 
@@ -232,7 +232,7 @@ router.get("/:shareId", rateLimitListShare, async (req, res) => {
  * DELETE /api/share/:shareId
  * Revoke a share link
  */
-router.delete("/:shareId", rateLimitRevokeShare, async (req, res) => {
+router.delete("/:shareId", rateLimitRevokeShare, async (req, res): Promise<void> => {
   try {
     const { shareId } = req.params;
 
@@ -289,7 +289,7 @@ router.delete("/:shareId", rateLimitRevokeShare, async (req, res) => {
  * GET /api/share/:shareId/download
  * Download a shared file (external access)
  */
-router.get("/:shareId/download", rateLimitDownloadShare, async (req, res) => {
+router.get("/:shareId/download", rateLimitDownloadShare, async (req, res): Promise<void> => {
   try {
     const { shareId } = req.params;
 
@@ -424,7 +424,7 @@ router.get("/:shareId/download", rateLimitDownloadShare, async (req, res) => {
  * GET /api/share/:shareId/access
  * Get access logs for a share
  */
-router.get("/:shareId/access", rateLimitAccessLogs, async (req, res) => {
+router.get("/:shareId/access", rateLimitAccessLogs, async (req, res): Promise<void> => {
   try {
     const { shareId } = req.params;
 

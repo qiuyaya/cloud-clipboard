@@ -74,7 +74,7 @@ describe("ShareService", () => {
       const shares = (shareService as any).shares as Map<string, ShareLink>;
       const firstShare = shares.values().next().value;
       expect(firstShare).toBeDefined();
-      firstShare.isActive = false;
+      firstShare!.isActive = false;
 
       const result = shareService.validateShare(firstShare!.shareId);
 
@@ -87,14 +87,14 @@ describe("ShareService", () => {
       const shares = (shareService as any).shares as Map<string, ShareLink>;
       const firstShare = shares.values().next().value;
       expect(firstShare).toBeDefined();
-      firstShare.expiresAt = new Date("2025-11-11T00:00:00Z"); // Yesterday
+      firstShare!.expiresAt = new Date("2025-11-11T00:00:00Z"); // Yesterday
 
       const result = shareService.validateShare(firstShare!.shareId);
 
       expect(result.isValid).toBe(false);
       expect(result.share?.isActive).toBe(false);
       expect(result.errorCode).toBe("expired");
-      expect(firstShare.isActive).toBe(false); // Should be marked inactive
+      expect(firstShare!.isActive).toBe(false); // Should be marked inactive
     });
   });
 

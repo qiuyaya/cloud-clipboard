@@ -189,7 +189,7 @@ describe("Share API Integration Tests", () => {
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = logs[logs.length - 1];
       expect(lastLog).toBeDefined();
-      expect(lastLog.success).toBe(true);
+      expect(lastLog!.success).toBe(true);
     });
 
     it("should return 404 for non-existent shareId", async () => {
@@ -211,7 +211,7 @@ describe("Share API Integration Tests", () => {
       expect(logsAfter.length).toBeGreaterThan(logsBefore.length);
       const lastLog = logsAfter[logsAfter.length - 1];
       expect(lastLog).toBeDefined();
-      expect(lastLog.success).toBe(false);
+      expect(lastLog!.success).toBe(false);
     });
 
     it("should handle expired share", async () => {
@@ -251,9 +251,9 @@ describe("Share API Integration Tests", () => {
       const lastLog = logs[logs.length - 1];
       expect(lastLog).toBeDefined();
 
-      expect(lastLog.userAgent).toBe(testUserAgent);
+      expect(lastLog!.userAgent).toBe(testUserAgent);
       // IP might be transformed by Express/Supertest, so just check it exists
-      expect(lastLog.ipAddress).toBeDefined();
+      expect(lastLog!.ipAddress).toBeDefined();
     });
 
     it("should handle multiple downloads of same share", async () => {
@@ -386,7 +386,7 @@ describe("Share API Integration Tests", () => {
       const lastLog = logs[logs.length - 1];
       expect(lastLog).toBeDefined();
 
-      const logTime = new Date(lastLog.timestamp);
+      const logTime = new Date(lastLog!.timestamp);
       expect(logTime.getTime()).toBeGreaterThanOrEqual(beforeTime.getTime());
       expect(logTime.getTime()).toBeLessThanOrEqual(afterTime.getTime());
     });
