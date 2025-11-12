@@ -1,0 +1,458 @@
+openapi: 3.0.3
+info:
+  title: Cloud Clipboard External File Sharing API
+  version: 1.0.0
+  description: |
+    API for creating, managing, and accessing externally shared files.
+
+    ## Authentication
+    - User endpoints require authentication via session cookie
+    - External access endpoints are public but may require password
+
+    ## Rate Limiting
+    - Create share: 10 requests/minute per user
+    - Download: 100 requests/minute per IP
+    - Revoke share: 30 requests/minute per user
+
+servers:
+  - url: https://api.cloud-clipboard.example.com
+    description: Production server
+  - url: http://localhost:3001
+    description: Development server
+
+security:
+  - cookieAuth: []
+
+paths:
+  /api/share:
+    post:
+      summary: Create a new share link for a file
+      operationId: createShareLink
+      tags:
+        - Share Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShareRequest'
+            examples:
+              simple_share:
+                summary: Simple share (no password)
+                value:
+                  fileId: "550e8400-e29b-41d4-a716-446655440000"
+                  expiresInDays: 7
+              password_protected:
+                summary: Password-protected share
+                value:
+                  fileId: "550e8400-e29b-41d4-a716-446655440000"
+                  password: "MyStr0ng!Pass"
+                  expiresInDays: 7
+      responses:
+        '201':
+          description: Share link created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid_file:
+                  value:
+                    error: "INVALID_FILE"
+                    message: "File not found or not accessible"
+                weak_password:
+                  value:
+                    error: "WEAK_PASSWORD"
+                    message: "Password must be at least 8 characters with uppercase, lowercase, number, and special character"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: List all share links created by authenticated user
+      operationId: listShareLinks
+      tags:
+        - Share Management
+      parameters:
+        - name: status
+          in: query
+          description: Filter by share status
+          schema:
+            type: string
+            enum: [active, expired, revoked, all]
+            default: active
+        - name: limit
+          in: query
+          description: Maximum number of shares to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of shares to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of share links
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shares:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ShareLinkSummary'
+                  total:
+                    type: integer
+                    description: Total number of shares matching the filter
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/share/{shareId}:
+    get:
+      summary: Get detailed information about a share link
+      operationId: getShareLink
+      tags:
+        - Share Management
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          description: Share link identifier
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 10
+      responses:
+        '200':
+          description: Share link details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkDetails'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Share link not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Revoke (delete) a share link
+      operationId: revokeShareLink
+      tags:
+        - Share Management
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          description: Share link identifier
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 10
+      responses:
+        '204':
+          description: Share link revoked successfully
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Share link not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/share/{shareId}/access:
+    get:
+      summary: Get access logs for a share link
+      operationId: getShareAccessLogs
+      tags:
+        - Share Management
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          description: Share link identifier
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 10
+        - name: limit
+          in: query
+          description: Maximum number of log entries to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Access logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccessLogEntry'
+                  total:
+                    type: integer
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Share link not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/share/{shareId}/download:
+    get:
+      summary: Download file from share link (external access)
+      operationId: downloadSharedFile
+      tags:
+        - External Access
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          description: Share link identifier
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 10
+      responses:
+        '200':
+          description: File download successful
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+              headers:
+                Content-Disposition:
+                  schema:
+                    type: string
+                  example: 'attachment; filename="example.pdf"'
+                Content-Type:
+                  schema:
+                    type: string
+                  example: 'application/pdf'
+                Content-Length:
+                  schema:
+                    type: integer
+                  description: File size in bytes
+        '401':
+          description: Password required or incorrect password
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+              example: 'Basic realm="Share Password Required"'
+        '404':
+          description: Share link not found, expired, or file not available
+        '410':
+          description: Share link has expired
+        '429':
+          description: Rate limit exceeded
+
+components:
+  schemas:
+    CreateShareRequest:
+      type: object
+      required:
+        - fileId
+      properties:
+        fileId:
+          type: string
+          format: uuid
+          description: ID of the file to share
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+          description: |
+            Optional password for protecting the share link.
+            Must meet complexity requirements:
+            - At least 8 characters
+            - At least 1 uppercase letter
+            - At least 1 lowercase letter
+            - At least 1 number
+            - At least 1 special character
+        expiresInDays:
+          type: integer
+          minimum: 1
+          maximum: 30
+          default: 7
+          description: Number of days until link expires
+
+    ShareLinkResponse:
+      type: object
+      required:
+        - shareId
+        - url
+        - createdAt
+        - expiresAt
+        - hasPassword
+      properties:
+        shareId:
+          type: string
+          description: Unique share identifier
+        url:
+          type: string
+          format: uri
+          description: Full URL for external access
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        hasPassword:
+          type: boolean
+          description: Whether password protection is enabled
+        accessCount:
+          type: integer
+          description: Number of times the file has been accessed
+
+    ShareLinkSummary:
+      type: object
+      required:
+        - shareId
+        - originalFilename
+        - fileSize
+        - createdAt
+        - expiresAt
+        - status
+        - accessCount
+      properties:
+        shareId:
+          type: string
+        originalFilename:
+          type: string
+        fileSize:
+          type: integer
+          description: File size in bytes
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, expired, revoked]
+        accessCount:
+          type: integer
+        hasPassword:
+          type: boolean
+
+    ShareLinkDetails:
+      allOf:
+        - $ref: '#/components/schemas/ShareLinkSummary'
+        - type: object
+          properties:
+            lastAccessedAt:
+              type: string
+              format: date-time
+              nullable: true
+            mimeType:
+              type: string
+            downloadUrl:
+              type: string
+              format: uri
+
+    AccessLogEntry:
+      type: object
+      required:
+        - timestamp
+        - ipAddress
+        - success
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+          nullable: true
+        success:
+          type: boolean
+        errorCode:
+          type: string
+          enum: [expired, invalid, wrong_password, file_not_found, revoked]
+          nullable: true
+        bytesTransferred:
+          type: integer
+          description: File size in bytes (only for successful downloads)
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details (optional)
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Session cookie for authentication
+
+tags:
+  - name: Share Management
+    description: Operations for creating and managing share links
+  - name: External Access
+    description: Public endpoints for downloading shared files
