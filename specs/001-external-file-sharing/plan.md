@@ -18,7 +18,7 @@
 
 **技术方法**:
 
-- 后端: 扩展Express.js路由，添加 `/api/share/*` 端点，实现 ShareLinkService
+- 后端: 扩展Express.js路由，添加 `/api/share/*` 端点，实现 ShareService
 - 前端: React组件支持生成分享、密码设置、链接管理
 - 数据模型: SharedFile、ShareLink、ShareAccessKey、ShareAccessLog 实体
 - 安全: 密码哈希存储、直接下载模式、404错误处理
@@ -98,7 +98,7 @@ cloud-clipboard/
 ├── server/                # Express.js backend
 │   ├── src/
 │   │   ├── routes/       # API routes (including new share routes)
-│   │   ├── services/     # Business logic (ShareLinkService)
+│   │   ├── services/     # Business logic (ShareService)
 │   │   ├── models/       # Data models
 │   │   ├── middleware/   # Authentication, logging
 │   │   └── types.ts      # Server-specific types
