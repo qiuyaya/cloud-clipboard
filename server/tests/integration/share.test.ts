@@ -36,7 +36,7 @@ describe("Share API Integration Tests", () => {
       expect(response.body.data.fileId).toBe("550e8400-e29b-41d4-a716-446655440000");
       expect(response.body.data.createdBy).toBe("user-123");
       expect(response.body.data.url).toBeDefined();
-      expect(response.body.data.url).toContain("/api/share/");
+      expect(response.body.data.url).toContain("<<OLD_PATH>>");
       expect(response.body.data.url).toContain("/download");
       expect(response.body.data.hasPassword).toBe(false);
       expect(response.body.data.accessCount).toBe(0);
@@ -154,7 +154,7 @@ describe("Share API Integration Tests", () => {
     });
   });
 
-  describe("GET /api/share/:shareId/download", () => {
+  describe("GET /public/file/:shareId", () => {
     it("should successfully download from valid share link", async () => {
       // First create a share
       const createResponse = await request(app)
@@ -168,7 +168,9 @@ describe("Share API Integration Tests", () => {
       const shareId = createResponse.body.data.shareId;
 
       // Then download
-      const downloadResponse = await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      const downloadResponse = await request(app)
+        .get(`<<OLD_PATH>>${shareId}/download`)
+        .expect(200);
 
       expect(downloadResponse.body.success).toBe(true);
       expect(downloadResponse.body.message).toBe("File streaming would happen here");
@@ -176,7 +178,7 @@ describe("Share API Integration Tests", () => {
     });
 
     it("should return 404 for non-existent share ID", async () => {
-      const response = await request(app).get("/api/share/non-existent-id/download").expect(404);
+      const response = await request(app).get("<<OLD_PATH>>non-existent-id/download").expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe("NOT_FOUND");
@@ -205,7 +207,7 @@ describe("Share API Integration Tests", () => {
         details.expiresAt = new Date(Date.now() - 1000); // Set to past
       }
 
-      const response = await request(app).get(`/api/share/${shareId}/download`).expect(404);
+      const response = await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe("NOT_FOUND");
@@ -227,7 +229,7 @@ describe("Share API Integration Tests", () => {
       shareService.revokeShare(shareId, "user-123");
 
       // Try to download
-      const response = await request(app).get(`/api/share/${shareId}/download`).expect(404);
+      const response = await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(404);
 
       expect(response.body.success).toBe(false);
     });
@@ -248,9 +250,9 @@ describe("Share API Integration Tests", () => {
       const shareId = createResponse.body.data.shareId;
 
       // Download twice
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(200);
 
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(200);
 
       // Check access count
       const details = shareService.getShareDetails(shareId);
@@ -270,7 +272,7 @@ describe("Share API Integration Tests", () => {
       const shareId = createResponse.body.data.shareId;
 
       // Download
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(200);
 
       // Check logs
       const logs = shareService.getAccessLogs(shareId);
@@ -284,7 +286,7 @@ describe("Share API Integration Tests", () => {
       clearState();
 
       // Try to download non-existent share
-      await request(app).get("/api/share/non-existent-id/download").expect(404);
+      await request(app).get("<<OLD_PATH>>non-existent-id/download").expect(404);
 
       // Logs should exist for the failed attempt
       const logs = shareService.getAccessLogs("non-existent-id");
@@ -310,7 +312,7 @@ describe("Share API Integration Tests", () => {
         details.expiresAt = new Date(Date.now() - 1000);
       }
 
-      await request(app).get(`/api/share/${shareId}/download`).expect(404);
+      await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(404);
 
       const expiredLogs = shareService.getAccessLogs(shareId);
       expect(expiredLogs[0].success).toBe(false);
@@ -400,7 +402,7 @@ describe("Share API Integration Tests", () => {
 
       // Try to download without password - should require auth
       const unauthorizedResponse = await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`<<OLD_PATH>>${shareId}/download`)
         .expect(401);
 
       expect(unauthorizedResponse.body.error).toBe("AUTHENTICATION_REQUIRED");
@@ -424,7 +426,7 @@ describe("Share API Integration Tests", () => {
       // Try to download with wrong password
       const wrongPassword = Buffer.from("user:wrongpassword").toString("base64");
       const wrongResponse = await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`<<OLD_PATH>>${shareId}/download`)
         .set("Authorization", `Basic ${wrongPassword}`)
         .expect(401);
 
@@ -449,7 +451,7 @@ describe("Share API Integration Tests", () => {
       // Download with correct password
       const correctPassword = Buffer.from("user:SecurePass123!").toString("base64");
       const successResponse = await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`<<OLD_PATH>>${shareId}/download`)
         .set("Authorization", `Basic ${correctPassword}`)
         .expect(200);
 
@@ -477,7 +479,7 @@ describe("Share API Integration Tests", () => {
       // Try with wrong password
       const wrongPassword = Buffer.from("user:wrong").toString("base64");
       await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`<<OLD_PATH>>${shareId}/download`)
         .set("Authorization", `Basic ${wrongPassword}`)
         .expect(401);
 
@@ -504,7 +506,7 @@ describe("Share API Integration Tests", () => {
 
       // Try with malformed auth header (doesn't start with 'Basic ')
       const malformedResponse = await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`<<OLD_PATH>>${shareId}/download`)
         .set("Authorization", "InvalidFormat")
         .expect(401);
 
@@ -528,7 +530,7 @@ describe("Share API Integration Tests", () => {
 
       // Try with invalid base64 after 'Basic '
       const invalidBase64 = await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`<<OLD_PATH>>${shareId}/download`)
         .set("Authorization", "Basic !@#$%^&*()")
         .expect(401);
 
@@ -708,7 +710,7 @@ describe("Share API Integration Tests", () => {
       const shareId = createResponse.body.data.shareId;
 
       // Get details
-      const response = await request(app).get(`/api/share/${shareId}`).expect(200);
+      const response = await request(app).get(`<<OLD_PATH>>${shareId}`).expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.shareId).toBe(shareId);
@@ -721,7 +723,7 @@ describe("Share API Integration Tests", () => {
     it("should return 404 for non-existent share details", async () => {
       clearState();
 
-      const response = await request(app).get("/api/share/non-existent-id").expect(404);
+      const response = await request(app).get("<<OLD_PATH>>non-existent-id").expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe("NOT_FOUND");
@@ -742,7 +744,7 @@ describe("Share API Integration Tests", () => {
 
       // Revoke share
       const response = await request(app)
-        .delete(`/api/share/${shareId}`)
+        .delete(`<<OLD_PATH>>${shareId}`)
         .send({ userId: "user-123" })
         .expect(200);
 
@@ -769,7 +771,7 @@ describe("Share API Integration Tests", () => {
 
       // Try to revoke as different user
       const response = await request(app)
-        .delete(`/api/share/${shareId}`)
+        .delete(`<<OLD_PATH>>${shareId}`)
         .send({ userId: "user-456" })
         .expect(403);
 
@@ -781,7 +783,7 @@ describe("Share API Integration Tests", () => {
       clearState();
 
       const response = await request(app)
-        .delete("/api/share/non-existent-id")
+        .delete("<<OLD_PATH>>non-existent-id")
         .send({ userId: "user-123" })
         .expect(404);
 
@@ -803,10 +805,10 @@ describe("Share API Integration Tests", () => {
       const shareId = createResponse.body.data.shareId;
 
       // Access the share
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(200);
 
       // Get access logs
-      const response = await request(app).get(`/api/share/${shareId}/access`).expect(200);
+      const response = await request(app).get(`<<OLD_PATH>>${shareId}/access`).expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.logs).toHaveLength(1);
@@ -830,12 +832,12 @@ describe("Share API Integration Tests", () => {
 
       // Access the share multiple times
       for (let i = 0; i < 5; i++) {
-        await request(app).get(`/api/share/${shareId}/download`).expect(200);
+        await request(app).get(`<<OLD_PATH>>${shareId}/download`).expect(200);
       }
 
       // Get limited logs
       const response = await request(app)
-        .get(`/api/share/${shareId}/access`)
+        .get(`<<OLD_PATH>>${shareId}/access`)
         .query({ limit: 3 })
         .expect(200);
 
@@ -846,7 +848,7 @@ describe("Share API Integration Tests", () => {
     it("should return 404 for access logs of non-existent share", async () => {
       clearState();
 
-      const response = await request(app).get("/api/share/non-existent-id/access").expect(404);
+      const response = await request(app).get("<<OLD_PATH>>non-existent-id/access").expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe("NOT_FOUND");

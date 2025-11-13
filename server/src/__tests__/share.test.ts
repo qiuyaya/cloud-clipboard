@@ -4,7 +4,7 @@ import { Server } from "http";
 import express from "express";
 import { shareService } from "../services/ShareService";
 import { FileManager } from "../services/FileManager";
-import { createShareRoutes } from "../routes/share";
+import { createShareRoutes, createShareDownloadHandler } from "../routes/share";
 
 describe("Share API Integration Tests", () => {
   let app: express.Application;
@@ -22,6 +22,7 @@ describe("Share API Integration Tests", () => {
     // Setup middleware
     app.use(express.json());
     app.use("/api/share", createShareRoutes(fileManager));
+    app.get("/public/file/:shareId", createShareDownloadHandler(fileManager));
 
     // Start server
     await new Promise<void>((resolve) => {
@@ -61,8 +62,7 @@ describe("Share API Integration Tests", () => {
       expect(response.body.data.password).toBeUndefined();
       expect(response.body.data.url).toBeDefined();
       expect(typeof response.body.data.url).toBe("string");
-      expect(response.body.data.url).toContain("/api/share/");
-      expect(response.body.data.url).toContain("/download");
+      expect(response.body.data.url).toContain("/public/file/");
       expect(response.body.data.expiresAt).toBeDefined();
       expect(response.body.data.accessCount).toBe(0);
     });
@@ -87,8 +87,7 @@ describe("Share API Integration Tests", () => {
       expect(response.body.data.password.length).toBe(6);
       expect(response.body.data.url).toBeDefined();
       expect(typeof response.body.data.url).toBe("string");
-      expect(response.body.data.url).toContain("/api/share/");
-      expect(response.body.data.url).toContain("/download");
+      expect(response.body.data.url).toContain("/public/file/");
       expect(response.body.data.expiresAt).toBeDefined();
       expect(response.body.data.accessCount).toBe(0);
     });
@@ -189,7 +188,7 @@ describe("Share API Integration Tests", () => {
     });
   });
 
-  describe("GET /api/share/:shareId/download", () => {
+  describe("GET /public/file/:shareId", () => {
     let shareId: string;
     let sharePassword: string;
 
@@ -210,20 +209,20 @@ describe("Share API Integration Tests", () => {
       // Need to provide password for authentication
       const auth = Buffer.from(`:${sharePassword}`).toString("base64");
       const response = await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`/public/file/${shareId}`)
         .set("Authorization", `Basic ${auth}`)
         .expect(404);
 
-      // Should still get JSON error response
+      // Should still get JSON error response with unified error code for security
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe("FILE_NOT_FOUND");
+      expect(response.body.error).toBe("NOT_FOUND");
     });
 
     it("should log failed access when file not found", async () => {
       // First download attempt
       const auth = Buffer.from(`:${sharePassword}`).toString("base64");
       await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`/public/file/${shareId}`)
         .set("Authorization", `Basic ${auth}`)
         .expect(404);
 
@@ -237,7 +236,7 @@ describe("Share API Integration Tests", () => {
     });
 
     it("should return 404 for non-existent shareId", async () => {
-      const response = await request(app).get("/api/share/nonexistent/download").expect(404);
+      const response = await request(app).get(`/public/file/nonexistent`).expect(404);
 
       // Response should have JSON body with success: false
       expect(response.body).toBeDefined();
@@ -257,7 +256,7 @@ describe("Share API Integration Tests", () => {
       // Use wrong password
       const wrongAuth = Buffer.from(`:wrongpassword`).toString("base64");
       await request(app)
-        .get(`/api/share/${testShareId}/download`)
+        .get(`/public/file/${testShareId}`)
         .set("Authorization", `Basic ${wrongAuth}`)
         .expect(401);
 
@@ -284,9 +283,7 @@ describe("Share API Integration Tests", () => {
       const share = shares.get(expiredShareId);
       share.expiresAt = new Date("2025-11-11T00:00:00Z"); // Yesterday
 
-      const downloadResponse = await request(app)
-        .get(`/api/share/${expiredShareId}/download`)
-        .expect(404);
+      const downloadResponse = await request(app).get(`/public/file/${expiredShareId}`).expect(404);
 
       expect(downloadResponse.body.success).toBe(false);
     });
@@ -297,7 +294,7 @@ describe("Share API Integration Tests", () => {
 
       // Since share now requires password, expect 401 without password
       await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`/public/file/${shareId}`)
         .set("User-Agent", testUserAgent)
         .set("X-Forwarded-For", testIP)
         .expect(401);
@@ -316,9 +313,9 @@ describe("Share API Integration Tests", () => {
 
     it("should handle multiple downloads of same share", async () => {
       // Download multiple times without password (will fail but should be logged)
-      await request(app).get(`/api/share/${shareId}/download`).expect(401);
-      await request(app).get(`/api/share/${shareId}/download`).expect(401);
-      await request(app).get(`/api/share/${shareId}/download`).expect(401);
+      await request(app).get(`/public/file/${shareId}`).expect(401);
+      await request(app).get(`/public/file/${shareId}`).expect(401);
+      await request(app).get(`/public/file/${shareId}`).expect(401);
 
       // Check that all attempts are logged (all should be failed)
       const logs = shareService.getAccessLogs(shareId);
@@ -339,9 +336,7 @@ describe("Share API Integration Tests", () => {
       shareService.revokeShare(revokedShareId, "user123");
 
       // Try to download
-      const downloadResponse = await request(app)
-        .get(`/api/share/${revokedShareId}/download`)
-        .expect(404);
+      const downloadResponse = await request(app).get(`/public/file/${revokedShareId}`).expect(404);
 
       expect(downloadResponse.body.success).toBe(false);
     });
@@ -349,14 +344,14 @@ describe("Share API Integration Tests", () => {
 
   describe("Share API Error Handling", () => {
     it("should handle invalid shareId format in download", async () => {
-      const response = await request(app).get("/api/unknown/!@#/download").expect(404);
+      const response = await request(app).get("/public/file/unknown/!@#").expect(404);
 
       // Just check that it returns 404, content may be HTML from default handler
       expect(response.status).toBe(404);
     });
 
     it("should handle malformed shareId in download", async () => {
-      const response = await request(app).get("/api/share/%2E%2E%2F/download").expect(404);
+      const response = await request(app).get("/public/file/%2E%2E%2F").expect(404);
 
       expect(response.body.success).toBe(false);
     });
@@ -413,6 +408,7 @@ describe("Share API Integration Tests", () => {
       const response = await request(app).post("/api/share").send({
         fileId: "550e8400-e29b-41d4-a716-446655440000",
         createdBy: "user123",
+        password: "auto-generate",
       });
 
       const shareId = response.body.data.shareId;
@@ -423,7 +419,7 @@ describe("Share API Integration Tests", () => {
       // Need to provide password for authentication
       const auth = Buffer.from(`:${sharePassword}`).toString("base64");
       await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`/public/file/${shareId}`)
         .set("Authorization", `Basic ${auth}`)
         .expect(404);
 
@@ -438,6 +434,7 @@ describe("Share API Integration Tests", () => {
       const response = await request(app).post("/api/share").send({
         fileId: "550e8400-e29b-41d4-a716-446655440000",
         createdBy: "user123",
+        password: "auto-generate",
       });
 
       const shareId = response.body.data.shareId;
@@ -445,7 +442,7 @@ describe("Share API Integration Tests", () => {
 
       const auth = Buffer.from(`:${sharePassword}`).toString("base64");
       await request(app)
-        .get(`/api/share/${shareId}/download`)
+        .get(`/public/file/${shareId}`)
         .set("Authorization", `Basic ${auth}`)
         .expect(404);
 

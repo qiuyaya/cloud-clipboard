@@ -1,14 +1,117 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import * as fs from "fs";
+import * as path from "path";
+import { fileTypeFromFile } from "file-type";
 import { shareService } from "../services/ShareService";
 import { FileManager } from "../services/FileManager";
 import { z } from "zod";
 import {
   rateLimitCreateShare,
-  rateLimitDownloadShare,
   rateLimitListShare,
   rateLimitRevokeShare,
   rateLimitAccessLogs,
+  concurrentDownloadTracker,
 } from "../middleware/rateLimiter";
+
+// Bandwidth tracking for rate limiting
+class BandwidthTracker {
+  private bandwidthMap: Map<string, { bytes: number; resetTime: number }> = new Map();
+
+  checkAndIncrement(ip: string, bytes: number, windowMs: number, maxBytes: number): boolean {
+    const now = Date.now();
+    const data = this.bandwidthMap.get(ip);
+
+    if (!data || now > data.resetTime) {
+      // Reset or create new tracking
+      this.bandwidthMap.set(ip, {
+        bytes,
+        resetTime: now + windowMs,
+      });
+      return true;
+    }
+
+    if (data.bytes + bytes > maxBytes) {
+      return false;
+    }
+
+    data.bytes += bytes;
+    return true;
+  }
+
+  cleanup(): void {
+    const now = Date.now();
+    for (const [ip, data] of this.bandwidthMap.entries()) {
+      if (now > data.resetTime) {
+        this.bandwidthMap.delete(ip);
+      }
+    }
+  }
+}
+
+const bandwidthTracker = new BandwidthTracker();
+
+// Track active file streams to prevent memory exhaustion
+class StreamTracker {
+  private activeStreams: Set<NodeJS.ReadableStream> = new Set();
+  private maxStreams: number;
+
+  constructor(maxStreams: number = 100) {
+    this.maxStreams = maxStreams;
+  }
+
+  canCreateStream(): boolean {
+    return this.activeStreams.size < this.maxStreams;
+  }
+
+  addStream(stream: NodeJS.ReadableStream): void {
+    this.activeStreams.add(stream);
+
+    // Auto-cleanup when stream ends or errors
+    const cleanup = () => {
+      this.activeStreams.delete(stream);
+    };
+
+    stream.on("end", cleanup);
+    stream.on("error", cleanup);
+    stream.on("close", cleanup);
+  }
+
+  getActiveCount(): number {
+    return this.activeStreams.size;
+  }
+
+  getMaxStreams(): number {
+    return this.maxStreams;
+  }
+}
+
+const streamTracker = new StreamTracker(parseInt(process.env.MAX_ACTIVE_FILE_STREAMS || "100"));
+
+// Input validation middleware for shareId
+export const validateShareId = (req: Request, res: Response, next: NextFunction): void => {
+  const shareId = req.params.shareId;
+
+  // Validate shareId format: only base62 characters (0-9, A-Z, a-z) and length 8-10
+  if (!shareId || typeof shareId !== "string" || !/^[0-9A-Za-z]{8,10}$/.test(shareId)) {
+    res.status(404).json({
+      success: false,
+      error: "NOT_FOUND",
+      message: "The requested resource was not found",
+    });
+    return;
+  }
+
+  next();
+};
+
+// Uniform error response function
+const sendErrorResponse = (res: Response, statusCode: number): void => {
+  res.status(statusCode).json({
+    success: false,
+    error: "NOT_FOUND",
+    message: "The requested resource was not found",
+  });
+};
 
 // Validation schema for create share request
 const CreateShareSchema = z.object({
@@ -17,7 +120,482 @@ const CreateShareSchema = z.object({
   password: z.enum(["auto-generate"]).optional(),
 });
 
+// Export the download handler for public file routes
+// The fileManager parameter is captured in closure and used for file retrieval
+export const createShareDownloadHandler = (fileManager: FileManager) => {
+  // fileManager is used in closure for file retrieval
+  void fileManager;
+
+  // Get configuration from environment
+  const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600"); // 100MB in bytes
+  const DOWNLOAD_TIMEOUT = parseInt(process.env.DOWNLOAD_TIMEOUT || "30000"); // 30 seconds in ms
+
+  return async (req: Request, res: Response): Promise<void> => {
+    // Enhanced IP validation - support X-Forwarded-For header for proxies
+    const getClientIP = (): string => {
+      const xForwardedFor = req.headers["x-forwarded-for"];
+      if (typeof xForwardedFor === "string" && xForwardedFor.trim() !== "") {
+        // Handle comma-separated IPs, take the first one (client IP)
+        const ips = xForwardedFor.split(",").map((ip) => ip.trim());
+        return ips[0] || "unknown";
+      }
+      return req.ip || req.connection.remoteAddress || "unknown";
+    };
+
+    const clientIP = getClientIP();
+    const shareId = req.params.shareId as string;
+
+    // Cleanup function to decrement counters
+    const cleanup = (): void => {
+      concurrentDownloadTracker.decrement(clientIP);
+      // Cleanup bandwidth tracker periodically
+      if (Math.random() < 0.01) {
+        // 1% chance to trigger cleanup
+        bandwidthTracker.cleanup();
+      }
+    };
+
+    try {
+      // Set timeout to prevent slowloris attacks
+      res.setTimeout(DOWNLOAD_TIMEOUT, () => {
+        console.warn(`Download timeout for shareId: ${shareId} from IP: ${clientIP}`);
+        cleanup();
+        if (!res.headersSent) {
+          sendErrorResponse(res, 408);
+        }
+      });
+
+      // Check concurrent download limit
+      if (!concurrentDownloadTracker.increment(clientIP)) {
+        console.warn(`Too many concurrent downloads from IP: ${clientIP}`);
+        sendErrorResponse(res, 429);
+        return;
+      }
+
+      // Validate share
+      const validation = shareService.validateShare(shareId);
+
+      if (!validation.isValid || !validation.share) {
+        cleanup();
+        sendErrorResponse(res, 404);
+        return;
+      }
+
+      // For password-protected shares, check if password is provided
+      if (validation.share.passwordHash) {
+        const authHeader = req.get("authorization");
+
+        if (!authHeader || !authHeader.startsWith("Basic ")) {
+          cleanup();
+
+          // Log failed access attempt
+          shareService.logAccess({
+            shareId,
+            ipAddress: clientIP,
+            userAgent: req.get("user-agent") || "unknown",
+            success: false,
+            errorCode: "wrong_password",
+          });
+
+          sendErrorResponse(res, 401);
+          return;
+        }
+
+        // Extract and verify password from Basic Auth
+        try {
+          const base64Credentials = authHeader.split(" ")[1];
+
+          if (!base64Credentials) {
+            cleanup();
+            sendErrorResponse(res, 401);
+            return;
+          }
+
+          const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+          const [_username, password] = credentials.split(":");
+
+          if (!password) {
+            cleanup();
+            sendErrorResponse(res, 401);
+            return;
+          }
+
+          // Verify password
+          if (!validation.share.passwordHash) {
+            cleanup();
+            sendErrorResponse(res, 401);
+            return;
+          }
+
+          const isPasswordValid = await shareService.comparePassword(
+            password,
+            validation.share.passwordHash,
+          );
+
+          if (!isPasswordValid) {
+            cleanup();
+
+            // Log failed access attempt
+            shareService.logAccess({
+              shareId,
+              ipAddress: clientIP,
+              userAgent: req.get("user-agent") || "unknown",
+              success: false,
+              errorCode: "wrong_password",
+            });
+
+            sendErrorResponse(res, 401);
+            return;
+          }
+        } catch (authError) {
+          console.error("Authentication error:", authError);
+          cleanup();
+          sendErrorResponse(res, 401);
+          return;
+        }
+      }
+
+      // Get file from FileManager
+      const fileRecord = await fileManager.getFile(validation.share.fileId);
+
+      if (!fileRecord) {
+        cleanup();
+
+        // Log failed access attempt
+        shareService.logAccess({
+          shareId,
+          ipAddress: clientIP,
+          userAgent: req.get("user-agent") || "unknown",
+          success: false,
+          errorCode: "file_not_found",
+        });
+
+        sendErrorResponse(res, 404);
+        return;
+      }
+
+      // Enhanced file access control - validate file path and check for symlink/hardlink attacks
+      try {
+        const allowedUploadDir = process.env.UPLOAD_DIR || path.join(__dirname, "../../uploads");
+        const normalizedPath = path.normalize(fileRecord.path);
+        const normalizedAllowedDir = path.normalize(allowedUploadDir);
+
+        // Ensure the file path is within the allowed directory (prevent path traversal)
+        if (!normalizedPath.startsWith(normalizedAllowedDir)) {
+          console.error(`Blocked path traversal attempt: ${fileRecord.path}`);
+          cleanup();
+
+          shareService.logAccess({
+            shareId,
+            ipAddress: clientIP,
+            userAgent: req.get("user-agent") || "unknown",
+            success: false,
+            errorCode: "file_not_found",
+          });
+
+          sendErrorResponse(res, 404);
+          return;
+        }
+
+        // Check if file still exists on disk
+        if (!fs.existsSync(fileRecord.path)) {
+          console.error(`File not found on disk: ${fileRecord.path}`);
+          cleanup();
+
+          shareService.logAccess({
+            shareId,
+            ipAddress: clientIP,
+            userAgent: req.get("user-agent") || "unknown",
+            success: false,
+            errorCode: "file_not_found",
+          });
+
+          sendErrorResponse(res, 404);
+          return;
+        }
+
+        // Security check: Detect and block symbolic links
+        const fileStats = fs.lstatSync(fileRecord.path);
+        if (fileStats.isSymbolicLink()) {
+          console.error(`Blocked symlink attack: ${fileRecord.path}`);
+          cleanup();
+
+          shareService.logAccess({
+            shareId,
+            ipAddress: clientIP,
+            userAgent: req.get("user-agent") || "unknown",
+            success: false,
+            errorCode: "file_not_found",
+          });
+
+          sendErrorResponse(res, 404);
+          return;
+        }
+
+        // Security check: Detect potential hardlink attacks
+        // Hardlinks with nlink > 1 might indicate attempts to access other files
+        if (fileStats.nlink > 1) {
+          console.error(
+            `Potential hardlink attack detected: ${fileRecord.path}, nlink=${fileStats.nlink}`,
+          );
+          cleanup();
+
+          shareService.logAccess({
+            shareId,
+            ipAddress: clientIP,
+            userAgent: req.get("user-agent") || "unknown",
+            success: false,
+            errorCode: "file_not_found",
+          });
+
+          sendErrorResponse(res, 404);
+          return;
+        }
+      } catch (pathError) {
+        console.error("Path validation error:", pathError);
+        cleanup();
+        sendErrorResponse(res, 404);
+        return;
+      }
+
+      // Check file size against configured limit
+      if (fileRecord.size > MAX_FILE_SIZE) {
+        console.warn(
+          `File size exceeds limit: ${fileRecord.size} > ${MAX_FILE_SIZE} for shareId: ${shareId}`,
+        );
+        cleanup();
+
+        shareService.logAccess({
+          shareId,
+          ipAddress: clientIP,
+          userAgent: req.get("user-agent") || "unknown",
+          success: false,
+          errorCode: "file_not_found",
+        });
+
+        sendErrorResponse(res, 404);
+        return;
+      }
+
+      // Bandwidth rate limiting: max bytes = MAX_FILE_SIZE * 10
+      const BANDWINDOW_WINDOW_MS = 60 * 1000; // 1 minute window
+      const MAX_BANDWIDTH_BYTES = MAX_FILE_SIZE * 10;
+
+      if (
+        !bandwidthTracker.checkAndIncrement(
+          clientIP,
+          fileRecord.size,
+          BANDWINDOW_WINDOW_MS,
+          MAX_BANDWIDTH_BYTES,
+        )
+      ) {
+        console.warn(
+          `Bandwidth limit exceeded for IP: ${clientIP}. Attempted to download ${fileRecord.size} bytes`,
+        );
+        cleanup();
+
+        shareService.logAccess({
+          shareId,
+          ipAddress: clientIP,
+          userAgent: req.get("user-agent") || "unknown",
+          success: false,
+          errorCode: "bandwidth_limit_exceeded",
+        });
+
+        sendErrorResponse(res, 429);
+        return;
+      }
+
+      // File type validation using file-type library
+      let detectedMimeType: string | null = null;
+      let detectedExt: string | null = null;
+
+      try {
+        const fileTypeResult = await fileTypeFromFile(fileRecord.path);
+
+        if (fileTypeResult) {
+          detectedMimeType = fileTypeResult.mime;
+          detectedExt = fileTypeResult.ext;
+          console.log(
+            `Detected file type for ${fileRecord.filename}: ${detectedMimeType} (${detectedExt})`,
+          );
+        } else {
+          console.warn(
+            `Could not detect file type for ${fileRecord.filename}, falling back to extension-based detection`,
+          );
+        }
+      } catch (typeError) {
+        console.error("Error detecting file type:", typeError);
+        // Continue with extension-based detection as fallback
+      }
+
+      // Verify the detected file type matches allowed types
+      const getMimeTypeSafe = (filename: string, detectedMime?: string | null): string => {
+        const ext = path.extname(filename).toLowerCase();
+        const mimeTypes: { [key: string]: string } = {
+          ".txt": "text/plain",
+          ".pdf": "application/pdf",
+          ".doc": "application/msword",
+          ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ".xls": "application/vnd.ms-excel",
+          ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          ".ppt": "application/vnd.ms-powerpoint",
+          ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".svg": "image/svg+xml",
+          ".webp": "image/webp",
+          ".zip": "application/zip",
+          ".rar": "application/vnd.rar",
+          ".7z": "application/x-7z-compressed",
+          ".tar": "application/x-tar",
+          ".gz": "application/gzip",
+          ".mp3": "audio/mpeg",
+          ".mp4": "video/mp4",
+          ".avi": "video/x-msvideo",
+          ".mov": "video/quicktime",
+          ".wmv": "video/x-ms-wmv",
+          ".flv": "video/x-flv",
+          ".webm": "video/webm",
+          ".json": "application/json",
+          ".xml": "application/xml",
+          ".csv": "text/csv",
+        };
+
+        return detectedMime || mimeTypes[ext] || "application/octet-stream";
+      };
+
+      // Log successful access with actual file size
+      shareService.logAccess({
+        shareId,
+        ipAddress: clientIP,
+        userAgent: req.get("user-agent") || "unknown",
+        success: true,
+        bytesTransferred: fileRecord.size,
+      });
+
+      // Check stream limit before creating read stream
+      if (!streamTracker.canCreateStream()) {
+        console.warn(
+          `Stream limit exceeded (${streamTracker.getActiveCount()}/${streamTracker.getMaxStreams()}) for IP: ${clientIP}`,
+        );
+        cleanup();
+
+        shareService.logAccess({
+          shareId,
+          ipAddress: clientIP,
+          userAgent: req.get("user-agent") || "unknown",
+          success: false,
+          errorCode: "resource_unavailable",
+        });
+
+        sendErrorResponse(res, 503);
+        return;
+      }
+
+      // Prevent race conditions by using file descriptor-based access
+      // This ensures the file cannot be replaced between validation and reading
+      let fileDescriptor: number | null = null;
+      try {
+        // Open file with file descriptor to prevent TOCTOU (Time-of-check-time-of-use) race condition
+        fileDescriptor = fs.openSync(fileRecord.path, "r");
+
+        // Re-verify file stats after opening (extra security layer)
+        const stats = fs.fstatSync(fileDescriptor);
+        if (stats.nlink > 1) {
+          // Hardlink check after opening (prevents race condition)
+          throw new Error(`Potential hardlink attack: nlink=${stats.nlink}`);
+        }
+
+        if (stats.size !== fileRecord.size) {
+          // File size mismatch - potential attack
+          throw new Error(`File size mismatch: expected ${fileRecord.size}, got ${stats.size}`);
+        }
+      } catch (raceConditionError) {
+        if (fileDescriptor !== null) {
+          try {
+            fs.closeSync(fileDescriptor);
+          } catch (closeError) {
+            console.error("Error closing file descriptor:", closeError);
+          }
+        }
+
+        console.error("Race condition or security violation detected:", raceConditionError);
+        cleanup();
+
+        shareService.logAccess({
+          shareId,
+          ipAddress: clientIP,
+          userAgent: req.get("user-agent") || "unknown",
+          success: false,
+          errorCode: "file_not_found",
+        });
+
+        sendErrorResponse(res, 404);
+        return;
+      }
+
+      // Stream the file using fs.createReadStream to prevent memory exhaustion
+      // Set response headers
+      const mimeType = getMimeTypeSafe(fileRecord.filename, detectedMimeType);
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Content-Length", fileRecord.size.toString());
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(fileRecord.filename)}"`,
+      );
+      res.setHeader("Cache-Control", "private, no-transform, max-age=3600");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+
+      // Create read stream from file descriptor (prevents race conditions)
+      const readStream = fs.createReadStream("", { fd: fileDescriptor, autoClose: true });
+
+      // Add stream to tracker for memory management
+      streamTracker.addStream(readStream);
+
+      // Ensure file descriptor is closed when stream ends
+      readStream.on("end", () => {
+        console.log(
+          `File streamed successfully: ${fileRecord.filename} (${fileRecord.size} bytes)`,
+        );
+        cleanup();
+      });
+
+      readStream.on("error", (err) => {
+        console.error("Error reading file stream:", err);
+        cleanup();
+        if (!res.headersSent) {
+          sendErrorResponse(res, 500);
+        } else {
+          res.end();
+        }
+      });
+
+      // Handle response close event
+      res.on("close", () => {
+        if (!res.writableEnded) {
+          readStream.destroy();
+          cleanup();
+        }
+      });
+
+      // Pipe the stream to response
+      readStream.pipe(res);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      cleanup();
+      if (!res.headersSent) {
+        sendErrorResponse(res, 500);
+      }
+    }
+  };
+};
+
 export const createShareRoutes = (fileManager: FileManager): Router => {
+  // fileManager parameter is for API compatibility but not used in this route group
+  void fileManager;
   const router = Router();
 
   /**
@@ -50,7 +628,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
           shareId: share.shareId,
           fileId: share.fileId,
           createdBy: share.createdBy,
-          url: `${req.protocol}://${req.get("host")}/api/share/${share.shareId}/download`,
+          url: `${req.protocol}://${req.get("host")}/public/file/${share.shareId}`,
           ...(share.password && { password: share.password }),
           createdAt: share.createdAt.toISOString(),
           expiresAt: share.expiresAt.toISOString(),
@@ -339,172 +917,6 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
       }
     },
   );
-
-  /**
-   * GET /api/share/:shareId/download
-   * Download a shared file (external access)
-   */
-  router.get("/:shareId/download", rateLimitDownloadShare, async (req, res): Promise<void> => {
-    try {
-      const shareId = req.params.shareId as string;
-
-      // Validate share
-      const validation = shareService.validateShare(shareId);
-
-      if (!validation.isValid || !validation.share) {
-        // Return 404 for invalid/expired links
-        res.status(404).json({
-          success: false,
-          error: "NOT_FOUND",
-          message: "Share link not found or expired",
-        });
-        return;
-      }
-
-      // For password-protected shares, check if password is provided
-      if (validation.share.passwordHash) {
-        const authHeader = req.get("authorization");
-
-        if (!authHeader || !authHeader.startsWith("Basic ")) {
-          res.setHeader("WWW-Authenticate", 'Basic realm="Share Password Required"');
-
-          // Log failed access attempt
-          shareService.logAccess({
-            shareId,
-            ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-            userAgent: req.get("user-agent") || "unknown",
-            success: false,
-            errorCode: "wrong_password",
-          });
-
-          res.status(401).json({
-            success: false,
-            error: "AUTHENTICATION_REQUIRED",
-            message: "Password required to access this share",
-          });
-          return;
-        }
-
-        // Extract and verify password from Basic Auth
-        try {
-          const base64Credentials = authHeader!.split(" ")[1];
-          if (!base64Credentials) {
-            throw new Error("Invalid auth format");
-          }
-          const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
-          const [, password] = credentials.split(":");
-
-          // In Basic Auth, the password is in the "password" field
-          // We ignore the username part
-          if (!validation.share) {
-            throw new Error("Share not found");
-          }
-          const isValid = await shareService.comparePassword(
-            password || "",
-            validation.share.passwordHash!,
-          );
-
-          if (!isValid) {
-            // Log failed access attempt
-            shareService.logAccess({
-              shareId,
-              ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-              userAgent: req.get("user-agent") || "unknown",
-              success: false,
-              errorCode: "wrong_password",
-            });
-
-            res.status(401).json({
-              success: false,
-              error: "INVALID_CREDENTIALS",
-              message: "Incorrect password",
-            });
-            return;
-          }
-        } catch (error) {
-          // Log failed access attempt
-          shareService.logAccess({
-            shareId,
-            ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-            userAgent: req.get("user-agent") || "unknown",
-            success: false,
-            errorCode: "wrong_password",
-          });
-
-          res.status(401).json({
-            success: false,
-            error: "INVALID_CREDENTIALS",
-            message: "Invalid authentication format",
-          });
-          return;
-        }
-      }
-
-      // Update access statistics
-      if (validation.share) {
-        validation.share.accessCount++;
-        validation.share.lastAccessedAt = new Date();
-      }
-
-      // Get file from fileManager using the fileId from share
-      const fileRecord = fileManager.getFile(validation.share!.fileId);
-
-      if (!fileRecord) {
-        // Log failed access attempt
-        shareService.logAccess({
-          shareId,
-          ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-          userAgent: req.get("user-agent") || "unknown",
-          success: false,
-          errorCode: "file_not_found",
-        });
-
-        // Return 404 for missing files (but after logging)
-        res.status(404).json({
-          success: false,
-          error: "FILE_NOT_FOUND",
-          message: "File not found on server (may have been deleted)",
-        });
-        return;
-      }
-
-      // Log successful access with actual file size
-      shareService.logAccess({
-        shareId,
-        ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-        userAgent: req.get("user-agent") || "unknown",
-        success: true,
-        bytesTransferred: fileRecord.size,
-      });
-
-      // Stream the file using res.download
-      // res.download automatically sets:
-      // - Content-Disposition: attachment with original filename
-      // - Content-Type: based on file extension
-      // - Content-Length: file size
-      res.download(fileRecord.path, fileRecord.filename, (err) => {
-        if (err) {
-          console.error("Error streaming file:", err);
-          if (!res.headersSent) {
-            res.status(500).json({
-              success: false,
-              error: "DOWNLOAD_ERROR",
-              message: "Failed to download file",
-            });
-          }
-        }
-      });
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          error: "INTERNAL_ERROR",
-          message: "Failed to download file",
-        });
-      }
-    }
-  });
 
   /**
    * GET /api/share/:shareId/access

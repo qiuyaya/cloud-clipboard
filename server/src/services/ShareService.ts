@@ -17,7 +17,13 @@ export interface AccessLog {
   ipAddress: string;
   userAgent?: string;
   success: boolean;
-  errorCode?: "expired" | "invalid" | "wrong_password" | "file_not_found";
+  errorCode?:
+    | "expired"
+    | "invalid"
+    | "wrong_password"
+    | "file_not_found"
+    | "bandwidth_limit_exceeded"
+    | "resource_unavailable";
   bytesTransferred?: number;
 }
 

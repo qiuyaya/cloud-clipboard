@@ -9,8 +9,9 @@ import { SocketService } from "./services/SocketService";
 import { FileManager } from "./services/FileManager";
 import { createRoomRoutes } from "./routes/rooms";
 import { createFileRoutes } from "./routes/files";
-import { createShareRoutes } from "./routes/share";
+import { createShareRoutes, createShareDownloadHandler } from "./routes/share";
 import { generalRateLimit, strictRateLimit } from "./middleware/rateLimit";
+import { rateLimitPublicDownload } from "./middleware/rateLimiter";
 import { log } from "./utils/logger";
 import type { APIResponse } from "@cloud-clipboard/shared";
 
@@ -143,6 +144,16 @@ if (isProduction) {
 app.use("/api/rooms", createRoomRoutes(roomService));
 app.use("/api/files", createFileRoutes(fileManager));
 app.use("/api/share", createShareRoutes(fileManager));
+
+// Public file sharing routes (external access) with security middleware
+import { validateShareId } from "./routes/share";
+
+app.get(
+  "/public/file/:shareId",
+  validateShareId,
+  rateLimitPublicDownload,
+  createShareDownloadHandler(fileManager),
+);
 
 app.get("/api/health", (_req, res: express.Response<APIResponse>) => {
   const roomStats = roomService.getRoomStats();

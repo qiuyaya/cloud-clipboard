@@ -52,6 +52,44 @@ class SimpleRateLimiter {
   }
 }
 
+// Concurrent download tracker
+class ConcurrentLimitTracker {
+  private concurrentCounts: Map<string, number> = new Map();
+
+  increment(key: string): boolean {
+    const count = this.concurrentCounts.get(key) || 0;
+    const maxConcurrent = parseInt(process.env.MAX_CONCURRENT_DOWNLOADS || "5");
+
+    if (count >= maxConcurrent) {
+      return false;
+    }
+
+    this.concurrentCounts.set(key, count + 1);
+    return true;
+  }
+
+  decrement(key: string): void {
+    const count = this.concurrentCounts.get(key) || 0;
+
+    if (count <= 1) {
+      this.concurrentCounts.delete(key);
+    } else {
+      this.concurrentCounts.set(key, count - 1);
+    }
+  }
+
+  getCount(key: string): number {
+    return this.concurrentCounts.get(key) || 0;
+  }
+
+  getMaxConcurrent(): number {
+    return parseInt(process.env.MAX_CONCURRENT_DOWNLOADS || "5");
+  }
+}
+
+// Export singleton instance of concurrent tracker
+export const concurrentDownloadTracker = new ConcurrentLimitTracker();
+
 // Rate limiters for different endpoints
 const createShareLimiter = new SimpleRateLimiter(
   60 * 1000, // 1 minute
@@ -81,6 +119,12 @@ const accessLogsLimiter = new SimpleRateLimiter(
   60 * 1000, // 1 minute
   50, // 50 access log requests per minute
   "Too many access log requests. Please try again later.",
+);
+
+const publicDownloadLimiter = new SimpleRateLimiter(
+  60 * 1000, // 1 minute
+  parseInt(process.env.PUBLIC_DOWNLOAD_RATE_LIMIT || "20"), // Configurable rate limit, default 20
+  "Too many public download attempts. Please try again later.",
 );
 
 // Middleware factory
@@ -126,6 +170,7 @@ export const rateLimitDownloadShare = createRateLimitMiddleware(downloadShareLim
 export const rateLimitListShare = createRateLimitMiddleware(listShareLimiter);
 export const rateLimitRevokeShare = createRateLimitMiddleware(revokeShareLimiter);
 export const rateLimitAccessLogs = createRateLimitMiddleware(accessLogsLimiter);
+export const rateLimitPublicDownload = createRateLimitMiddleware(publicDownloadLimiter);
 
 // Also export the limiter instances for testing
 export {
@@ -134,4 +179,5 @@ export {
   listShareLimiter,
   revokeShareLimiter,
   accessLogsLimiter,
+  publicDownloadLimiter,
 };

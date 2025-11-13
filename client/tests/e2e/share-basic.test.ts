@@ -197,7 +197,7 @@ test.describe("Basic File Sharing", () => {
 
   test("should show error for invalid share link", async ({ page }) => {
     // Try to access a non-existent share link
-    const invalidUrl = "/api/share/invalid-share-id/download";
+    const invalidUrl = "/public/file/invalid-share-id";
 
     await page.goto(invalidUrl);
 
