@@ -171,12 +171,22 @@ const userWithDate = {
 
 **Room Password Protection**: Optional password protection for rooms with secure sharing functionality.
 
+**Share Management Page**: Complete file sharing management interface with:
+
+- **Navigation Access**: Accessible via Settings button in sidebar (desktop) or top navigation (mobile)
+- **Full i18n Support**: Complete internationalization with Chinese and English translations
+- **Theme Support**: Full dark/light theme adaptation
+- **Share Listing**: View all user shares with filtering (all, active, expired, revoked)
+- **Action Buttons**: Copy links, view access logs, and revoke shares with tooltips
+- **Lightweight Feedback**: GitHub-style tooltips replace intrusive toast notifications
+- **Status Management**: Clear visual indicators for share status
+- **Two-row Layout**: Optimized button layout for better spacing and alignment
+
 **Testing Framework**: Comprehensive test coverage with:
 
 - Unit tests for all modules
 - Integration tests for API endpoints
 - End-to-end tests for user flows
-- Automated test coverage reporting
 
 **Debug Logging System**: Configurable logging for both frontend and backend:
 
@@ -191,6 +201,58 @@ const userWithDate = {
 - Multiple favicon sizes (16x16, 32x32, 48x48, 180x180, 192x192, 512x512)
 - PWA manifest (`/client/public/site.webmanifest`) with proper theme colors
 - HTML files updated with proper favicon references and meta tags
+
+**External File Sharing**: Secure file sharing functionality that allows creating shareable links for files with advanced access control:
+
+- **Secure Share Links**: Generate unique 8-10 character share IDs for files
+- **Password Protection**: Optional password protection with auto-generated 6-character secure passwords
+- **Expiration Control**: Configurable expiration time from 1-30 days with user-friendly presets
+  - **UI Selection**: Users can choose from 1, 3, 7, 15, or 30 days via dropdown selector
+  - **Default Setting**: 7 days is the default expiration time
+  - **Full i18n Support**: Expiration options fully translated to Chinese and English
+- **Access Tracking**: Detailed access logs with IP addresses, timestamps, success/failure status, and bytes transferred
+- **Rate Limiting**: Independent rate limits for share creation (10/minute) and downloads (100/minute per IP)
+- **RESTful API**: Complete API for creating, managing, and deleting share links
+- **Direct Delete**: No intermediate "revoked" state - users can directly delete shares from active/expired lists
+- **Simplified Management**: Two-state system (active/expired) instead of three (active/expired/revoked)
+- **Security Features**: HTTPS encryption, input validation with Zod schemas
+- **Management Interface**: Web UI for managing shares, viewing access logs, and deleting links
+
+**Unified User Feedback System**: Consistent, lightweight feedback across the entire application:
+
+- **GitHub-style Tooltips**: All copy operations and key actions now use elegant, non-intrusive tooltips
+- **Automatic Dismissal**: Tooltips disappear after 2 seconds without user interaction
+- **Theme Adaptation**: Full support for light/dark theme with semantic color tokens
+- **Consistent Behavior**: Copy buttons for messages, shares, passwords, and links all use unified feedback
+- **Reduced Interference**: Eliminates disruptive toast notifications for minor actions
+- **Visual Polish**: Smooth fade-in and zoom animations for professional feel
+
+**Optimized Sidebar Layout**: Improved button organization for better usability:
+
+- **Two-row Design**: Functions with tooltips moved to bottom row to prevent horizontal space issues
+- **Aligned Icons**: Perfect vertical alignment between top and bottom rows
+- **Responsive Spacing**: Fixed spacing (16px) prevents excessive stretching on large screens
+- **Visual Hierarchy**: Related functions grouped logically with clear visual separation
+- **Mobile Optimization**: Maintained consistency across desktop and mobile layouts
+- **Larger Room Info**: Increased left padding for better room key and user count display
+
+**Friendly Timestamp Formatting**: Enhanced message time display with human-readable formats:
+
+- **Relative Time**: Messages within 1 hour show "刚刚" (just now) or "X分钟前" (X minutes ago)
+- **Daily Context**: Today's messages show only time (e.g., "12:11")
+- **Yesterday**: Yesterday's messages show "昨天 12:11"
+- **This Year**: Messages within current year show "MM月DD日" (e.g., "11月14日")
+- **Older Dates**: Full date-time format "YYYY/MM/DD HH:MM" for historical messages
+- **Simplified Communication**: Users instantly understand message recency without mental date calculation
+
+**Unified Message UI**: Streamlined message actions for better user experience:
+
+- **Text Messages**: Copy button moved from content area to top-right icon for cleaner interface
+- **File Messages**: Download and Share buttons consolidated to top-right corner as compact icons
+- **Hover Interaction**: Buttons hidden by default, appear on hover (desktop) or always visible (mobile)
+- **Space Optimization**: Eliminated redundant button containers, message cards now more compact
+- **Consistent Design**: Both text and file messages follow the same action button pattern
+- **Mobile-First**: Touch-friendly icon sizes (h-3.5 w-3.5) with proper spacing and accessibility
 
 **PWA Support**: Progressive Web App capabilities for enhanced user experience:
 
@@ -214,6 +276,8 @@ const userWithDate = {
 1. 更新 README.md 的功能特性列表（中英文）
 2. 更新 CLAUDE.md 的架构说明和新功能实现部分
 3. 如涉及API变更，更新相关接口文档
+4. 新增页面组件时，更新组件导航和访问方式说明
+5. UI/UX改进（如新反馈系统、布局调整）需同步文档
 
 **新增或修改命令时**:
 
@@ -225,12 +289,20 @@ const userWithDate = {
 
 1. 更新 CLAUDE.md 的架构说明
 2. 更新 README.md 的技术栈信息
-3. 如有重大变更，更新 CHANGELOG.md
+3. 依赖增删需更新 README.md 和 package.json 说明
+4. 如有重大变更，更新 CHANGELOG.md
 
 **新增环境变量时**:
 
 1. 更新 README.md 的环境变量部分
 2. 更新相关的配置说明文档
+
+**UI/UX重大改进时**:
+
+1. 添加新的交互模式说明
+2. 更新截图或示例（如果适用）
+3. 说明用户体验改进点
+4. 更新相关的最佳实践指南
 
 ### 文档一致性检查内容
 
@@ -240,11 +312,30 @@ const userWithDate = {
 - 功能特性文档与实际代码实现的匹配
 - 命令文档与 package.json scripts 的一致性
 - 架构说明与实际项目结构的对应
+- UI/UX改进与实际实现的符合度
+- 依赖变更与文档的同步
+
+### 文档更新优先级
+
+1. **高优先级**: 功能变更、架构调整、安全相关
+2. **中优先级**: UI/UX改进、用户体验优化
+3. **低优先级**: 内部实现细节、代码注释
 
 ### 最佳实践
 
 1. **功能开发**: 新功能完成后立即更新相关文档
-2. **定期维护**: 每次版本发布前全面检查文档完整性
-3. **命令更新**: 添加新的 npm/bun 脚本后立即更新文档
+2. **UI/UX改进**: 同时更新用户指南和开发者文档
+3. **定期维护**: 每次版本发布前全面检查文档完整性
+4. **命令更新**: 添加新的 npm/bun 脚本后立即更新文档
+5. **依赖管理**: 删除未使用依赖后清理相关文档引用
 
 遵循这些指南可以确保项目文档始终与代码实现保持同步，为后续开发和维护提供准确的参考。
+
+## Active Technologies
+
+- TypeScript 5.9.3 + Bun 1.x, Express.js, Socket.IO, Zod, React, Vite (001-external-file-sharing)
+- In-memory Map-based storage (server), Multer for file uploads (001-external-file-sharing)
+
+## Recent Changes
+
+- 001-external-file-sharing: Added TypeScript 5.9.3 + Bun 1.x, Express.js, Socket.IO, Zod, React, Vite

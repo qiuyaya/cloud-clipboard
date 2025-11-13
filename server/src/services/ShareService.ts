@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { generateShareId, validatePassword } from "@cloud-clipboard/shared";
 import type { ShareLink as IShareLink } from "@cloud-clipboard/shared";
 
@@ -7,7 +7,9 @@ import type { ShareLink as IShareLink } from "@cloud-clipboard/shared";
  * Handles share link creation, validation, streaming, and access logging
  */
 
-export type ShareLink = IShareLink;
+export type ShareLink = IShareLink & {
+  password?: string; // Plain text password for display only
+};
 
 export interface AccessLog {
   shareId: string;
@@ -15,7 +17,7 @@ export interface AccessLog {
   ipAddress: string;
   userAgent?: string;
   success: boolean;
-  errorCode?: "expired" | "invalid" | "wrong_password" | "file_not_found" | "revoked";
+  errorCode?: "expired" | "invalid" | "wrong_password" | "file_not_found";
   bytesTransferred?: number;
 }
 
@@ -24,15 +26,27 @@ export class ShareService {
   private accessLogs: Map<string, AccessLog[]> = new Map();
 
   /**
-   * Create a new share link
+   * Generate a random 6-character password
+   */
+  private generateRandomPassword(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    let password = "";
+    for (let i = 0; i < 6; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  }
+
+  /**
+   * Create a new share link with optional auto-generated password
    */
   async createShare(params: {
     fileId: string;
     createdBy: string;
-    password?: string;
     expiresInDays?: number;
+    enablePassword?: boolean;
   }): Promise<ShareLink> {
-    const { fileId, createdBy, password, expiresInDays = 7 } = params;
+    const { fileId, createdBy, expiresInDays = 7, enablePassword = false } = params;
 
     // Generate unique share ID
     const shareId = generateShareId();
@@ -47,28 +61,25 @@ export class ShareService {
       fileId,
       createdAt: new Date(),
       expiresAt,
-      passwordHash: null, // Will be set below if password provided
+      passwordHash: null, // Will be set if password is enabled
       accessCount: 0,
       lastAccessedAt: null,
       isActive: true,
       createdBy,
     };
 
-    // Hash password if provided
-    if (password) {
-      // Validate password complexity
-      const validation = validatePassword(password);
-      if (!validation.isValid) {
-        throw new Error(`Password validation failed: ${validation.errors.join(", ")}`);
-      }
-
+    // Generate password if enabled
+    let password: string | undefined = undefined;
+    if (enablePassword) {
+      password = this.generateRandomPassword();
       share.passwordHash = await this.hashPassword(password);
     }
 
     // Store share link
     this.shares.set(shareId, share);
 
-    return share;
+    // Return share with the plain password for display (if generated)
+    return password ? { ...share, password } : share;
   }
 
   /**
@@ -93,7 +104,7 @@ export class ShareService {
       return {
         isValid: false,
         share,
-        errorCode: "revoked",
+        errorCode: "invalid",
       };
     }
 
@@ -237,6 +248,27 @@ export class ShareService {
     }
 
     share.isActive = false;
+    return true;
+  }
+
+  /**
+   * Permanently delete a share link
+   */
+  deleteShare(shareId: string, userId: string): boolean {
+    const share = this.shares.get(shareId);
+
+    if (!share) {
+      return false;
+    }
+
+    // Check if user owns this share
+    if (share.createdBy !== userId) {
+      return false;
+    }
+
+    // Delete share and its access logs
+    this.shares.delete(shareId);
+    this.accessLogs.delete(shareId);
     return true;
   }
 

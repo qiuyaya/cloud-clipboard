@@ -47,8 +47,6 @@ export class FileManager {
       this.roomFiles.set(fileRecord.roomKey, new Set());
     }
     this.roomFiles.get(fileRecord.roomKey)!.add(fileRecord.id);
-
-    console.log(`File ${fileRecord.filename} tracked for room ${fileRecord.roomKey}`);
   }
 
   getFile(fileId: string): FileRecord | undefined {

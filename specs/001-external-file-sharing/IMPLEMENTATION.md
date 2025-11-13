@@ -56,7 +56,6 @@
 - `client/src/services/shareApi.ts` - API client for share operations
 - `client/src/components/Share/ShareButton.tsx` - Share button component
 - `client/src/components/Share/ShareModal.tsx` - Share modal component
-- `client/src/pages/ShareDemo.tsx` - Demo page for testing
 - `.eslintignore` - ESLint ignore patterns
 
 **Shared**:

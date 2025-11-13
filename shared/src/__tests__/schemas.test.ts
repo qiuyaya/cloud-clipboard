@@ -196,8 +196,21 @@ describe("Schema Validation Tests", () => {
     });
 
     it("should validate file type format", () => {
-      const validTypes = ["text/plain", "image/jpeg", "application/pdf"];
-      const invalidTypes = ["invalid type", "text@plain", "", "a".repeat(101)];
+      // Any non-empty string under 100 characters is now valid
+      const validTypes = [
+        "text/plain",
+        "image/jpeg",
+        "application/pdf",
+        "text@plain",
+        "invalid type",
+        "custom.format",
+        "my-file-type_123",
+      ];
+
+      const invalidTypes = [
+        "", // Empty string
+        "a".repeat(101), // Too long
+      ];
 
       validTypes.forEach((type) => {
         expect(() => FileInfoSchema.parse({ ...validFileInfo, type })).not.toThrow();

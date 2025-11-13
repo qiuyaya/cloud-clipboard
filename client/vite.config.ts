@@ -2,10 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",
@@ -21,7 +17,7 @@ export default defineConfig({
         theme_color: "#6366f1",
         background_color: "#ffffff",
         display: "standalone",
-        orientation: "any",
+        orientation: "portrait",
         scope: process.env.VITE_BASE_PATH || "/",
         start_url: process.env.VITE_BASE_PATH || "/",
         icons: [
@@ -100,31 +96,6 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  },
-  build: {
-    // 构建性能优化
-    target: "es2015",
-    minify: "terser",
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
-    // 启用多核并行构建
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ["react", "react-dom"],
-          ui: ["@radix-ui/react-dialog", "@radix-ui/react-toast", "@radix-ui/react-dropdown-menu"],
-          socket: ["socket.io-client"],
-        },
-      },
-    },
-    // 调整chunk大小警告限制
-    chunkSizeWarningLimit: 1000,
-    // 启用Source Map（生产环境）
-    sourcemap: false,
   },
   server: {
     port: 3000,

@@ -47,42 +47,11 @@ const upload = multer({
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
-    // Security: Only allow safe file types
-    const allowedMimeTypes = [
-      "text/plain",
-      "text/csv",
-      "text/html",
-      "text/css",
-      "text/javascript",
-      "application/json",
-      "application/xml",
-      "application/pdf",
-      "application/zip",
-      "application/x-zip-compressed",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "application/msword",
-      "application/vnd.ms-excel",
-      "application/vnd.ms-powerpoint",
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "image/svg+xml",
-      "audio/mpeg",
-      "audio/wav",
-      "audio/ogg",
-      "audio/mp4",
-      "video/mp4",
-      "video/mpeg",
-      "video/quicktime",
-      "video/x-msvideo",
-      "video/webm",
-    ];
+    // Get file extension (lowercase)
+    const fileExtension = path.extname(file.originalname).toLowerCase();
 
-    const dangerousExtensions = [
+    // Dangerous extensions that could be used for attacks
+    const dangerousExtensions = new Set([
       ".exe",
       ".bat",
       ".cmd",
@@ -95,36 +64,53 @@ const upload = multer({
       ".bash",
       ".ps1",
       ".vbs",
-      ".js",
       ".php",
       ".asp",
       ".aspx",
       ".jsp",
-    ];
+      ".py",
+      ".rb",
+      ".pl",
+      ".c",
+      ".cpp",
+      ".cs",
+      ".java",
+      ".go",
+      ".rs",
+      ".swift",
+      ".dll",
+      ".so",
+      ".dylib",
+      ".app",
+      ".deb",
+      ".rpm",
+      ".dmg",
+    ]);
 
-    // Check MIME type
-    if (!allowedMimeTypes.includes(file.mimetype.toLowerCase())) {
-      cb(new Error(`File type ${file.mimetype} is not allowed`));
-      return;
-    }
-
-    // Check file extension
-    const fileExtension = path.extname(file.originalname).toLowerCase();
-    if (dangerousExtensions.includes(fileExtension)) {
+    // Check dangerous file extensions first
+    if (dangerousExtensions.has(fileExtension)) {
       cb(new Error(`File extension ${fileExtension} is not allowed`));
       return;
     }
 
-    // Additional filename validation
+    // Additional filename validation to prevent path traversal
     if (
       file.originalname.includes("..") ||
       file.originalname.includes("/") ||
-      file.originalname.includes("\\")
+      file.originalname.includes("\\") ||
+      file.originalname.includes(":") ||
+      file.originalname.includes("*") ||
+      file.originalname.includes("?") ||
+      file.originalname.includes('"') ||
+      file.originalname.includes("<") ||
+      file.originalname.includes(">") ||
+      file.originalname.includes("|")
     ) {
       cb(new Error("Invalid filename"));
       return;
     }
 
+    // Allow any file type except dangerous extensions
     cb(null, true);
   },
 });

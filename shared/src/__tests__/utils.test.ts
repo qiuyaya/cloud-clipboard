@@ -190,21 +190,34 @@ describe("Utility Functions Tests", () => {
     it("should format Date objects correctly", () => {
       const date = new Date("2024-01-15T10:30:45Z");
       const formatted = formatTimestamp(date);
-      expect(formatted).toMatch(/Jan 15, 2024/);
-      expect(formatted).toMatch(/\d{2}:\d{2}:\d{2}/);
+      // New format: shows date with time, can be "MM月DD日" or full date
+      expect(formatted).toMatch(/1月15日|2024\/01\/15|10:30/);
     });
 
     it("should format date strings correctly", () => {
       const dateString = "2024-01-15T10:30:45Z";
       const formatted = formatTimestamp(dateString);
-      expect(formatted).toMatch(/Jan 15, 2024/);
-      expect(formatted).toMatch(/\d{2}:\d{2}:\d{2}/);
+      expect(formatted).toMatch(/1月15日|2024\/01\/15|10:30/);
     });
 
     it("should handle invalid dates", () => {
       expect(formatTimestamp("invalid-date")).toBe("Invalid Date");
       expect(formatTimestamp("")).toBe("Invalid Date");
       expect(formatTimestamp(new Date("invalid"))).toBe("Invalid Date");
+    });
+
+    it("should show '刚刚' for very recent dates", () => {
+      const now = new Date();
+      const recentDate = new Date(now.getTime() - 10000); // 10 seconds ago
+      const formatted = formatTimestamp(recentDate);
+      expect(formatted).toBe("刚刚");
+    });
+
+    it("should show relative time for minutes", () => {
+      const now = new Date();
+      const minutesAgo = new Date(now.getTime() - 5 * 60000); // 5 minutes ago
+      const formatted = formatTimestamp(minutesAgo);
+      expect(formatted).toBe("5分钟前");
     });
   });
 

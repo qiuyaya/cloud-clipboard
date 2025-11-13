@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-import fs from "fs";
 
 test.describe("Basic File Sharing", () => {
   test.beforeEach(async ({ page }) => {
@@ -25,19 +24,15 @@ test.describe("Basic File Sharing", () => {
     });
 
     // Step 2: Upload a test file
-    // Create a test file
-    const testFileContent = "This is a test file for sharing!";
-    const testFile = await test.step("Create test file", async () => {
-      const fileBlob = new Blob([testFileContent], { type: "text/plain" });
-      const filePath = "test-file-" + Date.now() + ".txt";
-      const fsImport = fs;
-      fsImport.writeFileSync(filePath, testFileContent);
-      return filePath;
-    });
+    const testFileName = "test-file-" + Date.now() + ".txt";
 
-    // Upload the file using file input
+    // Upload the file using file input - Playwright will create a temporary file
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("This is a test file for sharing!"),
+    });
 
     // Wait for file to appear in messages
     await expect(page.getByText("test-file-")).toBeVisible({
@@ -139,13 +134,14 @@ test.describe("Basic File Sharing", () => {
     });
 
     // Step 2: Create and upload a test file
-    const testFileContent = "Password protected test file!";
-    const fsImport = fs;
-    const testFile = "test-password-file-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, testFileContent);
+    const testFileName = "test-password-file-" + Date.now() + ".txt";
 
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("Password protected test file!"),
+    });
 
     await expect(page.getByText("test-password-file-")).toBeVisible({
       timeout: 10000,
@@ -158,18 +154,9 @@ test.describe("Basic File Sharing", () => {
       .first();
     await shareButton.click();
 
-    // Step 4: Enable password protection
+    // Step 4: Create share link (password is auto-generated)
     await expect(page.getByText("Share File")).toBeVisible();
 
-    const addPasswordLink = page.getByText(/add password protection/i);
-    await addPasswordLink.click();
-
-    // Step 5: Enter a secure password
-    const passwordInput = page.locator('input[type="password"]');
-    const securePassword = "SecurePass123!";
-    await passwordInput.fill(securePassword);
-
-    // Step 6: Create share link
     const createButton = page.getByRole("button", { name: /create share link/i });
     await createButton.click();
 
@@ -178,7 +165,8 @@ test.describe("Basic File Sharing", () => {
       timeout: 5000,
     });
 
-    // Step 7: Verify password protection is indicated
+    // Step 5: Verify password protection is indicated
+    // Password is always auto-generated, so it should be password protected
     await expect(page.getByText(/password protected: yes/i)).toBeVisible();
 
     // Get the share URL
@@ -235,9 +223,8 @@ test.describe("Basic File Sharing", () => {
     });
 
     // Create and upload file
-    const fsImport = fs;
     const testFile = "test-copy-file-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, "Copy test file");
+    fs.writeFileSync(testFile, "Copy test file");
 
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(testFile);

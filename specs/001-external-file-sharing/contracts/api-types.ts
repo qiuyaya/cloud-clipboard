@@ -25,7 +25,7 @@ export interface ShareLinkSummary {
   fileSize: number; // bytes
   createdAt: string; // ISO 8601 date-time
   expiresAt: string; // ISO 8601 date-time
-  status: 'active' | 'expired' | 'revoked';
+  status: "active" | "expired" | "revoked";
   accessCount: number;
   hasPassword: boolean;
 }
@@ -41,7 +41,7 @@ export interface AccessLogEntry {
   ipAddress: string;
   userAgent?: string | null;
   success: boolean;
-  errorCode?: 'expired' | 'invalid' | 'wrong_password' | 'file_not_found' | 'revoked' | null;
+  errorCode?: "expired" | "invalid" | "wrong_password" | "file_not_found" | "revoked" | null;
   bytesTransferred?: number; // Only for successful downloads
 }
 
@@ -77,18 +77,18 @@ export const HttpStatus = {
 
 // Error codes
 export const ErrorCodes = {
-  INVALID_FILE: 'INVALID_FILE',
-  WEAK_PASSWORD: 'WEAK_PASSWORD',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  NOT_FOUND: 'NOT_FOUND',
-  RATE_LIMITED: 'RATE_LIMITED',
-  SHARE_EXPIRED: 'SHARE_EXPIRED',
-  SHARE_REVOKED: 'SHARE_REVOKED',
+  INVALID_FILE: "INVALID_FILE",
+  WEAK_PASSWORD: "WEAK_PASSWORD",
+  UNAUTHORIZED: "UNAUTHORIZED",
+  NOT_FOUND: "NOT_FOUND",
+  RATE_LIMITED: "RATE_LIMITED",
+  SHARE_EXPIRED: "SHARE_EXPIRED",
+  SHARE_REVOKED: "SHARE_REVOKED",
 } as const;
 
 // Query parameter types for list operations
 export interface ListShareLinksQuery {
-  status?: 'active' | 'expired' | 'revoked' | 'all';
+  status?: "active" | "expired" | "revoked" | "all";
   limit?: number; // 1-100, default: 20
   offset?: number; // >= 0, default: 0
 }

@@ -1,6 +1,7 @@
 import React from "react";
 import { RoomJoin } from "@/components/RoomJoin";
 import { ClipboardRoom } from "@/components/ClipboardRoom";
+import { SharePage } from "@/pages/SharePage";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { Toaster } from "@/components/ui/toaster";
@@ -56,6 +57,27 @@ export function App(): JSX.Element {
     roomKey,
   });
 
+  const [showSharePage, setShowSharePage] = React.useState(false);
+
+  const handleNavigateToShare = () => {
+    setShowSharePage(true);
+  };
+
+  const handleBackFromShare = () => {
+    setShowSharePage(false);
+  };
+
+  if (showSharePage && currentUser) {
+    return (
+      <>
+        <SharePage userId={currentUser.id} onBack={handleBackFromShare} />
+        <PWAInstallPrompt />
+        <PWAUpdatePrompt />
+        <Toaster />
+      </>
+    );
+  }
+
   if (!currentUser || !roomKey) {
     return (
       <>
@@ -85,6 +107,7 @@ export function App(): JSX.Element {
         onLeaveRoom={handleLeaveRoom}
         onSetRoomPassword={handleSetRoomPassword}
         onShareRoomLink={handleShareRoomLink}
+        onNavigateToShare={handleNavigateToShare}
         hasRoomPassword={hasRoomPassword}
       />
       <PWAInstallPrompt />

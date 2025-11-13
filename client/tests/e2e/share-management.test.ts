@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-import fs from "fs";
 
 test.describe("Share Management", () => {
   test.beforeEach(async ({ page }) => {
@@ -20,14 +19,16 @@ test.describe("Share Management", () => {
     });
 
     // Step 2: Upload a file
-    const fsImport = fs;
-    const testFile = "test-share-management-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, "Test file for management");
+    const testFileName = "test-share-management-" + Date.now() + ".txt";
 
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("Test file for management"),
+    });
 
-    await expect(page.getByText(testFile)).toBeVisible({
+    await expect(page.getByText(testFileName)).toBeVisible({
       timeout: 10000,
     });
 
@@ -82,14 +83,16 @@ test.describe("Share Management", () => {
 
     // Create multiple shares with different statuses
     for (let i = 0; i < 3; i++) {
-      const fsImport = fs;
-      const testFile = `test-filter-${i}-${Date.now()}.txt`;
-      fsImport.writeFileSync(testFile, `Test file ${i}`);
+      const testFileName = `test-filter-${i}-${Date.now()}.txt`;
 
       const fileInput = page.locator('input[type="file"]');
-      await fileInput.setInputFiles(testFile);
+      await fileInput.setInputFiles({
+        name: testFileName,
+        mimeType: "text/plain",
+        buffer: Buffer.from(`Test file ${i}`),
+      });
 
-      await expect(page.getByText(testFile)).toBeVisible();
+      await expect(page.getByText(testFileName)).toBeVisible();
 
       const shareButton = page
         .getByRole("button")
@@ -121,14 +124,16 @@ test.describe("Share Management", () => {
     });
 
     // Create share
-    const fsImport = fs;
-    const testFile = "test-logs-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, "Test file for logs");
+    const testFileName = "test-logs-" + Date.now() + ".txt";
 
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("Test file for logs"),
+    });
 
-    await expect(page.getByText(testFile)).toBeVisible();
+    await expect(page.getByText(testFileName)).toBeVisible();
 
     const shareButton = page
       .getByRole("button")
@@ -173,14 +178,16 @@ test.describe("Share Management", () => {
     });
 
     // Create share
-    const fsImport = fs;
-    const testFile = "test-revoke-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, "Test file to revoke");
+    const testFileName = "test-revoke-" + Date.now() + ".txt";
 
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("Test file to revoke"),
+    });
 
-    await expect(page.getByText(testFile)).toBeVisible();
+    await expect(page.getByText(testFileName)).toBeVisible();
 
     const shareButton = page
       .getByRole("button")
@@ -224,14 +231,16 @@ test.describe("Share Management", () => {
     });
 
     // Create share
-    const fsImport = fs;
-    const testFile = "test-copy-clipboard-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, "Test file");
+    const testFileName = "test-copy-clipboard-" + Date.now() + ".txt";
 
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("Test file"),
+    });
 
-    await expect(page.getByText(testFile)).toBeVisible();
+    await expect(page.getByText(testFileName)).toBeVisible();
 
     const shareButton = page
       .getByRole("button")
@@ -267,14 +276,16 @@ test.describe("Share Management", () => {
     });
 
     // Create share with password
-    const fsImport = fs;
-    const testFile = "test-password-" + Date.now() + ".txt";
-    fsImport.writeFileSync(testFile, "Password protected file");
+    const testFileName = "test-password-" + Date.now() + ".txt";
 
     const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(testFile);
+    await fileInput.setInputFiles({
+      name: testFileName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("Password protected file"),
+    });
 
-    await expect(page.getByText(testFile)).toBeVisible();
+    await expect(page.getByText(testFileName)).toBeVisible();
 
     const shareButton = page
       .getByRole("button")
@@ -282,13 +293,7 @@ test.describe("Share Management", () => {
       .first();
     await shareButton.click();
 
-    // Enable password
-    const addPasswordLink = page.getByText(/add password protection/i);
-    await addPasswordLink.click();
-
-    const passwordInput = page.locator('input[type="password"]');
-    await passwordInput.fill("SecurePass123!");
-
+    // Create share (password is auto-generated)
     const createButton = page.getByRole("button", { name: /create share link/i });
     await createButton.click();
 
@@ -297,6 +302,7 @@ test.describe("Share Management", () => {
     });
 
     // Verify password protection is indicated
+    // Password is always auto-generated, so it should be password protected
     await expect(page.getByText(/password protected: yes/i)).toBeVisible();
   });
 });

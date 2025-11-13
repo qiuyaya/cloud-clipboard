@@ -192,6 +192,13 @@ export const useSocketConnection = ({
     };
 
     const handleMessage = (message: TextMessage | FileMessage) => {
+      debug.info("Received message", {
+        type: message.type,
+        id: message.id,
+        sender: message.sender.name,
+        roomKey: message.roomKey,
+      });
+
       const messageWithDate = {
         ...message,
         timestamp:
@@ -204,7 +211,15 @@ export const useSocketConnection = ({
               : message.sender.lastSeen,
         },
       };
-      callbacksRef.current.onSetMessages((prev) => [...prev, messageWithDate]);
+
+      debug.debug("Updating messages state", {
+        currentCount: callbacksRef.current.onSetMessages.length,
+      });
+      callbacksRef.current.onSetMessages((prev) => {
+        const newMessages = [...prev, messageWithDate];
+        debug.info("Messages updated", { oldCount: prev.length, newCount: newMessages.length });
+        return newMessages;
+      });
     };
 
     const handleUserJoined = (user: User) => {
@@ -238,14 +253,14 @@ export const useSocketConnection = ({
             callbacksRef.current.fetchRoomMessages(currentRoomKey);
           }
 
-          setTimeout(() => {
-            toast({
-              title: t("toast.joinedRoom"),
-              description: t("toast.joinedRoomDesc", {
-                roomKey: currentRoomKey,
-              }),
-            });
-          }, 100);
+          // setTimeout(() => {
+          //   toast({
+          //     title: t("toast.joinedRoom"),
+          //     description: t("toast.joinedRoomDesc", {
+          //       roomKey: currentRoomKey,
+          //     }),
+          //   });
+          // }, 100);
           return userWithDate;
         } else if (prev.id !== userWithDate.id) {
           setTimeout(() => {
@@ -359,28 +374,12 @@ export const useSocketConnection = ({
 
     const handleRoomPasswordSet = (data: { roomKey: string; hasPassword: boolean }) => {
       callbacksRef.current.onSetHasRoomPassword(data.hasPassword);
-      toast({
-        title: data.hasPassword ? t("toast.passwordSet") : t("toast.passwordRemoved"),
-        description: data.hasPassword ? t("toast.passwordSetDesc") : t("toast.passwordRemovedDesc"),
-      });
+      // Removed toast - UI will handle feedback
     };
 
     const handleRoomLinkGenerated = (data: { roomKey: string; shareLink: string }) => {
-      navigator.clipboard
-        .writeText(data.shareLink)
-        .then(() => {
-          toast({
-            title: t("toast.linkCopied"),
-            description: t("toast.linkCopiedDesc"),
-          });
-        })
-        .catch(() => {
-          toast({
-            variant: "destructive",
-            title: t("toast.error"),
-            description: t("toast.linkCopyFailed"),
-          });
-        });
+      // Removed automatic copy and toast - UI will handle both
+      // This allows UI to show tooltip directly
     };
 
     socket.on("connect", handleConnect);

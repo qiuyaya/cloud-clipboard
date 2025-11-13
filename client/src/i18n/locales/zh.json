@@ -79,8 +79,6 @@
     "joinedRoomDesc": "已连接到房间：{{roomKey}}",
     "leftRoom": "已离开房间",
     "leftRoomDesc": "您已离开房间",
-    "fileUploaded": "文件已上传",
-    "fileUploadedDesc": "{{name}} 上传成功",
     "connectionError": "连接错误",
     "notConnected": "未连接到服务器。请重试。",
     "error": "错误",
@@ -130,5 +128,124 @@
     "offlineTitle": "离线就绪",
     "offlineDescription": "应用已准备好离线工作",
     "close": "关闭"
+  },
+  "share": {
+    "button": "分享",
+    "modal": {
+      "title": "分享文件",
+      "createdTitle": "分享链接已创建！",
+      "createButton": "创建分享链接",
+      "creating": "创建中...",
+      "urlLabel": "分享链接",
+      "expiresInDays": {
+        "label": "过期时间",
+        "placeholder": "选择过期时间",
+        "1day": "1 天",
+        "3days": "3 天",
+        "7days": "7 天",
+        "15days": "15 天",
+        "30days": "30 天",
+        "description": "分享链接将在所选时间后过期"
+      },
+      "expires": {
+        "7days": "7 天",
+        "label": "{{days}} 天后过期"
+      },
+      "status": {
+        "protected": "受保护",
+        "public": "公开"
+      },
+      "password": {
+        "title": "自动生成密钥",
+        "description": "系统将为该分享自动生成一个6位安全密钥",
+        "label": "密钥",
+        "copy": "复制密钥",
+        "generatedHint": "此密钥由系统自动生成，确保安全性"
+      },
+      "actions": {
+        "copy": "复制链接",
+        "test": "预览链接",
+        "createAnother": "创建另一个分享"
+      },
+      "toast": {
+        "createFailed": "创建分享链接失败"
+      },
+      "info": {
+        "created": "创建时间：{{time}}",
+        "expires": "过期时间：{{date}}",
+        "passwordProtected": "密钥保护：{{value}}",
+        "accessCount": "访问次数：{{count}}"
+      },
+      "errors": {
+        "createFailed": "创建分享链接失败",
+        "passwordRequired": "请输入密钥",
+        "passwordTooShort": "密钥至少需要6个字符"
+      }
+    },
+    "list": {
+      "title": "分享管理",
+      "description": "管理您的文件分享链接，查看访问日志",
+      "filters": {
+        "all": "全部",
+        "active": "活跃",
+        "expired": "已过期"
+      },
+      "empty": "未找到分享",
+      "loading": "加载中...",
+      "actions": {
+        "copy": "复制分享链接",
+        "logs": "查看访问日志",
+        "delete": "删除分享"
+      },
+      "status": {
+        "active": "活跃",
+        "expired": "已过期"
+      },
+      "fields": {
+        "filename": "文件名",
+        "created": "创建时间",
+        "expires": "过期时间",
+        "downloads": "下载次数",
+        "size": "文件大小",
+        "url": "分享链接"
+      },
+      "logs": {
+        "title": "访问日志 - {{filename}}",
+        "success": "成功",
+        "failed": "失败",
+        "empty": "未找到访问日志",
+        "fields": {
+          "timestamp": "时间",
+          "ip": "IP地址",
+          "userAgent": "用户代理",
+          "bytesTransferred": "传输大小"
+        }
+      },
+      "confirm": {
+        "deleteTitle": "删除分享链接",
+        "deleteMessage": "确定要永久删除这个分享链接吗？此操作不可恢复。",
+        "deleteButton": "删除",
+        "cancelButton": "取消"
+      },
+      "toast": {
+        "copySuccess": "分享链接已复制到剪贴板",
+        "loadFailed": "加载分享失败",
+        "logsLoadFailed": "加载访问日志失败",
+        "retry": "重试",
+        "deleteFailed": "删除分享失败"
+      }
+    },
+    "page": {
+      "back": "返回"
+    },
+    "download": {
+      "passwordRequired": "需要密钥",
+      "passwordPrompt": "请输入密钥以访问此分享",
+      "passwordPlaceholder": "密钥",
+      "submit": "提交",
+      "cancel": "取消",
+      "incorrectPassword": "密钥不正确",
+      "authFailed": "身份验证失败"
+    }
   }
 }

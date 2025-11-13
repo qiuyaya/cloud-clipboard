@@ -9,9 +9,20 @@ _中文 | [English](#english)_
 - 🔐 **安全房间认证** - 输入相同的房间密钥加入并共享数据
 - 📝 **文本共享** - 在设备间即时复制和粘贴文本
 - 📁 **文件共享** - 上传和下载最大100MB的文件
+- 🔗 **外部文件分享** - 创建安全的外部分享链接，支持密码保护和访问控制
+  - 📊 **分享管理页面** - 完整的外部分享链接管理界面
+  - ⏰ **自定义过期时间** - 可选择1/3/7/15/30天过期时间，默认7天
+  - 🔍 **访问日志** - 查看文件下载记录和访问统计
+  - 🏷️ **状态筛选** - 按活跃/过期状态筛选分享（简化为双状态）
+  - ⚡ **快速操作** - 一键复制链接、直接删除、查看日志
+  - 🎯 **简化管理** - 移除中间撤销状态，支持直接删除分享
 - 🔄 **实时同步** - 基于WebSocket的即时同步
 - 🌐 **P2P支持** - 局域网连接的直接文件传输
 - 🎨 **现代UI** - 使用React、Tailwind CSS和shadcn/ui构建的精美界面
+  - 🌙 **优雅反馈** - GitHub风格的轻量级提示，不打扰用户操作
+  - 📐 **优化布局** - 两行按钮布局，图标完美对齐，间距合理
+  - ⏰ **友好时间** - 智能时间格式：刚刚、X分钟前、昨天 HH:MM、MM月DD日
+  - 🎯 **统一交互** - 文本和文件消息操作按钮统一移至右上角，简洁优雅
 - ⚡ **快速可靠** - 使用Bun、TypeScript构建，具有严格的类型检查
 - 📱 **跨平台** - 适用于桌面、平板和移动设备
 - 🔄 **持久会话** - 浏览器刷新后自动重新加入房间
@@ -118,12 +129,24 @@ bun run start
 
 ## 📖 使用方法
 
+### 房间内共享
+
 1. **加入房间**: 输入房间密钥（任意字符串）和您的姓名
 2. **共享文本**: 输入或粘贴文本并点击发送
 3. **共享文件**: 点击文件按钮上传文件（最大100MB）
 4. **复制文本**: 点击任何文本消息上的复制按钮
 5. **下载文件**: 点击文件消息上的下载按钮
 6. **多用户协作**: 与他人共享相同的房间密钥进行协作
+
+### 外部文件分享
+
+1. **创建分享链接**: 在文件消息上点击"创建分享"按钮
+2. **设置访问控制**:
+   - 可选择设置密码保护（自动生成6位安全密码）
+   - 设置过期时间（1-30天，默认7天）
+3. **分享文件**: 获取安全的分享链接，可分享给任何人
+4. **外部访问**: 访问者可通过分享链接直接下载文件
+5. **管理分享**: 查看访问日志、获取链接详细信息或直接删除分享
 
 ## 🔧 调试功能
 
@@ -170,6 +193,8 @@ bun run server:dev
 
 ## 📁 文件传输
 
+### 房间内传输
+
 - **服务器上传**: 文件上传到服务器进行共享
 - **智能管理**: 按房间分组存储，支持自动清理
 - **保留策略**: 12小时最大保留时间，房间销毁时自动删除
@@ -177,6 +202,16 @@ bun run server:dev
 - **P2P传输**: 局域网中设备间直接传输（WebRTC）
 - **大小限制**: 最大文件大小100MB
 - **类型支持**: 支持所有文件类型
+
+### 外部文件分享
+
+- **安全链接**: 创建带唯一ID的安全分享链接（8-10字符）
+- **密码保护**: 自动生成6位安全密码，无需用户记忆复杂密码
+- **过期控制**: 1-30天可配置过期时间，默认7天
+- **访问跟踪**: 详细的访问日志记录（IP地址、时间戳、成功/失败）
+- **速率限制**: 独立的下载速率限制保护
+- **简化管理**: 支持直接删除分享，无需中间撤销状态
+- **安全传输**: HTTPS加密传输
 
 ## 🌍 环境变量
 
@@ -195,6 +230,13 @@ bun run server:dev
 - `FILE_RETENTION_HOURS` - 文件保留时间（默认：12小时）
 - `RATE_LIMIT_WINDOW_MS` - 速率限制窗口（默认：60000 = 1分钟）
 - `RATE_LIMIT_MAX_REQUESTS` - 每窗口最大请求数（默认：100）
+- `SHARE_RATE_LIMIT_WINDOW_MS` - 创建分享链接速率限制窗口（默认：60000 = 1分钟）
+- `SHARE_RATE_LIMIT_MAX_REQUESTS` - 创建分享链接每窗口最大请求数（默认：10）
+- `DOWNLOAD_RATE_LIMIT_WINDOW_MS` - 下载速率限制窗口（默认：60000 = 1分钟）
+- `DOWNLOAD_RATE_LIMIT_MAX_REQUESTS` - 下载每窗口最大请求数（默认：100）
+- `SHARE_DEFAULT_EXPIRY_DAYS` - 分享链接默认过期天数（默认：7）
+- `SHARE_MAX_EXPIRY_DAYS` - 分享链接最大过期天数（默认：30）
+- `SHARE_MIN_PASSWORD_LENGTH` - 密码保护最小密码长度（默认：8）
 
 ### 客户端
 
@@ -274,9 +316,20 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 🔐 **Secure Room Authentication** - Enter the same room key to join and share data
 - 📝 **Text Sharing** - Copy and paste text instantly across devices
 - 📁 **File Sharing** - Upload and download files up to 100MB
+- 🔗 **External File Sharing** - Create secure external share links with password protection and access control
+  - 📊 **Share Management** - Complete external share link management interface
+  - ⏰ **Expiration Control** - Configurable expiration time with presets (1/3/7/15/30 days, default: 7)
+  - 🔍 **Access Logs** - View download records and access statistics
+  - 🏷️ **Status Filtering** - Filter shares by active/expired status (simplified dual-state system)
+  - ⚡ **Quick Actions** - Copy links, direct delete, view logs
+  - 🎯 **Simplified Management** - Removed intermediate revoked state, direct delete supported
 - 🔄 **Real-time Sync** - WebSocket-based instant synchronization
 - 🌐 **P2P Support** - Direct file transfer for local network connections
 - 🎨 **Modern UI** - Beautiful interface built with React, Tailwind CSS, and shadcn/ui
+  - 🌙 **Elegant Feedback** - GitHub-style lightweight tooltips, non-intrusive user experience
+  - 📐 **Optimized Layout** - Two-row button layout with perfect icon alignment
+  - ⏰ **Friendly Timestamps** - Smart time formats: "just now", "X min ago", "Yesterday HH:MM", "MMM DD"
+  - 🎯 **Unified Interaction** - Text and file message action buttons unified in top-right corner
 - ⚡ **Fast & Reliable** - Built with Bun, TypeScript, and strict type checking
 - 📱 **Cross-Platform** - Works on desktop, tablet, and mobile devices
 - 🔄 **Session Persistence** - Automatically rejoin rooms after browser refresh
@@ -382,12 +435,24 @@ bun run start
 
 ## 📖 Usage
 
+### In-Room Sharing
+
 1. **Join a Room**: Enter a room key (any string) and your name
 2. **Share Text**: Type or paste text and click Send
 3. **Share Files**: Click the File button to upload files (max 100MB)
 4. **Copy Text**: Click the Copy button on any text message
 5. **Download Files**: Click the Download button on file messages
 6. **Multiple Users**: Share the same room key with others to collaborate
+
+### External File Sharing
+
+1. **Create Share Link**: Click "Create Share" on any file message
+2. **Set Access Control**:
+   - Optionally set password protection (auto-generated 6-character secure password)
+   - Set expiration time (1-30 days, default: 7 days)
+3. **Share File**: Get a secure share link to share with anyone
+4. **External Access**: Recipients can download files directly via the share link
+5. **Manage Shares**: View access logs, get share details, or delete share directly
 
 ## 🔧 Debug Features
 
@@ -434,6 +499,8 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 
 ## 📁 File Transfer
 
+### In-Room Transfer
+
 - **Server Upload**: Files are uploaded to the server for sharing
 - **Smart Management**: Room-based file grouping with automatic cleanup
 - **Retention Policy**: 12-hour maximum retention, auto-delete on room destruction
@@ -441,6 +508,16 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 - **P2P Transfer**: Direct device-to-device transfer for local network (WebRTC)
 - **Size Limit**: Maximum file size of 100MB
 - **Type Support**: All file types are supported
+
+### External File Sharing
+
+- **Secure Links**: Create secure share links with unique IDs (8-10 characters)
+- **Password Protection**: Auto-generated 6-character secure passwords, no complex requirements
+- **Expiration Control**: Configurable expiration time from 1-30 days (default: 7 days)
+- **Access Tracking**: Detailed access logs with IP address, timestamp, and success/failure status
+- **Rate Limiting**: Independent download rate limiting for protection
+- **Simplified Management**: Direct delete shares, no intermediate revoked state
+- **Secure Transmission**: HTTPS encrypted transmission
 
 ## 🌍 Environment Variables
 
@@ -459,6 +536,13 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 - `FILE_RETENTION_HOURS` - File retention period (default: 12 hours)
 - `RATE_LIMIT_WINDOW_MS` - Rate limit window (default: 60000 = 1 minute)
 - `RATE_LIMIT_MAX_REQUESTS` - Max requests per window (default: 100)
+- `SHARE_RATE_LIMIT_WINDOW_MS` - Share link creation rate limit window (default: 60000 = 1 minute)
+- `SHARE_RATE_LIMIT_MAX_REQUESTS` - Max share link creations per window (default: 10)
+- `DOWNLOAD_RATE_LIMIT_WINDOW_MS` - Download rate limit window (default: 60000 = 1 minute)
+- `DOWNLOAD_RATE_LIMIT_MAX_REQUESTS` - Max downloads per window (default: 100)
+- `SHARE_DEFAULT_EXPIRY_DAYS` - Default share link expiration in days (default: 7)
+- `SHARE_MAX_EXPIRY_DAYS` - Max share link expiration in days (default: 30)
+- `SHARE_MIN_PASSWORD_LENGTH` - Minimum password length for password protection (default: 8)
 
 ### Client
 

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { formatTimestamp } from "@cloud-clipboard/shared";
 import type { User, RoomKey } from "@cloud-clipboard/shared";
-import { Users, LogOut, Share2, Lock, Unlock, Copy } from "lucide-react";
+import { Users, LogOut, Share2, Lock, Unlock, Copy, Settings } from "lucide-react";
 
 interface SidebarContentProps {
   roomKey: RoomKey;
@@ -14,6 +14,7 @@ interface SidebarContentProps {
   onLeaveRoom: () => void;
   onSetRoomPassword: (hasPassword: boolean) => void;
   onShareRoomLink: () => void;
+  onNavigateToShare?: () => void;
   hasRoomPassword?: boolean;
   isMobile: boolean;
 }
@@ -25,20 +26,36 @@ export function SidebarContent({
   onLeaveRoom,
   onSetRoomPassword,
   onShareRoomLink,
+  onNavigateToShare,
   hasRoomPassword = false,
   isMobile,
 }: SidebarContentProps): JSX.Element {
   const { t } = useTranslation();
   const [copiedRoomKey, setCopiedRoomKey] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState<boolean | null>(null);
 
   const onlineUsers = users.filter((user) => user.isOnline);
 
   const handleToggleRoomPassword = (): void => {
-    onSetRoomPassword(!hasRoomPassword);
+    const newState = !hasRoomPassword;
+    onSetRoomPassword(newState);
+    // Show temporary feedback
+    setPasswordChanged(newState);
+    setTimeout(() => setPasswordChanged(null), 2000);
   };
 
-  const handleShareRoom = (): void => {
-    onShareRoomLink();
+  const handleShareRoom = async (): Promise<void> => {
+    try {
+      onShareRoomLink();
+      // Give time for the link to be generated and copied
+      setTimeout(() => {
+        setCopiedShareLink(true);
+        setTimeout(() => setCopiedShareLink(false), 2000);
+      }, 500);
+    } catch (err) {
+      console.error("Failed to share room:", err);
+    }
   };
 
   const handleDoubleClickRoomKey = async (): Promise<void> => {
@@ -53,9 +70,9 @@ export function SidebarContent({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="pl-6 pr-2 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="pr-3">
             <div className="flex items-center gap-2 group">
               <h2
                 className="text-lg font-semibold cursor-pointer select-all hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -76,36 +93,108 @@ export function SidebarContent({
             </p>
           </div>
           {!isMobile && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleRoomPassword}
-                className="flex items-center gap-2 min-w-fit mobile-touch"
-                title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
-              >
-                {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShareRoom}
-                className="flex items-center gap-2 min-w-fit mobile-touch"
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-1">
-                <LanguageToggle />
-                <ThemeToggle />
+            <div className="flex flex-col gap-1.5">
+              {/* Top Row - Actions without tooltip */}
+              <div className="flex items-center justify-center gap-1">
+                {/* Left aligned */}
+                <div className="min-w-0 flex-shrink-0">
+                  <ThemeToggle />
+                </div>
+
+                {/* Spacer */}
+                <div className="w-2" />
+
+                {/* Center aligned - Language */}
+                <div className="flex justify-center">
+                  <div className="flex items-center gap-1">
+                    <LanguageToggle />
+                  </div>
+                </div>
+
+                {/* Spacer */}
+                <div className="w-2" />
+
+                {/* Right aligned - Leave room */}
+                <div className="min-w-0 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onLeaveRoom}
+                    className="flex items-center gap-2 min-w-fit mobile-touch"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onLeaveRoom}
-                className="flex items-center gap-2 min-w-fit mobile-touch"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+
+              {/* Bottom Row - Actions with tooltip */}
+              <div className="flex items-center justify-center gap-1">
+                {/* Left aligned - Password */}
+                <div className="min-w-0 flex-shrink-0">
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleToggleRoomPassword}
+                      className="flex items-center gap-2 min-w-fit mobile-touch"
+                      title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
+                    >
+                      {hasRoomPassword ? (
+                        <Unlock className="h-4 w-4" />
+                      ) : (
+                        <Lock className="h-4 w-4" />
+                      )}
+                    </Button>
+                    {passwordChanged !== null && (
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                        <span className="text-popover-foreground">
+                          {passwordChanged ? "Password set!" : "Password removed!"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Spacer */}
+                <div className="w-2" />
+
+                {/* Center aligned - Share */}
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleShareRoom}
+                      className="flex items-center gap-2 min-w-fit mobile-touch"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                    {copiedShareLink && (
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                        <span className="text-popover-foreground">Link copied!</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Spacer */}
+                <div className="w-2" />
+
+                {/* Right aligned - Settings */}
+                <div className="min-w-0 flex-shrink-0">
+                  {onNavigateToShare && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onNavigateToShare}
+                      className="flex items-center gap-2 min-w-fit mobile-touch"
+                      title="Share Management"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

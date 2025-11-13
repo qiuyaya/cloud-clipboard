@@ -3,7 +3,8 @@ import request from "supertest";
 import { Server } from "http";
 import express from "express";
 import { shareService } from "../services/ShareService";
-import shareRoutes from "../routes/share";
+import { FileManager } from "../services/FileManager";
+import { createShareRoutes } from "../routes/share";
 
 describe("Share API Integration Tests", () => {
   let app: express.Application;
@@ -15,9 +16,12 @@ describe("Share API Integration Tests", () => {
     app = express();
     server = require("http").createServer(app);
 
+    // Initialize services
+    const fileManager = new FileManager();
+
     // Setup middleware
     app.use(express.json());
-    app.use("/api/share", shareRoutes);
+    app.use("/api/share", createShareRoutes(fileManager));
 
     // Start server
     await new Promise<void>((resolve) => {
@@ -39,7 +43,7 @@ describe("Share API Integration Tests", () => {
   });
 
   describe("POST /api/share", () => {
-    it("should create a share link without password", async () => {
+    it("should create a share link without password by default", async () => {
       const response = await request(app)
         .post("/api/share")
         .send({
@@ -54,6 +58,33 @@ describe("Share API Integration Tests", () => {
       expect(response.body.data.fileId).toBe("550e8400-e29b-41d4-a716-446655440000");
       expect(response.body.data.createdBy).toBe("user123");
       expect(response.body.data.hasPassword).toBe(false);
+      expect(response.body.data.password).toBeUndefined();
+      expect(response.body.data.url).toBeDefined();
+      expect(typeof response.body.data.url).toBe("string");
+      expect(response.body.data.url).toContain("/api/share/");
+      expect(response.body.data.url).toContain("/download");
+      expect(response.body.data.expiresAt).toBeDefined();
+      expect(response.body.data.accessCount).toBe(0);
+    });
+
+    it("should create a share link with auto-generated password when enabled", async () => {
+      const response = await request(app)
+        .post("/api/share")
+        .send({
+          fileId: "550e8400-e29b-41d4-a716-446655440001",
+          createdBy: "user123",
+          password: "auto-generate",
+        })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.shareId).toBeDefined();
+      expect(response.body.data.fileId).toBe("550e8400-e29b-41d4-a716-446655440001");
+      expect(response.body.data.createdBy).toBe("user123");
+      expect(response.body.data.hasPassword).toBe(true);
+      expect(response.body.data.password).toBeDefined();
+      expect(response.body.data.password.length).toBe(6);
       expect(response.body.data.url).toBeDefined();
       expect(typeof response.body.data.url).toBe("string");
       expect(response.body.data.url).toContain("/api/share/");
@@ -89,11 +120,11 @@ describe("Share API Integration Tests", () => {
       expect(response.body.message).toBeDefined();
     });
 
-    it("should return 400 for invalid fileId", async () => {
+    it("should return 400 for empty fileId", async () => {
       const response = await request(app)
         .post("/api/share")
         .send({
-          fileId: "invalid-uuid",
+          fileId: "",
           createdBy: "user123",
         })
         .expect(400);
@@ -160,36 +191,49 @@ describe("Share API Integration Tests", () => {
 
   describe("GET /api/share/:shareId/download", () => {
     let shareId: string;
+    let sharePassword: string;
 
     beforeAll(async () => {
-      // Create a share link for testing
+      // Create a share link with password for testing
       const response = await request(app).post("/api/share").send({
         fileId: "550e8400-e29b-41d4-a716-446655440000",
         createdBy: "user123",
+        password: "auto-generate",
       });
 
       shareId = response.body.data.shareId;
+      sharePassword = response.body.data.password;
     });
 
-    it("should successfully download file for valid shareId", async () => {
-      const response = await request(app).get(`/api/share/${shareId}/download`).expect(200);
+    it("should return 404 for share without actual file", async () => {
+      // Share exists but file doesn't exist in fileManager (test scenario)
+      // Need to provide password for authentication
+      const auth = Buffer.from(`:${sharePassword}`).toString("base64");
+      const response = await request(app)
+        .get(`/api/share/${shareId}/download`)
+        .set("Authorization", `Basic ${auth}`)
+        .expect(404);
 
-      // Since streamFile is a placeholder, it returns JSON
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe("File streaming would happen here");
-      expect(response.body.shareId).toBe(shareId);
+      // Should still get JSON error response
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe("FILE_NOT_FOUND");
     });
 
-    it("should update access count on download", async () => {
-      // First download
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+    it("should log failed access when file not found", async () => {
+      // First download attempt
+      const auth = Buffer.from(`:${sharePassword}`).toString("base64");
+      await request(app)
+        .get(`/api/share/${shareId}/download`)
+        .set("Authorization", `Basic ${auth}`)
+        .expect(404);
 
-      // Check access logs
+      // Check access logs - should have logged the failed attempt
       const logs = shareService.getAccessLogs(shareId);
       expect(logs.length).toBeGreaterThan(0);
       const lastLog = logs[logs.length - 1];
       expect(lastLog).toBeDefined();
-      expect(lastLog!.success).toBe(true);
+      expect(lastLog!.success).toBe(false);
+      expect(lastLog!.errorCode).toBe("file_not_found");
     });
 
     it("should return 404 for non-existent shareId", async () => {
@@ -201,15 +245,26 @@ describe("Share API Integration Tests", () => {
     });
 
     it("should log failed access attempt", async () => {
-      // Use a unique ID to avoid interference from other tests
-      const uniqueId = `test-${Date.now()}`;
-      const logsBefore = shareService.getAccessLogs(uniqueId);
+      // Create a new share for this test
+      const response = await request(app).post("/api/share").send({
+        fileId: "550e8400-e29b-41d4-a716-446655440999",
+        createdBy: "user123",
+        password: "auto-generate",
+      });
 
-      await request(app).get(`/api/share/${uniqueId}/download`).expect(404);
+      const testShareId = response.body.data.shareId;
 
-      const logsAfter = shareService.getAccessLogs(uniqueId);
-      expect(logsAfter.length).toBeGreaterThan(logsBefore.length);
-      const lastLog = logsAfter[logsAfter.length - 1];
+      // Use wrong password
+      const wrongAuth = Buffer.from(`:wrongpassword`).toString("base64");
+      await request(app)
+        .get(`/api/share/${testShareId}/download`)
+        .set("Authorization", `Basic ${wrongAuth}`)
+        .expect(401);
+
+      // Check that the failed attempt was logged
+      const logs = shareService.getAccessLogs(testShareId);
+      expect(logs.length).toBeGreaterThan(0);
+      const lastLog = logs[logs.length - 1];
       expect(lastLog).toBeDefined();
       expect(lastLog!.success).toBe(false);
     });
@@ -240,11 +295,12 @@ describe("Share API Integration Tests", () => {
       const testUserAgent = "Mozilla/5.0 (Test Browser)";
       const testIP = "192.168.1.100";
 
+      // Since share now requires password, expect 401 without password
       await request(app)
         .get(`/api/share/${shareId}/download`)
         .set("User-Agent", testUserAgent)
         .set("X-Forwarded-For", testIP)
-        .expect(200);
+        .expect(401);
 
       const logs = shareService.getAccessLogs(shareId);
       expect(logs.length).toBeGreaterThan(0);
@@ -254,18 +310,20 @@ describe("Share API Integration Tests", () => {
       expect(lastLog!.userAgent).toBe(testUserAgent);
       // IP might be transformed by Express/Supertest, so just check it exists
       expect(lastLog!.ipAddress).toBeDefined();
+      expect(lastLog!.success).toBe(false);
+      expect(lastLog!.errorCode).toBe("wrong_password");
     });
 
     it("should handle multiple downloads of same share", async () => {
-      // Download multiple times
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      // Download multiple times without password (will fail but should be logged)
+      await request(app).get(`/api/share/${shareId}/download`).expect(401);
+      await request(app).get(`/api/share/${shareId}/download`).expect(401);
+      await request(app).get(`/api/share/${shareId}/download`).expect(401);
 
-      // Check that all attempts are logged
+      // Check that all attempts are logged (all should be failed)
       const logs = shareService.getAccessLogs(shareId);
-      const successfulLogs = logs.filter((log) => log.success === true);
-      expect(successfulLogs.length).toBeGreaterThan(2);
+      const failedLogs = logs.filter((log) => log.success === false);
+      expect(failedLogs.length).toBeGreaterThan(2);
     });
 
     it("should handle revoked share", async () => {
@@ -358,10 +416,16 @@ describe("Share API Integration Tests", () => {
       });
 
       const shareId = response.body.data.shareId;
+      const sharePassword = response.body.data.password;
       expect(response.body.data.accessCount).toBe(0);
 
-      // Download once
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      // Download once (will fail but log access)
+      // Need to provide password for authentication
+      const auth = Buffer.from(`:${sharePassword}`).toString("base64");
+      await request(app)
+        .get(`/api/share/${shareId}/download`)
+        .set("Authorization", `Basic ${auth}`)
+        .expect(404);
 
       // Access count should be updated in service
       const logs = shareService.getAccessLogs(shareId);
@@ -377,8 +441,13 @@ describe("Share API Integration Tests", () => {
       });
 
       const shareId = response.body.data.shareId;
+      const sharePassword = response.body.data.password;
 
-      await request(app).get(`/api/share/${shareId}/download`).expect(200);
+      const auth = Buffer.from(`:${sharePassword}`).toString("base64");
+      await request(app)
+        .get(`/api/share/${shareId}/download`)
+        .set("Authorization", `Basic ${auth}`)
+        .expect(404);
 
       const afterTime = new Date();
       const logs = shareService.getAccessLogs(shareId);

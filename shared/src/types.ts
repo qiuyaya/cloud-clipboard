@@ -18,6 +18,9 @@ import {
   RoomPasswordSchema,
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
+  SharedFileSchema,
+  ShareLinkSchema,
+  ShareAccessLogSchema,
 } from "./schemas";
 
 export type RoomKey = z.infer<typeof RoomKeySchema>;
@@ -40,6 +43,16 @@ export type APIResponse<T = unknown> = Omit<z.infer<typeof APIResponseSchema>, "
 };
 export type P2PConnection = z.infer<typeof P2PConnectionSchema>;
 export type RoomInfo = z.infer<typeof RoomInfoSchema>;
+export type SharedFile = z.infer<typeof SharedFileSchema>;
+export type ShareLink = z.infer<typeof ShareLinkSchema>;
+export type ShareAccessLog = z.infer<typeof ShareAccessLogSchema>;
+
+export type ShareAccessErrorCode =
+  | "expired"
+  | "invalid"
+  | "wrong_password"
+  | "file_not_found"
+  | "revoked";
 
 export interface ServerToClientEvents {
   message: (message: WebSocketMessage) => void;

@@ -1,3 +1,26 @@
+<!--
+Sync Impact Report - Constitution Update v1.1.0 → v1.2.0
+Version Change: 1.1.0 → 1.2.0
+Date: 2025-11-13
+
+Modified Principles:
+- Security Requirements: Updated to reflect optional password protection (passwords are NOT mandatory by default, only enabled when user explicitly chooses)
+
+Changes Made:
+- Line 114: Updated to clarify passwords are optional with auto-generation when enabled
+- Line 225: Updated version and last amended date
+
+Templates Updated:
+✅ .specify/templates/plan-template.md (already contains Constitution Check section - no changes needed)
+✅ .specify/templates/spec-template.md (no specific password references)
+✅ .specify/templates/tasks-template.md (no specific password references)
+
+Follow-up Actions:
+- All templates already contain proper Constitution Check references
+- UI and backend have been updated to support optional passwords
+- No additional changes required in dependent templates
+-->
+
 # Cloud Clipboard Constitution
 
 **Project Constitution for Cloud Clipboard / 云剪贴板**
@@ -88,7 +111,7 @@ Shared package MUST be source of truth for types and schemas. Server and client 
 ### Security Requirements
 
 - Room keys MUST be validated for format (6-50 chars, alphanumeric + underscore/hyphen, must include both letters and numbers)
-- Passwords MUST meet complexity requirements (8+ chars, upper, lower, number, special)
+- Share link passwords are optional: when enabled, passwords MUST be auto-generated as 6-character random strings using secure character set (excludes confusing characters: I, l, O, 0, 1)
 - Session tokens MUST expire after 2 hours of inactivity
 - CORS MUST be configured appropriately for production deployments
 - Helmet MUST be used for security headers
@@ -198,4 +221,4 @@ Any architecture decision that increases complexity beyond the current monorepo 
 - Long-term maintenance implications
 - Migration path if the complexity is removed later
 
-**Version**: 1.0.0 | **Ratified**: 2025-11-12 | **Last Amended**: 2025-11-12
+**Version**: 1.2.0 | **Ratified**: 2025-11-12 | **Last Amended**: 2025-11-13

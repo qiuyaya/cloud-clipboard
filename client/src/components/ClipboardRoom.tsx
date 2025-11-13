@@ -9,6 +9,7 @@ import { MobileNav } from "@/components/MobileNav";
 import { SidebarContent } from "./SidebarContent";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { ShareModal } from "./Share/ShareModal";
 import { useTranslation } from "react-i18next";
 import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
 import type { User, TextMessage, FileMessage, RoomKey } from "@cloud-clipboard/shared";
@@ -24,6 +25,7 @@ interface ClipboardRoomProps {
   onLeaveRoom: () => void;
   onSetRoomPassword: (hasPassword: boolean) => void;
   onShareRoomLink: () => void;
+  onNavigateToShare?: () => void;
   hasRoomPassword?: boolean;
 }
 
@@ -37,10 +39,17 @@ export function ClipboardRoom({
   onLeaveRoom,
   onSetRoomPassword,
   onShareRoomLink,
+  onNavigateToShare,
   hasRoomPassword = false,
 }: ClipboardRoomProps): JSX.Element {
   const [textInput, setTextInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedFileForShare, setSelectedFileForShare] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -76,13 +85,13 @@ export function ClipboardRoom({
     e.target.value = "";
   };
 
-  const copyToClipboard = async (text: string): Promise<void> => {
+  const copyToClipboard = async (text: string, messageId?: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text);
-      toast({
-        title: t("toast.copied"),
-        description: t("toast.copiedDesc"),
-      });
+      if (messageId) {
+        setCopiedMessageId(messageId);
+        setTimeout(() => setCopiedMessageId(null), 2000);
+      }
     } catch {
       toast({
         variant: "destructive",
@@ -111,6 +120,14 @@ export function ClipboardRoom({
     onSetRoomPassword(!hasRoomPassword);
   };
 
+  const handleShareClick = (message: FileMessage): void => {
+    setSelectedFileForShare({
+      id: message.fileId || message.id, // Use fileId if available, fallback to message.id
+      name: message.fileInfo.name,
+    });
+    setShareModalOpen(true);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 safe-area-inset">
       {/* 桌面端侧边栏 */}
@@ -123,6 +140,7 @@ export function ClipboardRoom({
             onLeaveRoom={onLeaveRoom}
             onSetRoomPassword={onSetRoomPassword}
             onShareRoomLink={onShareRoomLink}
+            onNavigateToShare={onNavigateToShare}
             hasRoomPassword={hasRoomPassword}
             isMobile={isMobile}
           />
@@ -143,6 +161,7 @@ export function ClipboardRoom({
               onLeaveRoom={onLeaveRoom}
               onSetRoomPassword={onSetRoomPassword}
               onShareRoomLink={onShareRoomLink}
+              onNavigateToShare={onNavigateToShare}
               hasRoomPassword={hasRoomPassword}
               isMobile={isMobile}
             />
@@ -157,6 +176,7 @@ export function ClipboardRoom({
           <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
             <MobileNav onOpenSidebar={() => setIsSidebarOpen(true)} />
             <div className="flex items-center gap-2">
+              {/* Room Actions - Left */}
               <Button
                 variant="outline"
                 size="mobile-sm"
@@ -166,24 +186,40 @@ export function ClipboardRoom({
               >
                 {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               </Button>
-              <Button
-                variant="outline"
-                size="mobile-sm"
-                onClick={shareRoom}
-                className="mobile-touch"
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
-              <LanguageToggle />
               <ThemeToggle />
+
+              {/* Spacer */}
+              <div className="w-px h-6 bg-border mx-1" />
+
+              {/* Management - Middle */}
               <Button
                 variant="outline"
                 size="mobile-sm"
                 onClick={onLeaveRoom}
                 className="mobile-touch"
+                title="Leave Room"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
+
+              {/* Spacer */}
+              <div className="w-px h-6 bg-border mx-1" />
+
+              {/* User Settings - Right */}
+              <div className="flex items-center gap-1">
+                <LanguageToggle />
+              </div>
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="mobile-sm"
+                  onClick={shareRoom}
+                  className="mobile-touch"
+                  title="Share Room"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -198,12 +234,12 @@ export function ClipboardRoom({
             messages.map((message) => (
               <Card
                 key={message.id}
-                className={`max-w-full lg:max-w-2xl ${
+                className={`group max-w-full lg:max-w-2xl ${
                   message.sender.id === currentUser.id ? "ml-auto" : "mr-auto"
                 }`}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between relative">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">
                         {message.sender.name}
@@ -213,48 +249,54 @@ export function ClipboardRoom({
                         {formatTimestamp(message.timestamp)}
                       </span>
                     </div>
+                    {message.type === "text" && (
+                      <button
+                        onClick={() => copyToClipboard(message.content, message.id)}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors opacity-0 group-hover:opacity-100 opacity-100 md:opacity-0"
+                        title={t("message.copy")}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {message.type === "file" && message.downloadUrl && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 opacity-100 md:opacity-0">
+                        <button
+                          onClick={() => downloadFile(message)}
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          title={t("message.download")}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleShareClick(message)}
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          title={t("share.button")}
+                        >
+                          <Share2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    {copiedMessageId === message.id && (
+                      <div className="absolute -top-8 right-0 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                        <span className="text-popover-foreground">Copied!</span>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
                   {message.type === "text" ? (
-                    <div className="space-y-2">
-                      <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                        <pre className="whitespace-pre-wrap text-sm font-mono">
-                          {message.content}
-                        </pre>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="mobile-sm"
-                        onClick={() => copyToClipboard(message.content)}
-                        className="flex items-center gap-2 mobile-touch"
-                      >
-                        <Copy className="h-3 w-3" />
-                        {t("message.copy")}
-                      </Button>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                      <pre className="whitespace-pre-wrap text-sm font-mono">{message.content}</pre>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <File className="h-8 w-8 text-blue-500" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{message.fileInfo.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(message.fileInfo.size)} • {message.fileInfo.type}
-                          </p>
-                        </div>
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <File className="h-8 w-8 text-blue-500" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{message.fileInfo.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(message.fileInfo.size)} • {message.fileInfo.type}
+                        </p>
                       </div>
-                      {message.downloadUrl && (
-                        <Button
-                          variant="outline"
-                          size="mobile-sm"
-                          onClick={() => downloadFile(message)}
-                          className="flex items-center gap-2 mobile-touch"
-                        >
-                          <Download className="h-3 w-3" />
-                          {t("message.download")}
-                        </Button>
-                      )}
                     </div>
                   )}
                 </CardContent>
@@ -297,6 +339,19 @@ export function ClipboardRoom({
           <p className="text-xs text-muted-foreground mt-2">{t("room.maxLimits")}</p>
         </div>
       </div>
+
+      {/* 分享模态框 */}
+      {selectedFileForShare && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => {
+            setShareModalOpen(false);
+            setSelectedFileForShare(null);
+          }}
+          fileId={selectedFileForShare.id}
+          fileName={selectedFileForShare.name}
+        />
+      )}
     </div>
   );
 }

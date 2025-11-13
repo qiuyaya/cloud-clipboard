@@ -79,8 +79,6 @@
     "joinedRoomDesc": "Connected to room: {{roomKey}}",
     "leftRoom": "Left room",
     "leftRoomDesc": "You have left the room",
-    "fileUploaded": "File uploaded",
-    "fileUploadedDesc": "{{name}} uploaded successfully",
     "connectionError": "Connection error",
     "notConnected": "Not connected to server. Please try again.",
     "error": "Error",
@@ -130,5 +128,124 @@
     "offlineTitle": "Ready for Offline",
     "offlineDescription": "App is ready to work offline",
     "close": "Close"
+  },
+  "share": {
+    "button": "Share",
+    "modal": {
+      "title": "Share File",
+      "createdTitle": "Share Link Created!",
+      "createButton": "Create Share Link",
+      "creating": "Creating...",
+      "urlLabel": "Share URL",
+      "expiresInDays": {
+        "label": "Expiration Time",
+        "placeholder": "Select expiration time",
+        "1day": "1 day",
+        "3days": "3 days",
+        "7days": "7 days",
+        "15days": "15 days",
+        "30days": "30 days",
+        "description": "The share link will expire after the selected time"
+      },
+      "expires": {
+        "7days": "7 days",
+        "label": "Expires in {{days}} days"
+      },
+      "status": {
+        "protected": "Protected",
+        "public": "Public"
+      },
+      "password": {
+        "title": "Auto-Generated Password",
+        "description": "A secure 6-character password will be automatically generated for this share",
+        "label": "Password",
+        "copy": "Copy Password",
+        "generatedHint": "This password is generated automatically for security"
+      },
+      "actions": {
+        "copy": "Copy Link",
+        "test": "Preview",
+        "createAnother": "Create Another Share"
+      },
+      "toast": {
+        "createFailed": "Failed to create share link"
+      },
+      "info": {
+        "created": "Created: {{time}}",
+        "expires": "Expires: {{date}}",
+        "passwordProtected": "Password Protected: {{value}}",
+        "accessCount": "Access Count: {{count}}"
+      },
+      "errors": {
+        "createFailed": "Failed to create share link",
+        "passwordRequired": "Password is required",
+        "passwordTooShort": "Password must be at least 6 characters"
+      }
+    },
+    "list": {
+      "title": "Share Management",
+      "description": "Manage your file share links and view access logs",
+      "filters": {
+        "all": "All",
+        "active": "Active",
+        "expired": "Expired"
+      },
+      "empty": "No shares found",
+      "loading": "Loading shares...",
+      "actions": {
+        "copy": "Copy share link",
+        "logs": "View access logs",
+        "delete": "Delete share"
+      },
+      "status": {
+        "active": "Active",
+        "expired": "Expired"
+      },
+      "fields": {
+        "filename": "Filename",
+        "created": "Created",
+        "expires": "Expires",
+        "downloads": "Downloads",
+        "size": "Size",
+        "url": "Share URL"
+      },
+      "logs": {
+        "title": "Access Logs - {{filename}}",
+        "success": "Success",
+        "failed": "Failed",
+        "empty": "No access logs found",
+        "fields": {
+          "timestamp": "Time",
+          "ip": "IP Address",
+          "userAgent": "User Agent",
+          "bytesTransferred": "Transferred"
+        }
+      },
+      "confirm": {
+        "deleteTitle": "Delete Share Link",
+        "deleteMessage": "Are you sure you want to permanently delete this share link? This action cannot be undone.",
+        "deleteButton": "Delete",
+        "cancelButton": "Cancel"
+      },
+      "toast": {
+        "copySuccess": "Share link copied to clipboard",
+        "loadFailed": "Failed to load shares",
+        "logsLoadFailed": "Failed to load access logs",
+        "retry": "Retry",
+        "deleteFailed": "Failed to delete share"
+      }
+    },
+    "page": {
+      "back": "Back"
+    },
+    "download": {
+      "passwordRequired": "Password Required",
+      "passwordPrompt": "Enter password to access this share",
+      "passwordPlaceholder": "Password",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "incorrectPassword": "Incorrect password",
+      "authFailed": "Authentication failed"
+    }
   }
 }

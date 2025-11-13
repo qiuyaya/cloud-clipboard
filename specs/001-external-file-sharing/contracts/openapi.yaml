@@ -35,7 +35,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateShareRequest'
+              $ref: "#/components/schemas/CreateShareRequest"
             examples:
               simple_share:
                 summary: Simple share (no password)
@@ -49,18 +49,18 @@ paths:
                   password: "MyStr0ng!Pass"
                   expiresInDays: 7
       responses:
-        '201':
+        "201":
           description: Share link created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ShareLinkResponse'
-        '400':
+                $ref: "#/components/schemas/ShareLinkResponse"
+        "400":
           description: Invalid request parameters
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
               examples:
                 invalid_file:
                   value:
@@ -70,18 +70,18 @@ paths:
                   value:
                     error: "WEAK_PASSWORD"
                     message: "Password must be at least 8 characters with uppercase, lowercase, number, and special character"
-        '401':
+        "401":
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '429':
+                $ref: "#/components/schemas/Error"
+        "429":
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
     get:
       summary: List all share links created by authenticated user
@@ -112,7 +112,7 @@ paths:
             minimum: 0
             default: 0
       responses:
-        '200':
+        "200":
           description: List of share links
           content:
             application/json:
@@ -122,16 +122,16 @@ paths:
                   shares:
                     type: array
                     items:
-                      $ref: '#/components/schemas/ShareLinkSummary'
+                      $ref: "#/components/schemas/ShareLinkSummary"
                   total:
                     type: integer
                     description: Total number of shares matching the filter
-        '401':
+        "401":
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/share/{shareId}:
     get:
@@ -149,24 +149,24 @@ paths:
             minLength: 8
             maxLength: 10
       responses:
-        '200':
+        "200":
           description: Share link details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ShareLinkDetails'
-        '401':
+                $ref: "#/components/schemas/ShareLinkDetails"
+        "401":
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '404':
+                $ref: "#/components/schemas/Error"
+        "404":
           description: Share link not found or not owned by user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
     delete:
       summary: Revoke (delete) a share link
@@ -183,20 +183,20 @@ paths:
             minLength: 8
             maxLength: 10
       responses:
-        '204':
+        "204":
           description: Share link revoked successfully
-        '401':
+        "401":
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '404':
+                $ref: "#/components/schemas/Error"
+        "404":
           description: Share link not found or not owned by user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/share/{shareId}/access:
     get:
@@ -222,7 +222,7 @@ paths:
             maximum: 100
             default: 50
       responses:
-        '200':
+        "200":
           description: Access logs
           content:
             application/json:
@@ -232,21 +232,21 @@ paths:
                   logs:
                     type: array
                     items:
-                      $ref: '#/components/schemas/AccessLogEntry'
+                      $ref: "#/components/schemas/AccessLogEntry"
                   total:
                     type: integer
-        '401':
+        "401":
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-        '404':
+                $ref: "#/components/schemas/Error"
+        "404":
           description: Share link not found or not owned by user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
 
   /api/share/{shareId}/download:
     get:
@@ -264,7 +264,7 @@ paths:
             minLength: 8
             maxLength: 10
       responses:
-        '200':
+        "200":
           description: File download successful
           content:
             application/octet-stream:
@@ -279,23 +279,23 @@ paths:
                 Content-Type:
                   schema:
                     type: string
-                  example: 'application/pdf'
+                  example: "application/pdf"
                 Content-Length:
                   schema:
                     type: integer
                   description: File size in bytes
-        '401':
+        "401":
           description: Password required or incorrect password
           headers:
             WWW-Authenticate:
               schema:
                 type: string
               example: 'Basic realm="Share Password Required"'
-        '404':
+        "404":
           description: Share link not found, expired, or file not available
-        '410':
+        "410":
           description: Share link has expired
-        '429':
+        "429":
           description: Rate limit exceeded
 
 components:
@@ -391,7 +391,7 @@ components:
 
     ShareLinkDetails:
       allOf:
-        - $ref: '#/components/schemas/ShareLinkSummary'
+        - $ref: "#/components/schemas/ShareLinkSummary"
         - type: object
           properties:
             lastAccessedAt:

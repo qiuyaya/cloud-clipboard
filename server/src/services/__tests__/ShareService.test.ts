@@ -14,7 +14,7 @@ describe("ShareService", () => {
   });
 
   describe("createShare", () => {
-    it("should create a share link without password", async () => {
+    it("should create a share link without password by default", async () => {
       const result = await shareService.createShare({
         fileId: "550e8400-e29b-41d4-a716-446655440000",
         createdBy: "user123",
@@ -24,6 +24,25 @@ describe("ShareService", () => {
       expect(result.fileId).toBe("550e8400-e29b-41d4-a716-446655440000");
       expect(result.createdAt).toEqual(mockDate);
       expect(result.passwordHash).toBeNull();
+      expect(result.password).toBeUndefined();
+      expect(result.accessCount).toBe(0);
+      expect(result.isActive).toBe(true);
+      expect(result.createdBy).toBe("user123");
+    });
+
+    it("should create a share link with auto-generated password when enabled", async () => {
+      const result = await shareService.createShare({
+        fileId: "550e8400-e29b-41d4-a716-446655440001",
+        createdBy: "user123",
+        enablePassword: true,
+      });
+
+      expect(result.shareId).toBeDefined();
+      expect(result.fileId).toBe("550e8400-e29b-41d4-a716-446655440001");
+      expect(result.passwordHash).toBeDefined();
+      expect(result.passwordHash).not.toBeNull();
+      expect(result.password).toBeDefined();
+      expect(result.password!.length).toBe(6);
       expect(result.accessCount).toBe(0);
       expect(result.isActive).toBe(true);
       expect(result.createdBy).toBe("user123");
@@ -70,7 +89,7 @@ describe("ShareService", () => {
       expect(result.errorCode).toBe("invalid");
     });
 
-    it("should return revoked for inactive share", () => {
+    it("should return invalid for inactive share", () => {
       const shares = (shareService as any).shares as Map<string, ShareLink>;
       const firstShare = shares.values().next().value;
       expect(firstShare).toBeDefined();
@@ -80,7 +99,7 @@ describe("ShareService", () => {
 
       expect(result.isValid).toBe(false);
       expect(result.share?.isActive).toBe(false);
-      expect(result.errorCode).toBe("revoked");
+      expect(result.errorCode).toBe("invalid");
     });
 
     it("should mark expired share as inactive", () => {
@@ -123,7 +142,7 @@ describe("ShareService", () => {
       const shareLogs = logs.get(firstShare!.shareId);
 
       expect(shareLogs).toBeDefined();
-      expect(shareLogs.length).toBe(1);
+      expect(shareLogs?.length).toBe(1);
       expect(shareLogs![0].shareId).toBe(firstShare!.shareId);
       expect(shareLogs![0].ipAddress).toBe("192.168.1.1");
       expect(shareLogs![0].success).toBe(true);
@@ -144,7 +163,7 @@ describe("ShareService", () => {
       const logs = (shareService as any).accessLogs as Map<string, any[]>;
       const shareLogs = logs.get(firstShare!.shareId);
 
-      expect(shareLogs.length).toBe(1);
+      expect(shareLogs?.length).toBe(1);
       expect(shareLogs![0].success).toBe(false);
       expect(shareLogs![0].errorCode).toBe("wrong_password");
     });

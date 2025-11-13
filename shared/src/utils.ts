@@ -169,14 +169,45 @@ export const formatTimestamp = (date: Date | string): string => {
     return "Invalid Date";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(dateObj);
+  const now = new Date();
+  const diffMs = now.getTime() - dateObj.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  // If within last hour, show relative time
+  if (diffMins < 1) {
+    return "刚刚";
+  } else if (diffMins < 60) {
+    return `${diffMins}分钟前`;
+  }
+  // If today, show time only
+  else if (dateObj.toDateString() === now.toDateString()) {
+    return new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(dateObj);
+  }
+  // If yesterday
+  else if (diffDays === 1) {
+    return `昨天 ${new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(dateObj)}`;
+  }
+  // If within this year
+  else if (dateObj.getFullYear() === now.getFullYear()) {
+    return `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+  }
+  // For older dates, show full date
+  else {
+    return new Intl.DateTimeFormat("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(dateObj);
+  }
 };
 
 // Browser fingerprinting utilities (client-side only)
@@ -320,4 +351,63 @@ export const simpleHash = (str: string): number => {
     hash = hash & hash; // Convert to 32bit integer
   }
   return Math.abs(hash);
+};
+
+// Share-related utilities
+const BASE62_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/**
+ * Generate a unique share ID using UUID v4 and base62 encoding
+ */
+export const generateShareId = (): string => {
+  // Generate UUID v4
+  const uuid = crypto.randomUUID().replace(/-/g, "");
+
+  // Convert to base62
+  return base62Encode(uuid).substring(0, 10);
+};
+
+/**
+ * Encode a hexadecimal string to base62
+ */
+export const base62Encode = (hex: string): string => {
+  // Convert hex string to big integer
+  const bigInt = BigInt("0x" + hex);
+
+  // Encode to base62
+  let result = "";
+  let num = bigInt;
+
+  if (num === 0n) {
+    return "0";
+  }
+
+  while (num > 0) {
+    const remainder = num % 62n;
+    result = BASE62_CHARS[Number(remainder)] + result;
+    num = num / 62n;
+  }
+
+  return result;
+};
+
+/**
+ * Validate password length
+ * - At least 6 characters
+ */
+export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+
+  if (password.length < 6) {
+    errors.push("Password must be at least 6 characters");
+  }
+
+  if (password.length > 100) {
+    errors.push("Password must not exceed 100 characters");
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
 };

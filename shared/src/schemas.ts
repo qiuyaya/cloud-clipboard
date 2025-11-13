@@ -77,11 +77,7 @@ export const FileInfoSchema = z.object({
     .number()
     .min(0, "File size cannot be negative")
     .max(100 * 1024 * 1024, "File size cannot exceed 100MB"),
-  type: z
-    .string()
-    .min(1, "File type is required")
-    .max(100, "File type too long")
-    .regex(/^[a-zA-Z0-9/-]+$/, "Invalid file type format"),
+  type: z.string().min(1, "File type is required").max(100, "File type too long"),
   lastModified: z
     .number()
     .min(0, "Last modified timestamp invalid")
@@ -97,6 +93,7 @@ export const FileMessageSchema = z.object({
   roomKey: RoomKeySchema,
   isP2P: z.boolean().optional(),
   downloadUrl: z.string().url().optional(),
+  fileId: z.string().min(1).optional(),
 });
 
 export const JoinRoomRequestSchema = z.object({
@@ -178,4 +175,45 @@ export const RoomInfoSchema = z.object({
   createdAt: z.date(),
   lastActivity: z.date(),
   hasPassword: z.boolean().optional(),
+});
+
+// Share-related schemas
+export const SharedFileSchema = z.object({
+  id: z.string().uuid(),
+  originalFilename: z.string().min(1).max(255),
+  fileSize: z
+    .number()
+    .min(1)
+    .max(100 * 1024 * 1024), // 100MB
+  mimeType: z.string(),
+  uploadTimestamp: z.date(),
+  uploadedBy: z.string(),
+  storagePath: z.string(),
+  checksum: z.string().length(64), // SHA-256 hex
+});
+
+export const ShareLinkSchema = z.object({
+  shareId: z.string().min(8).max(10), // base62 encoded UUID
+  fileId: z.string().uuid(),
+  createdAt: z.date(),
+  expiresAt: z.date(),
+  passwordHash: z.string().nullable().optional(),
+  accessCount: z.number().int().min(0),
+  lastAccessedAt: z.date().nullable().optional(),
+  isActive: z.boolean(),
+  createdBy: z.string(),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export const ShareAccessLogSchema = z.object({
+  shareId: z.string(),
+  timestamp: z.date(),
+  ipAddress: z.string(),
+  userAgent: z.string().max(500).optional(),
+  success: z.boolean(),
+  errorCode: z
+    .enum(["expired", "invalid", "wrong_password", "file_not_found", "revoked"])
+    .nullable()
+    .optional(),
+  bytesTransferred: z.number().int().min(0).optional(),
 });
