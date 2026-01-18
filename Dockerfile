@@ -32,7 +32,6 @@ COPY --from=builder --chown=cloudclipboard:nodejs /app/server/public ./server/pu
 
 # 复制依赖（包含所有工作区依赖）
 COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=cloudclipboard:nodejs /app/server/node_modules ./server/node_modules
 
 # 创建必要目录
 RUN mkdir -p /app/uploads && \
@@ -46,4 +45,4 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV UPLOAD_DIR=/app/uploads
 
-CMD ["bun", "run", "server/dist/index.js"]
+CMD ["bun", "server/dist/index.js"]
