@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.2] - 2026-01-18
+
+- test: 先删除失败的e2e
+- fix: 优化Docker部署配置和文件去重功能
+
 ## [1.4.1] - 2026-01-18
 
 - fix: 修复Docker构建中的工作区依赖路径问题
