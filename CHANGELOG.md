@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-01-18
+
+- fix: 修复Docker构建中的工作区依赖路径问题
+
 ## [1.4.0] - 2026-01-18
 
 - feat: 添加WebSocket连接状态指示器和修复文件上传问题
