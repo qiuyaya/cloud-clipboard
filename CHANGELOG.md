@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-01-18
+
+- feat: 添加WebSocket连接状态指示器和修复文件上传问题
+- feat: 实现完整的外部文件分享功能
+- feat: 实现外部文件分享功能
+- fix: 完成TypeScript类型检查错误修复
+- fix: 修复TypeScript类型检查错误
+- fix: 修复E2E测试中的require引用错误
+- docs: 同步任务状态 - 标记所有53个任务为已完成
+- docs: 修复规范分析中的5个关键问题
+- docs: 修复规范文档中的关键冲突和不一致问题
+- fix: 修复Docker构建中vite.config.ts的\_\_dirname问题
+- chore: release v1.3.1
+- chore: 更新依赖到最新版本，调整CI
+- feat: 添加自动化校验脚本和流程
+- fix: 修复Security Scan中的esbuild误报
+- perf: 阶段1 - 内存和安全优化
+- perf: 优化构建速度
+- release: v1.3.0
+- revert: 回退v1.3.x版本到v1.2.3
+- fix: 修复GitHub Actions构建错误
+- chore: release v1.3.1
+- fix: 修复GitHub Actions构建错误
+- fix: 修复构建错误
+- fix: 修复失败的脚本
+- chore: release v1.3.0
+- feat: 优化移动端使用体验
+
 ## [1.3.1] - 2025-11-08
 
 - chore: 更新依赖到最新版本，调整CI
