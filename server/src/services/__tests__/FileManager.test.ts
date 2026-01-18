@@ -210,7 +210,7 @@ describe("FileManager", () => {
 
       expect(result).toEqual({ filename: "test.txt", roomKey: "room123" });
       expect(fileManager.getFile("file1")).toBeUndefined();
-      expect(mockFs.promises.unlink).toHaveBeenCalledWith("/uploads/file1");
+      expect(mockFs.unlinkSync).toHaveBeenCalledWith("/uploads/file1");
     });
 
     it("should return null for non-existent file", () => {
@@ -220,7 +220,9 @@ describe("FileManager", () => {
 
     it("should handle file deletion error", () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      mockFs.promises.unlink.mockRejectedValue(new Error("Delete failed"));
+      mockFs.unlinkSync.mockImplementation(() => {
+        throw new Error("Delete failed");
+      });
 
       const fileRecord = {
         id: "file1",
@@ -234,8 +236,9 @@ describe("FileManager", () => {
       fileManager.addFile(fileRecord);
       const result = fileManager.deleteFile("file1", "manual");
 
-      // File is still tracked despite deletion error
+      // File is still removed from tracking despite deletion error
       expect(result).toEqual({ filename: "test.txt", roomKey: "room123" });
+      expect(fileManager.getFile("file1")).toBeUndefined();
       consoleSpy.mockRestore();
     });
 

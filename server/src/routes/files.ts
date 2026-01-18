@@ -27,16 +27,30 @@ const router = Router();
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    const uploadDir = path.join(process.cwd(), "uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    try {
+      const uploadDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      // Verify directory is writable
+      if (!fs.existsSync(uploadDir)) {
+        throw new Error(`Upload directory does not exist: ${uploadDir}`);
+      }
+      cb(null, uploadDir);
+    } catch (error) {
+      console.error("Failed to create upload directory:", error);
+      cb(error as Error, "");
     }
-    cb(null, uploadDir);
   },
   filename: (_req, file, cb) => {
-    const sanitized = sanitizeFileName(file.originalname);
-    const timestamp = Date.now();
-    cb(null, `${timestamp}-${sanitized}`);
+    try {
+      const sanitized = sanitizeFileName(file.originalname);
+      const timestamp = Date.now();
+      cb(null, `${timestamp}-${sanitized}`);
+    } catch (error) {
+      console.error("Failed to generate filename:", error);
+      cb(error as Error, "");
+    }
   },
 });
 
@@ -47,71 +61,76 @@ const upload = multer({
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
-    // Get file extension (lowercase)
-    const fileExtension = path.extname(file.originalname).toLowerCase();
+    try {
+      // Get file extension (lowercase)
+      const fileExtension = path.extname(file.originalname).toLowerCase();
 
-    // Dangerous extensions that could be used for attacks
-    const dangerousExtensions = new Set([
-      ".exe",
-      ".bat",
-      ".cmd",
-      ".com",
-      ".scr",
-      ".pif",
-      ".msi",
-      ".jar",
-      ".sh",
-      ".bash",
-      ".ps1",
-      ".vbs",
-      ".php",
-      ".asp",
-      ".aspx",
-      ".jsp",
-      ".py",
-      ".rb",
-      ".pl",
-      ".c",
-      ".cpp",
-      ".cs",
-      ".java",
-      ".go",
-      ".rs",
-      ".swift",
-      ".dll",
-      ".so",
-      ".dylib",
-      ".app",
-      ".deb",
-      ".rpm",
-      ".dmg",
-    ]);
+      // Dangerous extensions that could be used for attacks
+      const dangerousExtensions = new Set([
+        ".exe",
+        ".bat",
+        ".cmd",
+        ".com",
+        ".scr",
+        ".pif",
+        ".msi",
+        ".jar",
+        ".sh",
+        ".bash",
+        ".ps1",
+        ".vbs",
+        ".php",
+        ".asp",
+        ".aspx",
+        ".jsp",
+        ".py",
+        ".rb",
+        ".pl",
+        ".c",
+        ".cpp",
+        ".cs",
+        ".java",
+        ".go",
+        ".rs",
+        ".swift",
+        ".dll",
+        ".so",
+        ".dylib",
+        ".app",
+        ".deb",
+        ".rpm",
+        ".dmg",
+      ]);
 
-    // Check dangerous file extensions first
-    if (dangerousExtensions.has(fileExtension)) {
-      cb(new Error(`File extension ${fileExtension} is not allowed`));
-      return;
+      // Check dangerous file extensions first
+      if (dangerousExtensions.has(fileExtension)) {
+        cb(new Error(`File extension ${fileExtension} is not allowed`));
+        return;
+      }
+
+      // Additional filename validation to prevent path traversal
+      if (
+        file.originalname.includes("..") ||
+        file.originalname.includes("/") ||
+        file.originalname.includes("\\") ||
+        file.originalname.includes(":") ||
+        file.originalname.includes("*") ||
+        file.originalname.includes("?") ||
+        file.originalname.includes('"') ||
+        file.originalname.includes("<") ||
+        file.originalname.includes(">") ||
+        file.originalname.includes("|")
+      ) {
+        cb(new Error("Invalid filename"));
+        return;
+      }
+
+      // Allow any file type except dangerous extensions
+      cb(null, true);
+    } catch (error) {
+      console.error("File filter error:", error);
+      cb(new Error("File validation failed"));
     }
-
-    // Additional filename validation to prevent path traversal
-    if (
-      file.originalname.includes("..") ||
-      file.originalname.includes("/") ||
-      file.originalname.includes("\\") ||
-      file.originalname.includes(":") ||
-      file.originalname.includes("*") ||
-      file.originalname.includes("?") ||
-      file.originalname.includes('"') ||
-      file.originalname.includes("<") ||
-      file.originalname.includes(">") ||
-      file.originalname.includes("|")
-    ) {
-      cb(new Error("Invalid filename"));
-      return;
-    }
-
-    // Allow any file type except dangerous extensions
-    cb(null, true);
   },
 });
 
@@ -159,14 +178,29 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
         };
 
         // Track file in FileManager
-        fileManager.addFile({
-          id: req.file.filename,
-          filename: req.file.originalname,
-          path: req.file.path,
-          roomKey: req.roomKey!,
-          uploadedAt: new Date(),
-          size: req.file.size,
-        });
+        try {
+          fileManager.addFile({
+            id: req.file.filename,
+            filename: req.file.originalname,
+            path: req.file.path,
+            roomKey: req.roomKey!,
+            uploadedAt: new Date(),
+            size: req.file.size,
+          });
+        } catch (fileError) {
+          console.error("Failed to track file in FileManager:", fileError);
+          // Clean up the uploaded file if tracking fails
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch (cleanupError) {
+            console.error("Failed to clean up file after tracking failure:", cleanupError);
+          }
+          res.status(500).json({
+            success: false,
+            message: "Failed to track uploaded file",
+          });
+          return;
+        }
 
         res.json({
           success: true,
@@ -179,9 +213,22 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
         });
       } catch (error) {
         console.error("File upload error:", error);
+
+        // 如果文件已上传但处理失败，尝试清理
+        if (req.file && req.file.path) {
+          try {
+            if (fs.existsSync(req.file.path)) {
+              fs.unlinkSync(req.file.path);
+              console.log(`Cleaned up failed upload: ${req.file.path}`);
+            }
+          } catch (cleanupError) {
+            console.error("Failed to clean up file after upload error:", cleanupError);
+          }
+        }
+
         res.status(500).json({
           success: false,
-          message: "Failed to upload file",
+          message: error instanceof Error ? error.message : "Failed to upload file",
         });
       }
     },

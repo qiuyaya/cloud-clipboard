@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/useToast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PasswordInput } from "@/components/PasswordInput";
+import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { useTranslation } from "react-i18next";
 import type {
   JoinRoomRequest,
@@ -23,6 +24,7 @@ interface RoomJoinProps {
   onJoinRoom: (data: JoinRoomRequest) => void;
   onJoinRoomWithPassword: (data: JoinRoomWithPasswordRequest) => void;
   isConnecting: boolean;
+  isConnected: boolean;
   showPasswordInput?: boolean;
   onCancelPassword?: () => void;
 }
@@ -31,6 +33,7 @@ export function RoomJoin({
   onJoinRoom,
   onJoinRoomWithPassword,
   isConnecting,
+  isConnected,
   showPasswordInput,
   onCancelPassword,
 }: RoomJoinProps): JSX.Element {
@@ -299,7 +302,8 @@ export function RoomJoin({
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 safe-area-inset">
-      <div className="absolute top-4 right-4 flex gap-2 z-10">
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+        <ConnectionStatus isConnected={isConnected} isConnecting={isConnecting} />
         <LanguageToggle />
         <ThemeToggle />
       </div>

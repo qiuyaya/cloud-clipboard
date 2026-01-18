@@ -70,10 +70,13 @@ export class FileManager {
     try {
       // Delete physical file
       if (fs.existsSync(file.path)) {
-        // 优化：使用fs.promises.unlink确保异步操作完成
-        fs.promises.unlink(file.path).catch((err) => {
-          console.error(`Failed to unlink file ${file.path}:`, err);
-        });
+        // 使用同步方法确保文件删除完成，避免异步操作导致的竞态条件
+        try {
+          fs.unlinkSync(file.path);
+        } catch (unlinkError) {
+          console.error(`Failed to unlink file ${file.path}:`, unlinkError);
+          // 即使文件删除失败，也继续清理跟踪信息，避免内存泄漏
+        }
       }
 
       // Remove from tracking

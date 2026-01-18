@@ -85,6 +85,7 @@ export function App(): JSX.Element {
           onJoinRoom={(data) => handleJoinRoom(data, isConnected)}
           onJoinRoomWithPassword={(data) => handleJoinRoomWithPassword(data, isConnected)}
           isConnecting={isConnecting}
+          isConnected={isConnected}
           showPasswordInput={showPasswordInput}
           onCancelPassword={handleCancelPassword}
         />

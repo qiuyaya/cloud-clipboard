@@ -1,4 +1,9 @@
 {
+  "connection": {
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "disconnected": "Disconnected"
+  },
   "roomJoin": {
     "title": "Cloud Clipboard",
     "description": "Enter a room key to share text and files across your devices",

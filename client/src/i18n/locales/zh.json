@@ -1,4 +1,9 @@
 {
+  "connection": {
+    "connected": "已连接",
+    "connecting": "连接中...",
+    "disconnected": "已断开"
+  },
   "roomJoin": {
     "title": "云剪切板",
     "description": "输入房间密钥，在不同设备间分享文本和文件",
