@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import type { RoomKey } from "@cloud-clipboard/shared";
 
 interface FileRecord {
@@ -9,11 +10,13 @@ interface FileRecord {
   roomKey: RoomKey;
   uploadedAt: Date;
   size: number;
+  hash?: string; // 文件内容哈希，用于去重
 }
 
 export class FileManager {
   private files: Map<string, FileRecord> = new Map();
   private roomFiles: Map<RoomKey, Set<string>> = new Map();
+  private hashToFileId: Map<string, string> = new Map(); // 哈希到文件ID的映射，用于去重
   private uploadDir = path.join(process.cwd(), "uploads");
   private maxRetentionHours = 12;
   private cleanupInterval: NodeJS.Timeout;
@@ -47,10 +50,40 @@ export class FileManager {
       this.roomFiles.set(fileRecord.roomKey, new Set());
     }
     this.roomFiles.get(fileRecord.roomKey)!.add(fileRecord.id);
+
+    // Track file by hash for deduplication
+    if (fileRecord.hash) {
+      this.hashToFileId.set(fileRecord.hash, fileRecord.id);
+    }
   }
 
   getFile(fileId: string): FileRecord | undefined {
     return this.files.get(fileId);
+  }
+
+  /**
+   * 根据文件哈希查找已存在的文件
+   * @param hash 文件内容的SHA-256哈希
+   * @returns 文件ID，如果不存在则返回undefined
+   */
+  getFileIdByHash(hash: string): string | undefined {
+    return this.hashToFileId.get(hash);
+  }
+
+  /**
+   * 计算文件内容的SHA-256哈希
+   * @param filePath 文件路径
+   * @returns SHA-256哈希字符串
+   */
+  async calculateFileHash(filePath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash("sha256");
+      const stream = fs.createReadStream(filePath);
+
+      stream.on("data", (data) => hash.update(data));
+      stream.on("end", () => resolve(hash.digest("hex")));
+      stream.on("error", reject);
+    });
   }
 
   getFilesInRoom(roomKey: RoomKey): FileRecord[] {

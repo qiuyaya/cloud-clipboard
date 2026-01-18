@@ -20,15 +20,9 @@ services:
       - uploads:/app/uploads
     security_opt:
       - no-new-privileges:true
-    read_only: true
     tmpfs:
       - /tmp:size=100M,noexec,nosuid,nodev
     user: "1001:1001"
 
 volumes:
   uploads:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/uploads

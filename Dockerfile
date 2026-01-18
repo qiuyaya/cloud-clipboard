@@ -22,7 +22,7 @@ FROM oven/bun:alpine AS runtime
 
 # 创建用户
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S cloudclipboard -u 1001
+    adduser -S cloudclipboard -u 1001 -G nodejs
 
 WORKDIR /app
 
@@ -35,7 +35,8 @@ COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modul
 
 # 创建必要目录
 RUN mkdir -p /app/uploads && \
-    chown -R cloudclipboard:nodejs /app/uploads
+    chown -R cloudclipboard:nodejs /app/uploads && \
+    chmod 755 /app/uploads
 
 USER cloudclipboard
 

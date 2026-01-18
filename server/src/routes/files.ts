@@ -152,7 +152,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
     uploadRateLimit.middleware(),
     authenticateRoom,
     upload.single("file"),
-    (req, res: any) => {
+    async (req, res: any) => {
       try {
         if (!req.file) {
           res.status(400).json({
@@ -162,6 +162,52 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
           return;
         }
 
+        // Calculate file hash for deduplication
+        const fileHash = await fileManager.calculateFileHash(req.file.path);
+
+        // Check if file with same hash already exists
+        const existingFileId = fileManager.getFileIdByHash(fileHash);
+
+        if (existingFileId) {
+          // File already exists, return existing file info
+          const existingFile = fileManager.getFile(existingFileId);
+
+          if (existingFile) {
+            console.log(
+              `File deduplicated: ${req.file.originalname} (hash: ${fileHash.substring(0, 16)}...)`,
+            );
+
+            // Clean up the duplicate file that was just uploaded
+            try {
+              fs.unlinkSync(req.file.path);
+              console.log(`Cleaned up duplicate file: ${req.file.path}`);
+            } catch (cleanupError) {
+              console.error("Failed to clean up duplicate file:", cleanupError);
+            }
+
+            const fileInfo: FileInfo = {
+              name: existingFile.filename,
+              size: existingFile.size,
+              type: req.file.mimetype,
+              lastModified: existingFile.uploadedAt.getTime(),
+            };
+
+            res.json({
+              success: true,
+              message: "File already exists, using existing copy",
+              data: {
+                fileId: existingFile.id,
+                downloadUrl: `${getProtocol(req)}://${req.get("host")}/api/files/download/${existingFile.id}`,
+                ...fileInfo,
+                isDuplicate: true,
+                originalFileId: existingFile.id,
+              },
+            });
+            return;
+          }
+        }
+
+        // New file, process it normally
         const fileInfo: FileInfo = {
           name: req.file.originalname,
           size: req.file.size,
@@ -177,7 +223,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
           uploadedAt: new Date(),
         };
 
-        // Track file in FileManager
+        // Track file in FileManager with hash
         try {
           fileManager.addFile({
             id: req.file.filename,
@@ -186,7 +232,12 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
             roomKey: req.roomKey!,
             uploadedAt: new Date(),
             size: req.file.size,
+            hash: fileHash,
           });
+
+          console.log(
+            `New file uploaded: ${req.file.originalname} (hash: ${fileHash.substring(0, 16)}...)`,
+          );
         } catch (fileError) {
           console.error("Failed to track file in FileManager:", fileError);
           // Clean up the uploaded file if tracking fails
@@ -209,6 +260,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
             fileId: fileData.id,
             downloadUrl: `${getProtocol(req)}://${req.get("host")}/api/files/download/${fileData.id}`,
             ...fileInfo,
+            isDuplicate: false,
           },
         });
       } catch (error) {
