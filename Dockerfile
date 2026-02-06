@@ -20,25 +20,30 @@ RUN bun run build
 # Stage 2: 极简运行时
 FROM oven/bun:alpine AS runtime
 
-# 创建用户
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S cloudclipboard -u 1001 -G nodejs
-
 WORKDIR /app
 
 # 复制构建产物
-COPY --from=builder --chown=cloudclipboard:nodejs /app/server/dist ./server/dist
-COPY --from=builder --chown=cloudclipboard:nodejs /app/server/public ./server/public
+COPY --from=builder /app/server/dist ./server/dist
+COPY --from=builder /app/server/public ./server/public
 
 # 复制依赖（包含所有工作区依赖）
-COPY --from=builder --chown=cloudclipboard:nodejs /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules ./node_modules
 
-# 创建必要目录
-RUN mkdir -p /app/uploads && \
-    chown -R cloudclipboard:nodejs /app/uploads && \
-    chmod 755 /app/uploads
+# 创建 uploads 目录并设置权限
+RUN mkdir -p /app/uploads && chown -R bun:bun /app/uploads
 
-USER cloudclipboard
+# 安装 gosu 用于切换用户
+RUN apk add --no-cache gosu
+
+# 创建启动脚本
+COPY <<EOF /app/entrypoint.sh
+#!/bin/sh
+# 修复 volume 挂载后的权限
+chown -R bun:bun /app/uploads
+# 切换到 bun 用户运行应用
+exec gosu bun bun server/dist/index.js
+EOF
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 3001
 
@@ -46,4 +51,4 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV UPLOAD_DIR=/app/uploads
 
-CMD ["bun", "server/dist/index.js"]
+CMD ["/app/entrypoint.sh"]

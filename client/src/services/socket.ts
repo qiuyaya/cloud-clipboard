@@ -34,7 +34,12 @@ class SocketService {
 
     // Support subpath deployment for Socket.IO
     const basePath = import.meta.env.BASE_URL || "/";
-    const socketPath = basePath === "/" ? "/socket.io" : `${basePath}/socket.io`;
+    // Remove trailing slash from basePath to avoid double slashes
+    const normalizedBasePath = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+    const socketPath =
+      normalizedBasePath === "" || normalizedBasePath === "/"
+        ? "/socket.io"
+        : `${normalizedBasePath}/socket.io`;
 
     debug.info("Attempting to connect to server", {
       serverUrl,
