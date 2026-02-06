@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.4] - 2026-02-06
+
+- fix: 修复分享API子路径部署支持并添加Docker时区配置
+- fix: 修复房间分享链接复制功能并完善国际化
+- test: 完善单元测试
+
 ## [1.4.3] - 2026-02-06
 
 - feat: 添加版本号显示和孤儿文件清理功能

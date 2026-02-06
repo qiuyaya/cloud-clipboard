@@ -1,6 +1,6 @@
 {
   "name": "@cloud-clipboard/shared",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Strongly-typed schemas, validation, and utility functions shared across cloud clipboard components",
   "main": "src/index.ts",
   "types": "src/index.ts",
