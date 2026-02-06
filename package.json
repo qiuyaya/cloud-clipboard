@@ -1,6 +1,6 @@
 {
   "name": "cloud-clipboard",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "A real-time cloud clipboard application with secure room-based sharing, automatic file management, and modern PWA features",
   "type": "module",
   "main": "index.js",

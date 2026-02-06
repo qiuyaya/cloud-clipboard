@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.5] - 2026-02-06
+
+- fix: 修复单元测试并简化Dockerfile
+- fix: 修复Docker容器文件上传权限问题和Socket.IO路径拼接
+
 ## [1.4.4] - 2026-02-06
 
 - fix: 修复分享API子路径部署支持并添加Docker时区配置
