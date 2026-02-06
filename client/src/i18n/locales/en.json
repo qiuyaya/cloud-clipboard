@@ -58,7 +58,10 @@
     "noMessages": "No messages yet. Send a text or file to get started!",
     "maxLimits": "Max text: 100k chars • Max file: 100MB",
     "doubleClickToCopy": "Double-click to copy room key",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "linkCopied": "Link copied!",
+    "passwordSet": "Password set!",
+    "passwordRemoved": "Password removed!"
   },
   "message": {
     "you": "(You)",

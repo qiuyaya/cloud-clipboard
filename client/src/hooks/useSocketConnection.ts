@@ -378,8 +378,10 @@ export const useSocketConnection = ({
     };
 
     const handleRoomLinkGenerated = (data: { roomKey: string; shareLink: string }) => {
-      // Removed automatic copy and toast - UI will handle both
-      // This allows UI to show tooltip directly
+      // Copy share link to clipboard
+      navigator.clipboard.writeText(data.shareLink).catch((err) => {
+        console.error("Failed to copy share link:", err);
+      });
     };
 
     socket.on("connect", handleConnect);

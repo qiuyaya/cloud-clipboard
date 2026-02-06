@@ -278,7 +278,7 @@ export function ClipboardRoom({
                     )}
                     {copiedMessageId === message.id && (
                       <div className="absolute -top-8 right-0 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">Copied!</span>
+                        <span className="text-popover-foreground">{t("room.copied")}</span>
                       </div>
                     )}
                   </div>

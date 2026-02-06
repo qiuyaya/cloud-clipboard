@@ -149,7 +149,7 @@ export function SidebarContent({
                     {passwordChanged !== null && (
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
                         <span className="text-popover-foreground">
-                          {passwordChanged ? "Password set!" : "Password removed!"}
+                          {passwordChanged ? t("room.passwordSet") : t("room.passwordRemoved")}
                         </span>
                       </div>
                     )}
@@ -172,7 +172,7 @@ export function SidebarContent({
                     </Button>
                     {copiedShareLink && (
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">Link copied!</span>
+                        <span className="text-popover-foreground">{t("room.linkCopied")}</span>
                       </div>
                     )}
                   </div>

@@ -158,7 +158,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
                 </Button>
                 {copiedItem === "url" && (
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                    <span className="text-popover-foreground">Copied!</span>
+                    <span className="text-popover-foreground">{t("room.copied")}</span>
                   </div>
                 )}
               </div>
@@ -186,7 +186,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
                   </Button>
                   {copiedItem === "password" && (
                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                      <span className="text-popover-foreground">Copied!</span>
+                      <span className="text-popover-foreground">{t("room.copied")}</span>
                     </div>
                   )}
                 </div>
