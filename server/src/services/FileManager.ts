@@ -38,8 +38,44 @@ export class FileManager {
       10 * 60 * 1000, // 10分钟
     );
 
+    // Initial cleanup on startup - scan for orphaned files
+    this.scanAndCleanupOrphanedFiles();
+
     // Initial cleanup on startup
     this.cleanupExpiredFiles();
+  }
+
+  /**
+   * 扫描 uploads 目录，清理孤儿文件
+   * 解决服务器重启后内存索引丢失但磁盘文件残留的问题
+   */
+  private scanAndCleanupOrphanedFiles(): void {
+    try {
+      const entries = fs.readdirSync(this.uploadDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          const filePath = path.join(this.uploadDir, entry.name);
+          const stats = fs.statSync(filePath);
+          const age = Date.now() - stats.mtimeMs;
+
+          // 如果文件超过 maxRetentionHours（12小时）未修改，视为过期文件
+          const maxAge = this.maxRetentionHours * 60 * 60 * 1000;
+          if (age > maxAge) {
+            console.log(`[Orphan Cleanup] Removing stale file: ${entry.name}`);
+            try {
+              fs.unlinkSync(filePath);
+            } catch (unlinkError) {
+              console.error(`[Orphan Cleanup] Failed to remove ${entry.name}:`, unlinkError);
+            }
+          }
+        }
+      }
+
+      console.log("[Orphan Cleanup] Scan completed");
+    } catch (error) {
+      console.error("[Orphan Cleanup] Scan failed:", error);
+    }
   }
 
   addFile(fileRecord: FileRecord): void {

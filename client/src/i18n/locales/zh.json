@@ -122,6 +122,9 @@
     "zh": "中文",
     "en": "English"
   },
+  "version": {
+    "label": "版本 {{version}}"
+  },
   "pwa": {
     "installTitle": "安装应用",
     "installDescription": "安装云剪切板以便快速访问和离线使用",

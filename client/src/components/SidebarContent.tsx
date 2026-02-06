@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { Version } from "@/components/Version";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { formatTimestamp } from "@cloud-clipboard/shared";
@@ -234,6 +235,10 @@ export function SidebarContent({
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <Version />
       </div>
     </div>
   );

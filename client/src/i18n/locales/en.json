@@ -122,6 +122,9 @@
     "zh": "中文",
     "en": "English"
   },
+  "version": {
+    "label": "Version {{version}}"
+  },
   "pwa": {
     "installTitle": "Install App",
     "installDescription": "Install Cloud Clipboard for quick access and offline use",

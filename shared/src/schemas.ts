@@ -81,7 +81,10 @@ export const FileInfoSchema = z.object({
   lastModified: z
     .number()
     .min(0, "Last modified timestamp invalid")
-    .max(Date.now() + 86400000, "Last modified timestamp cannot be in the future"), // Allow 24h clock skew
+    .refine(
+      (val) => val <= Date.now() + 86400000,
+      "Last modified timestamp cannot be in the future",
+    ), // Allow 24h clock skew
 });
 
 export const FileMessageSchema = z.object({

@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { PasswordInput } from "@/components/PasswordInput";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
+import { Version } from "@/components/Version";
 import { useTranslation } from "react-i18next";
 import type {
   JoinRoomRequest,
@@ -382,6 +383,8 @@ export function RoomJoin({
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">{t("roomJoin.shareHint")}</p>
           </div>
+
+          <Version />
         </CardContent>
       </Card>
     </div>
