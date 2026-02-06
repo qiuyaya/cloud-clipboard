@@ -3,6 +3,8 @@
  * Handles all share-related API calls
  */
 
+import { getApiPath } from "@/utils/api";
+
 export interface CreateShareRequest {
   fileId: string;
   password?: string;
@@ -56,12 +58,19 @@ export interface ApiError {
 
 const API_BASE = "/api/share";
 
+/**
+ * Get the full API path with base path prefix for subpath deployment
+ */
+function getShareApiPath(path: string = ""): string {
+  return getApiPath(`${API_BASE}${path}`);
+}
+
 class ShareApiService {
   /**
    * Create a new share link
    */
   async createShare(request: CreateShareRequest): Promise<ShareLinkResponse> {
-    const response = await fetch(API_BASE, {
+    const response = await fetch(getShareApiPath(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -99,7 +108,7 @@ class ShareApiService {
     if (params?.limit) queryParams.append("limit", params.limit.toString());
     if (params?.offset) queryParams.append("offset", params.offset.toString());
 
-    const response = await fetch(`${API_BASE}?${queryParams.toString()}`, {
+    const response = await fetch(`${getShareApiPath()}?${queryParams.toString()}`, {
       credentials: "include",
     });
 
@@ -120,7 +129,7 @@ class ShareApiService {
    * Get share details
    */
   async getShareDetails(shareId: string): Promise<ShareDetails> {
-    const response = await fetch(`${API_BASE}/${shareId}`, {
+    const response = await fetch(getShareApiPath(`/${shareId}`), {
       credentials: "include",
     });
 
@@ -141,7 +150,7 @@ class ShareApiService {
    * Revoke a share link
    */
   async revokeShare(shareId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/${shareId}`, {
+    const response = await fetch(getShareApiPath(`/${shareId}`), {
       method: "DELETE",
       credentials: "include",
     });
@@ -160,7 +169,7 @@ class ShareApiService {
    * Permanently delete a share link
    */
   async permanentDeleteShare(shareId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/${shareId}/permanent-delete`, {
+    const response = await fetch(getShareApiPath(`/${shareId}/permanent-delete`), {
       method: "POST",
       credentials: "include",
     });
@@ -195,9 +204,12 @@ class ShareApiService {
     const queryParams = new URLSearchParams();
     if (limit) queryParams.append("limit", limit.toString());
 
-    const response = await fetch(`${API_BASE}/${shareId}/access?${queryParams.toString()}`, {
-      credentials: "include",
-    });
+    const response = await fetch(
+      `${getShareApiPath(`/${shareId}/access`)}?${queryParams.toString()}`,
+      {
+        credentials: "include",
+      },
+    );
 
     if (!response.ok) {
       try {
@@ -225,7 +237,7 @@ class ShareApiService {
       headers["Authorization"] = `Basic ${credentials}`;
     }
 
-    const response = await fetch(`${API_BASE}/${shareId}/download`, {
+    const response = await fetch(getShareApiPath(`/${shareId}/download`), {
       headers,
       credentials: "include",
     });
@@ -252,7 +264,7 @@ class ShareApiService {
     status?: string;
   }> {
     try {
-      const response = await fetch(`${API_BASE}/${shareId}`, {
+      const response = await fetch(getShareApiPath(`/${shareId}`), {
         credentials: "include",
       });
 

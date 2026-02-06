@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -20,15 +19,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
-import {
-  Copy,
-  ExternalLink,
-  Link as LinkIcon,
-  Shield,
-  ShieldOff,
-  Calendar,
-  Users,
-} from "lucide-react";
+import { getApiPath } from "@/utils/api";
+import { Copy, Link as LinkIcon, Shield, ShieldOff, Calendar } from "lucide-react";
 
 interface ShareButtonProps {
   fileId: string;
@@ -74,7 +66,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         requestBody.password = "auto-generate"; // Let server generate password
       }
 
-      const response = await fetch("/api/share", {
+      const response = await fetch(getApiPath("/api/share"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
