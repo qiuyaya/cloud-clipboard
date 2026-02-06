@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.3] - 2026-02-06
+
+- feat: 添加版本号显示和孤儿文件清理功能
+
 ## [1.4.2] - 2026-01-18
 
 - test: 先删除失败的e2e
