@@ -1,0 +1,63 @@
+# Stage 1: 构建 Rust 后端
+FROM rust:1.93-alpine AS rust-builder
+
+WORKDIR /app
+
+# 安装构建依赖
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+
+# 复制 Cargo 配置
+COPY server-rust/Cargo.toml server-rust/Cargo.lock* ./
+
+# 创建虚拟 src 以缓存依赖
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# 预编译依赖
+RUN cargo build --release && rm -rf src target/release/deps/cloud_clipboard*
+
+# 复制实际源码
+COPY server-rust/src ./src
+
+# 编译项目
+RUN cargo build --release
+
+# Stage 2: 构建前端
+FROM oven/bun AS frontend-builder
+
+WORKDIR /app
+
+COPY ./ ./
+
+RUN bun install --frozen-lockfile
+
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+
+ENV NODE_ENV=production
+RUN bun run build
+
+# Stage 3: 运行时
+FROM alpine:3.21 AS runtime
+
+WORKDIR /app
+
+# 安装运行时依赖
+RUN apk add --no-cache ca-certificates
+
+# 复制 Rust 后端
+COPY --from=rust-builder /app/target/release/cloud-clipboard-server ./server
+
+# 复制前端构建产物
+COPY --from=frontend-builder /app/server/public ./public
+
+# 创建 uploads 目录
+RUN mkdir -p /app/uploads && chmod 777 /app/uploads
+
+EXPOSE 3001
+
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV UPLOAD_DIR=/app/uploads
+ENV RUST_LOG=info
+
+CMD ["./server"]
