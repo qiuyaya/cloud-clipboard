@@ -12,6 +12,7 @@ import {
   rateLimitAccessLogs,
   concurrentDownloadTracker,
 } from "../middleware/rateLimiter";
+import { getPublicUrl } from "../utils/url";
 
 // Bandwidth tracking for rate limiting
 class BandwidthTracker {
@@ -628,7 +629,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
           shareId: share.shareId,
           fileId: share.fileId,
           createdBy: share.createdBy,
-          url: `${req.protocol}://${req.get("host")}/public/file/${share.shareId}`,
+          url: getPublicUrl(req, `/public/file/${share.shareId}`),
           ...(share.password && { password: share.password }),
           createdAt: share.createdAt.toISOString(),
           expiresAt: share.expiresAt.toISOString(),

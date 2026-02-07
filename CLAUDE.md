@@ -217,6 +217,7 @@ const userWithDate = {
 - **Simplified Management**: Two-state system (active/expired) instead of three (active/expired/revoked)
 - **Security Features**: HTTPS encryption, input validation with Zod schemas
 - **Management Interface**: Web UI for managing shares, viewing access logs, and deleting links
+- **Public URL Support**: Configurable `PUBLIC_URL` environment variable for correct share link generation behind reverse proxies
 
 **Unified User Feedback System**: Consistent, lightweight feedback across the entire application:
 
