@@ -107,6 +107,15 @@ export const validateShareId = (req: Request, res: Response, next: NextFunction)
 
 // Uniform error response function
 const sendErrorResponse = (res: Response, statusCode: number): void => {
+  if (statusCode === 401) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="File Download", charset="UTF-8"');
+    res.status(401).json({
+      success: false,
+      error: "UNAUTHORIZED",
+      message: "Password required to access this file",
+    });
+    return;
+  }
   res.status(statusCode).json({
     success: false,
     error: "NOT_FOUND",
