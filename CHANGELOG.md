@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.7] - 2026-02-07
+
+- feat: 添加 PUBLIC_URL 环境变量支持用于反向代理场景
+
 ## [1.4.6] - 2026-02-06
 
 - fix: Docker容器以非root用户运行
