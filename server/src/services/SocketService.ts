@@ -636,12 +636,16 @@ export class SocketService {
       }
 
       // Generate share link with password if room is password protected
-      // Try to get the client origin from the socket handshake, fallback to CLIENT_URL env var
-      const clientOrigin =
-        process.env.CLIENT_URL ||
-        socket.handshake.headers.origin ||
-        socket.handshake.headers.referer?.split("?")[0].replace(/\/$/, "") ||
-        "http://localhost:3000";
+      // Priority: PUBLIC_URL > CLIENT_URL > socket handshake headers > fallback
+      const publicUrl = process.env.PUBLIC_URL;
+      const clientOrigin = publicUrl
+        ? publicUrl.endsWith("/")
+          ? publicUrl.slice(0, -1)
+          : publicUrl
+        : process.env.CLIENT_URL ||
+          socket.handshake.headers.origin ||
+          socket.handshake.headers.referer?.split("?")[0].replace(/\/$/, "") ||
+          "http://localhost:3000";
       let shareLink = `${clientOrigin}/?room=${validatedData.roomKey}`;
 
       if (room.hasPassword()) {
