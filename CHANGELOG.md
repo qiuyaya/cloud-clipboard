@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.9] - 2026-02-07
+
+- fix: 带密码的分享链接返回正确的 401 响应和 WWW-Authenticate 头
+
 ## [1.4.8] - 2026-02-07
 
 - fix: 全局限流支持环境变量覆盖并添加房间消息历史同步
