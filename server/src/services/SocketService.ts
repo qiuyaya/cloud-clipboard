@@ -360,6 +360,12 @@ export class SocketService {
       socket.emit("userJoined", user);
       socket.emit("userList", room.getUserList());
 
+      // Send message history to the new user
+      const messages = this.roomService.getMessagesInRoom(validatedData.roomKey);
+      if (messages.length > 0) {
+        socket.emit("messageHistory", messages);
+      }
+
       // Notify others in the room
       console.log(`📢 [Server] Notifying other users in room about new user:`, user.name);
       socket.to(validatedData.roomKey).emit("userJoined", user);
@@ -433,6 +439,13 @@ export class SocketService {
 
           socket.emit("userJoined", existingUser);
           socket.emit("userList", room.getUserList());
+
+          // Send message history to rejoining user
+          const messages = this.roomService.getMessagesInRoom(validatedData.roomKey);
+          if (messages.length > 0) {
+            socket.emit("messageHistory", messages);
+          }
+
           socket.to(validatedData.roomKey).emit("userList", room.getUserList());
 
           return;
@@ -479,6 +492,12 @@ export class SocketService {
 
       socket.emit("userJoined", user);
       socket.emit("userList", room.getUserList());
+
+      // Send message history to the new user
+      const pwMessages = this.roomService.getMessagesInRoom(validatedData.roomKey);
+      if (pwMessages.length > 0) {
+        socket.emit("messageHistory", pwMessages);
+      }
 
       socket.to(validatedData.roomKey).emit("userJoined", user);
       socket.to(validatedData.roomKey).emit("userList", room.getUserList());

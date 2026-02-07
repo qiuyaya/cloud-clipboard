@@ -56,6 +56,7 @@ export type ShareAccessErrorCode =
 
 export interface ServerToClientEvents {
   message: (message: WebSocketMessage) => void;
+  messageHistory: (messages: (TextMessage | FileMessage)[]) => void;
   userJoined: (user: User) => void;
   userLeft: (userId: string) => void;
   userList: (users: User[]) => void;

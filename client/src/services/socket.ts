@@ -187,6 +187,12 @@ class SocketService {
     }
   }
 
+  onMessageHistory(callback: (messages: (TextMessage | FileMessage)[]) => void): void {
+    if (this.socket) {
+      this.socket.on("messageHistory", callback);
+    }
+  }
+
   onUserJoined(callback: (user: User) => void): void {
     if (this.socket) {
       this.socket.on("userJoined", callback);

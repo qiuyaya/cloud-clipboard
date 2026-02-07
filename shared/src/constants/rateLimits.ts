@@ -11,10 +11,11 @@ export const TIME_CONSTANTS = {
 
 // HTTP Rate Limits
 export const HTTP_RATE_LIMITS = {
-  // General API rate limit - 15 minutes window, 100 requests
+  // General API rate limit - 15 minutes window, 500 requests
+  // Can be overridden by RATE_LIMIT_WINDOW_MS and RATE_LIMIT_MAX_REQUESTS env vars
   GENERAL: {
     WINDOW_MS: TIME_CONSTANTS.FIFTEEN_MINUTES,
-    MAX_REQUESTS: 100,
+    MAX_REQUESTS: 500,
   },
   // File upload rate limit - 1 minute window, 5 uploads
   UPLOAD: {
