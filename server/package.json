@@ -1,6 +1,6 @@
 {
   "name": "@cloud-clipboard/server",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "description": "High-performance backend server with WebSocket support, smart file management, and automatic room cleanup for cloud clipboard",
   "main": "dist/index.js",
   "scripts": {

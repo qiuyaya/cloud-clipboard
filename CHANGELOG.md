@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.8] - 2026-02-07
+
+- fix: 全局限流支持环境变量覆盖并添加房间消息历史同步
+- fix: 修复分享链接在浏览器中打开时被 Service Worker 拦截返回 SPA 页面的问题
+- fix: 房间分享链接支持 PUBLIC_URL 环境变量
+
 ## [1.4.7] - 2026-02-07
 
 - feat: 添加 PUBLIC_URL 环境变量支持用于反向代理场景
