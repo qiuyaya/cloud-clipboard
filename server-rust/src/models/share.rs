@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct ShareAccessLog {
     pub timestamp: DateTime<Utc>,
     pub ip_address: String,
+    pub user_agent: Option<String>,
     pub success: bool,
     pub bytes_transferred: Option<u64>,
     pub error_message: Option<String>,
@@ -41,8 +42,13 @@ pub struct ShareInfoResponse {
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub is_active: bool,
+    pub is_expired: bool,
     pub has_password: bool,
     pub access_count: u64,
+    pub created_by: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_accessed_at: Option<DateTime<Utc>>,
+    pub status: String,
 }
 
 impl ShareInfo {
@@ -90,10 +96,11 @@ impl ShareInfo {
         }
     }
 
-    pub fn record_access(&mut self, ip_address: String, success: bool, bytes: Option<u64>, error: Option<String>) {
+    pub fn record_access(&mut self, ip_address: String, success: bool, bytes: Option<u64>, error: Option<String>, user_agent: Option<String>) {
         self.access_logs.push(ShareAccessLog {
             timestamp: Utc::now(),
             ip_address,
+            user_agent,
             success,
             bytes_transferred: bytes,
             error_message: error,
@@ -104,15 +111,21 @@ impl ShareInfo {
     }
 
     pub fn to_response(&self) -> ShareInfoResponse {
+        let is_expired = self.is_expired();
+        let is_active = self.is_active && !is_expired;
         ShareInfoResponse {
             share_id: self.share_id.clone(),
             file_name: self.file_name.clone(),
             file_size: self.file_size,
             created_at: self.created_at,
             expires_at: self.expires_at,
-            is_active: self.is_active && !self.is_expired(),
+            is_active,
+            is_expired,
             has_password: self.has_password(),
             access_count: self.access_count,
+            created_by: self.created_by.clone(),
+            last_accessed_at: self.access_logs.last().map(|log| log.timestamp),
+            status: if is_active { "active".to_string() } else { "expired".to_string() },
         }
     }
 }

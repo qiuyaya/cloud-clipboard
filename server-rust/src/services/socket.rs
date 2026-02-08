@@ -214,13 +214,13 @@ struct SocketRateLimitConfig {
 
 fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
     match event {
-        "joinRoom" | "joinRoomWithPassword" => SocketRateLimitConfig { max_requests: 5, window_ms: 10_000 },
-        "leaveRoom" => SocketRateLimitConfig { max_requests: 10, window_ms: 10_000 },
-        "sendMessage" => SocketRateLimitConfig { max_requests: 30, window_ms: 10_000 },
-        "requestUserList" => SocketRateLimitConfig { max_requests: 10, window_ms: 10_000 },
-        "setRoomPassword" => SocketRateLimitConfig { max_requests: 3, window_ms: 30_000 },
-        "shareRoomLink" => SocketRateLimitConfig { max_requests: 5, window_ms: 30_000 },
-        _ => SocketRateLimitConfig { max_requests: 30, window_ms: 10_000 },
+        "joinRoom" | "joinRoomWithPassword" => SocketRateLimitConfig { max_requests: 5, window_ms: 60_000 },
+        "leaveRoom" => SocketRateLimitConfig { max_requests: 10, window_ms: 60_000 },
+        "sendMessage" => SocketRateLimitConfig { max_requests: 30, window_ms: 60_000 },
+        "requestUserList" => SocketRateLimitConfig { max_requests: 20, window_ms: 60_000 },
+        "setRoomPassword" => SocketRateLimitConfig { max_requests: 10, window_ms: 60_000 },
+        "shareRoomLink" => SocketRateLimitConfig { max_requests: 20, window_ms: 60_000 },
+        _ => SocketRateLimitConfig { max_requests: 30, window_ms: 60_000 },
     }
 }
 
@@ -480,7 +480,15 @@ async fn handle_join_room(
     let username = data.user
         .as_ref()
         .and_then(|u| u.name.clone())
-        .unwrap_or_else(|| format!("User_{}", &user_id[5..11]));
+        .unwrap_or_else(|| {
+            use rand::Rng;
+            let suffix: String = rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
+                .take(6)
+                .map(|b| (b as char).to_ascii_lowercase())
+                .collect();
+            format!("用户{}", suffix)
+        });
 
     // Detect device type: prefer client-provided value, fallback to User-Agent detection
     let device_type = data.user
@@ -552,7 +560,15 @@ async fn handle_join_room_with_password(
     let username = data.user
         .as_ref()
         .and_then(|u| u.name.clone())
-        .unwrap_or_else(|| format!("User_{}", &user_id[5..11]));
+        .unwrap_or_else(|| {
+            use rand::Rng;
+            let suffix: String = rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
+                .take(6)
+                .map(|b| (b as char).to_ascii_lowercase())
+                .collect();
+            format!("用户{}", suffix)
+        });
 
     // Detect device type: prefer client-provided value, fallback to User-Agent detection
     let device_type = data.user
@@ -687,7 +703,31 @@ async fn handle_set_room_password(
     data: SetRoomPasswordRequest,
     room_service: Arc<RoomService>,
 ) {
-    match room_service.set_room_password(&data.room_key, data.password.as_deref()) {
+    let socket_id = socket.id.to_string();
+
+    // Verify user is authenticated
+    let user = match room_service.get_user_by_socket(&socket_id) {
+        Some(u) => u,
+        None => {
+            let _ = socket.emit("error", &"User not authenticated");
+            return;
+        }
+    };
+
+    // Verify user is in the target room
+    if user.room_key != data.room_key {
+        let _ = socket.emit("error", &"User not in room");
+        return;
+    }
+
+    // Generate UUID password if password field is present but empty (matching Node.js behavior)
+    let password = match &data.password {
+        Some(pwd) if pwd.is_empty() => Some(uuid::Uuid::new_v4().to_string()),
+        Some(pwd) => Some(pwd.clone()),
+        None => None,
+    };
+
+    match room_service.set_room_password(&data.room_key, password.as_deref()) {
         Ok(has_password) => {
             // Broadcast to all users in the room
             let event = RoomPasswordSetEvent {
@@ -696,7 +736,7 @@ async fn handle_set_room_password(
             };
             let _ = socket.to(data.room_key.clone()).emit("roomPasswordSet", &event);
             let _ = socket.emit("roomPasswordSet", &event);
-            tracing::info!("Room {} password {}", data.room_key, if has_password { "set" } else { "removed" });
+            tracing::info!("Room {} password {} by {}", data.room_key, if has_password { "set" } else { "removed" }, user.username);
         }
         Err(error) => {
             let _ = socket.emit("error", &error);
@@ -709,6 +749,29 @@ async fn handle_share_room_link(
     data: ShareRoomLinkRequest,
     room_service: Arc<RoomService>,
 ) {
+    let socket_id = socket.id.to_string();
+
+    // Verify user is authenticated
+    let user = match room_service.get_user_by_socket(&socket_id) {
+        Some(u) => u,
+        None => {
+            let _ = socket.emit("error", &"User not authenticated");
+            return;
+        }
+    };
+
+    // Verify user is in the target room
+    if user.room_key != data.room_key {
+        let _ = socket.emit("error", &"User not in room");
+        return;
+    }
+
+    // Verify room exists
+    if !room_service.room_exists(&data.room_key) {
+        let _ = socket.emit("error", &"Room not found");
+        return;
+    }
+
     // Get client origin from socket handshake headers, matching Node.js behavior
     let client_origin = std::env::var("CLIENT_URL").ok().unwrap_or_else(|| {
         let req_parts = socket.req_parts();
@@ -736,7 +799,7 @@ async fn handle_share_room_link(
     };
 
     let _ = socket.emit("roomLinkGenerated", &event);
-    tracing::info!("Share link generated for room {}", data.room_key);
+    tracing::info!("Share link generated for room {} by {}", data.room_key, user.username);
 }
 
 async fn handle_p2p_offer(

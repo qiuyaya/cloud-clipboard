@@ -19,13 +19,15 @@ use super::ApiResponse;
 #[serde(rename_all = "camelCase")]
 pub struct UploadResponse {
     pub file_id: String,
-    pub filename: String,
-    pub original_name: String,
-    pub size: u64,
-    pub mime_type: String,
     pub download_url: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    pub size: u64,
+    #[serde(rename = "type")]
+    pub file_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_duplicate: Option<bool>,
+    pub last_modified: Option<u64>,
+    pub is_duplicate: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub original_file_id: Option<String>,
 }
@@ -116,10 +118,24 @@ fn validate_file_id(file_id: &str) -> Result<(), (StatusCode, Json<ApiResponse<(
 // ============= Router =============
 
 pub fn router() -> Router<AppState> {
-    Router::new()
+    use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, create_rate_limiter};
+
+    let config = RateLimitConfig::from_env();
+
+    // Upload rate limit: 5/min (matching Node.js uploadRateLimit)
+    let upload_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 5));
+
+    let upload_routes = Router::new()
         .route("/upload", post(upload_file))
+        .layer(upload_limiter);
+
+    let other_routes = Router::new()
         .route("/download/{file_id}", get(download_file))
-        .route("/{file_id}", delete(delete_file))
+        .route("/{file_id}", delete(delete_file));
+
+    Router::new()
+        .merge(upload_routes)
+        .merge(other_routes)
 }
 
 // ============= Handlers =============
@@ -271,19 +287,21 @@ async fn upload_file(
             )
         })?;
 
-    let download_url = format!("/api/files/download/{}", file_info.filename);
+    let base_url = super::build_base_url(&headers);
+    let download_url = format!("{}/api/files/download/{}", base_url, file_info.filename);
+    let last_modified = file_info.uploaded_at.timestamp_millis() as u64;
 
     Ok(Json(ApiResponse {
         success: true,
         message: Some("File uploaded successfully".to_string()),
         data: Some(UploadResponse {
-            file_id: file_info.filename.clone(),
-            filename: file_info.filename,
-            original_name: file_info.original_name,
-            size: file_info.size,
-            mime_type: file_info.mime_type,
+            file_id: file_info.filename,
             download_url,
-            is_duplicate: file_info.is_duplicate,
+            name: file_info.original_name,
+            size: file_info.size,
+            file_type: file_info.mime_type,
+            last_modified: Some(last_modified),
+            is_duplicate: file_info.is_duplicate.unwrap_or(false),
             original_file_id: file_info.original_file_id,
         }),
     }))

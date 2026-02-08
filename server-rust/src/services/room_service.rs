@@ -36,12 +36,13 @@ impl RoomService {
         self.event_sender.subscribe()
     }
 
-    /// Create a new room
+    /// Create a new room (idempotent - returns existing room if already exists)
     pub fn create_room(&self, room_key: &str, password: Option<&str>) -> Result<RoomInfo, String> {
         let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
 
-        if rooms.contains_key(room_key) {
-            return Err("Room already exists".to_string());
+        if let Some(room) = rooms.get(room_key) {
+            // Room already exists, return existing room info (idempotent, matching Node.js behavior)
+            return Ok(room.to_info());
         }
 
         let password_hash = password.map(|p| {
@@ -149,7 +150,7 @@ impl RoomService {
         }
 
         // Generate unique username
-        let unique_username = room.generate_unique_username(username);
+        let unique_username = room.generate_unique_username(username, fingerprint);
 
         // Create user
         let mut user = User::new(user_id.to_string(), unique_username, room_key.to_string());

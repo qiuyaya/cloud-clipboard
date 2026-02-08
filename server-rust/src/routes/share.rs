@@ -1,11 +1,12 @@
 use axum::{
     body::Body,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderName, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post},
     Json, Router,
 };
+use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
 use tokio_util::io::ReaderStream;
 use std::collections::HashMap;
@@ -18,39 +19,50 @@ use super::ApiResponse;
 
 // ============= Stream & Bandwidth Tracking =============
 
-/// Track concurrent download streams
-static MAX_CONCURRENT_STREAMS: AtomicUsize = AtomicUsize::new(100);
-
 /// Global concurrent stream counter
 static ACTIVE_STREAMS: AtomicUsize = AtomicUsize::new(0);
 
+/// Per-IP concurrent stream tracker
+static PER_IP_STREAMS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, usize>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+const MAX_CONCURRENT_GLOBAL: usize = 100;
+const MAX_CONCURRENT_PER_IP: usize = 5;
+
 /// RAII guard for stream tracking - decrements counter on drop
-struct StreamGuard;
+struct StreamGuard {
+    ip: String,
+}
 
 impl StreamGuard {
-    fn acquire() -> Result<Self, ()> {
-        let max = MAX_CONCURRENT_STREAMS.load(Ordering::Relaxed);
-        loop {
-            let current = ACTIVE_STREAMS.load(Ordering::Relaxed);
-            if current >= max {
-                return Err(());
-            }
-            match ACTIVE_STREAMS.compare_exchange(
-                current,
-                current + 1,
-                Ordering::AcqRel,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return Ok(StreamGuard),
-                Err(_) => continue,
-            }
+    fn acquire(ip: String) -> Result<Self, ()> {
+        let global = ACTIVE_STREAMS.load(Ordering::Relaxed);
+        if global >= MAX_CONCURRENT_GLOBAL {
+            return Err(());
         }
+
+        let mut map = PER_IP_STREAMS.lock().map_err(|_| ())?;
+        let count = map.entry(ip.clone()).or_insert(0);
+        if *count >= MAX_CONCURRENT_PER_IP {
+            return Err(());
+        }
+        *count += 1;
+        ACTIVE_STREAMS.fetch_add(1, Ordering::AcqRel);
+        Ok(StreamGuard { ip })
     }
 }
 
 impl Drop for StreamGuard {
     fn drop(&mut self) {
         ACTIVE_STREAMS.fetch_sub(1, Ordering::AcqRel);
+        if let Ok(mut map) = PER_IP_STREAMS.lock() {
+            if let Some(count) = map.get_mut(&self.ip) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    map.remove(&self.ip);
+                }
+            }
+        }
     }
 }
 
@@ -130,15 +142,21 @@ pub struct CreateShareRequest {
     pub user_id: String,
     pub expires_in_days: Option<i64>,
     pub password: Option<String>,
+    pub enable_password: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateShareResponse {
     pub share_id: String,
+    pub file_id: String,
+    pub created_by: String,
     pub share_url: String,
-    pub expires_at: String,
     pub password: Option<String>,
+    pub created_at: String,
+    pub expires_at: String,
+    pub has_password: bool,
+    pub access_count: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -192,24 +210,70 @@ fn extract_user_id(headers: &HeaderMap) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Extract password from Authorization: Basic <base64> header
+/// Basic Auth format: base64("username:password"), username can be empty
+fn extract_basic_auth_password(headers: &HeaderMap) -> Option<String> {
+    let auth_header = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    if !auth_header.starts_with("Basic ") {
+        return None;
+    }
+    let decoded = general_purpose::STANDARD
+        .decode(auth_header.trim_start_matches("Basic ").trim())
+        .ok()?;
+    let decoded_str = String::from_utf8(decoded).ok()?;
+    let password = decoded_str.splitn(2, ':').nth(1)?;
+    if password.is_empty() {
+        None
+    } else {
+        Some(password.to_string())
+    }
+}
+
 // ============= Router =============
 
 pub fn router() -> Router<AppState> {
-    Router::new()
-        // 创建分享
+    use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, create_rate_limiter};
+
+    let config = RateLimitConfig::from_env();
+
+    // Create per-operation rate limiters (matching Node.js rateLimiter.ts)
+    let create_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 10));   // 10/min
+    let list_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 30));     // 30/min
+    let revoke_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 20));   // 20/min
+    let access_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 50));   // 50/min
+
+    // Create route: POST /
+    let create_routes = Router::new()
         .route("/", post(create_share))
-        // 获取用户分享列表 (支持 query 参数)
+        .layer(create_limiter);
+
+    // List route: GET /
+    let list_routes = Router::new()
         .route("/", get(list_shares))
-        // 获取分享详情
+        .layer(list_limiter.clone());
+
+    // Detail/delete routes
+    let detail_routes = Router::new()
         .route("/{share_id}", get(get_share))
-        // 删除分享 (撤销)
+        .layer(list_limiter);
+
+    let delete_routes = Router::new()
         .route("/{share_id}", delete(delete_share))
-        // 永久删除
         .route("/{share_id}/permanent-delete", post(permanent_delete))
-        // 获取访问日志
+        .layer(revoke_limiter);
+
+    // Access log routes
+    let access_routes = Router::new()
         .route("/{share_id}/access", get(get_access_logs))
-        // 获取指定用户的分享列表 (兼容旧 API)
         .route("/user/{user_id}", get(get_user_shares))
+        .layer(access_limiter);
+
+    Router::new()
+        .merge(create_routes)
+        .merge(list_routes)
+        .merge(detail_routes)
+        .merge(delete_routes)
+        .merge(access_routes)
 }
 
 // ============= Handlers =============
@@ -217,6 +281,7 @@ pub fn router() -> Router<AppState> {
 /// POST /api/share
 async fn create_share(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<CreateShareRequest>,
 ) -> Result<Json<ApiResponse<CreateShareResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
     let expires_in_days = payload.expires_in_days.unwrap_or(7);
@@ -239,23 +304,31 @@ async fn create_share(
         payload.room_key,
         payload.user_id,
         expires_in_days,
+        payload.enable_password.unwrap_or(false),
         payload.password.as_deref(),
     ) {
         Ok((share, generated_password)) => {
-            // Generate full share URL using BASE_PATH if configured
+            // Generate full share URL using base URL and BASE_PATH
+            let base_url = super::build_base_url(&headers);
             let base_path = std::env::var("BASE_PATH")
                 .unwrap_or_default()
                 .trim_end_matches('/')
                 .to_string();
-            let share_url = format!("{}/public/file/{}", base_path, share.share_id);
+            let share_url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            let has_password = share.has_password();
             Ok(Json(ApiResponse {
                 success: true,
                 message: Some("Share created".to_string()),
                 data: Some(CreateShareResponse {
                     share_id: share.share_id,
+                    file_id: share.file_name.clone(),
+                    has_password,
+                    created_by: share.created_by,
                     share_url,
-                    expires_at: share.expires_at.to_rfc3339(),
                     password: generated_password,
+                    created_at: share.created_at.to_rfc3339(),
+                    expires_at: share.expires_at.to_rfc3339(),
+                    access_count: 0,
                 }),
             }))
         }
@@ -365,8 +438,40 @@ async fn get_share(
 /// DELETE /api/share/:shareId
 async fn delete_share(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(share_id): Path<String>,
 ) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
+    // Require user_id for ownership verification
+    let user_id = extract_user_id(&headers).ok_or_else(|| (
+        StatusCode::UNAUTHORIZED,
+        Json(ApiResponse {
+            success: false,
+            message: Some("User ID required (x-user-id header)".to_string()),
+            data: None,
+        }),
+    ))?;
+
+    // Check share exists and verify ownership
+    let share = state.share_service.get_share(&share_id).ok_or_else(|| (
+        StatusCode::NOT_FOUND,
+        Json(ApiResponse {
+            success: false,
+            message: Some("Share not found".to_string()),
+            data: None,
+        }),
+    ))?;
+
+    if share.created_by != user_id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse {
+                success: false,
+                message: Some("You do not have permission to revoke this share".to_string()),
+                data: None,
+            }),
+        ));
+    }
+
     match state.share_service.revoke_share(&share_id) {
         Ok(true) => Ok(Json(ApiResponse {
             success: true,
@@ -483,22 +588,7 @@ async fn get_user_shares(
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Json<ApiResponse<Vec<crate::models::share::ShareInfoResponse>>> {
-    let shares = state.share_service.get_user_shares(&user_id);
-    let now = chrono::Utc::now();
-
-    let response: Vec<_> = shares
-        .into_iter()
-        .map(|share| crate::models::share::ShareInfoResponse {
-            share_id: share.share_id,
-            file_name: share.file_name,
-            file_size: share.file_size,
-            created_at: share.created_at,
-            expires_at: share.expires_at,
-            is_active: share.is_active && share.expires_at > now,
-            access_count: share.access_count,
-            has_password: share.has_password,
-        })
-        .collect();
+    let response = state.share_service.get_user_shares_response(&user_id);
 
     Json(ApiResponse {
         success: true,
@@ -514,8 +604,30 @@ pub async fn public_download(
     Path(share_id): Path<String>,
     Query(query): Query<DownloadQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ApiResponse<()>>)> {
-    // P2.1: Check concurrent stream limit
-    let _stream_guard = StreamGuard::acquire().map_err(|_| {
+    // Validate shareId format (8-10 character base62: [a-zA-Z0-9])
+    if share_id.len() < 8 || share_id.len() > 10
+        || !share_id.chars().all(|c| c.is_ascii_alphanumeric())
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Invalid share ID format".to_string()),
+                data: None,
+            }),
+        ));
+    }
+
+    // Extract client IP early for per-IP stream limiting
+    let client_ip = extract_client_ip(&headers);
+
+    // Extract User-Agent for access logging
+    let user_agent = headers.get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // P2.1: Check concurrent stream limit (per-IP + global)
+    let _stream_guard = StreamGuard::acquire(client_ip.clone()).map_err(|_| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(ApiResponse {
@@ -540,10 +652,10 @@ pub async fn public_download(
     // Check expiration
     if share.is_expired() {
         return Err((
-            StatusCode::GONE,
+            StatusCode::NOT_FOUND,
             Json(ApiResponse {
                 success: false,
-                message: Some("Share has expired".to_string()),
+                message: Some("Share not found".to_string()),
                 data: None,
             }),
         ));
@@ -552,20 +664,23 @@ pub async fn public_download(
     // Check if share is active
     if !share.is_active {
         return Err((
-            StatusCode::GONE,
+            StatusCode::NOT_FOUND,
             Json(ApiResponse {
                 success: false,
-                message: Some("Share has been revoked".to_string()),
+                message: Some("Share not found".to_string()),
                 data: None,
             }),
         ));
     }
 
     // Verify password if required
-    let client_ip = extract_client_ip(&headers);
     if share.has_password() {
-        match &query.password {
-            Some(pwd) if share.verify_password(pwd) => {}
+        // Prefer Basic Auth, fallback to query parameter
+        let password = extract_basic_auth_password(&headers)
+            .or_else(|| query.password.clone());
+
+        match password {
+            Some(pwd) if share.verify_password(&pwd) => {}
             Some(_) => {
                 let _ = state.share_service.record_access(
                     &share_id,
@@ -573,6 +688,7 @@ pub async fn public_download(
                     false,
                     None,
                     Some("Invalid password".to_string()),
+                    user_agent,
                 );
                 return Err((
                     StatusCode::UNAUTHORIZED,
@@ -644,6 +760,23 @@ pub async fn public_download(
         ));
     }
 
+    // Detect hard link attacks
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if metadata.nlink() > 1 {
+            tracing::warn!("Hard link detected for file: {:?}", file_info.path);
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(ApiResponse {
+                    success: false,
+                    message: Some("Access denied".to_string()),
+                    data: None,
+                }),
+            ));
+        }
+    }
+
     // P2.3: Open file by path and verify it's within upload directory
     let upload_dir = state.file_manager.upload_dir().canonicalize().map_err(|_| {
         (
@@ -697,6 +830,7 @@ pub async fn public_download(
         true,
         Some(file_info.size),
         None,
+        user_agent,
     );
 
     let stream = ReaderStream::new(file);
@@ -712,6 +846,8 @@ pub async fn public_download(
             (header::CONTENT_TYPE, file_info.mime_type),
             (header::CONTENT_DISPOSITION, content_disposition),
             (header::CONTENT_LENGTH, file_info.size.to_string()),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate".to_string()),
+            (HeaderName::from_static("x-content-type-options"), "nosniff".to_string()),
         ],
         body,
     ))

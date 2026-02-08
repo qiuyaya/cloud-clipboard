@@ -258,6 +258,7 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-extra",
+ "base64",
  "bcrypt",
  "chrono",
  "dotenvy",

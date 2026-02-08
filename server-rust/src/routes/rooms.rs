@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 use crate::models::Message;
+use crate::utils::validate_room_key;
 use super::ApiResponse;
 
 // ============= Request/Response Types =============
@@ -114,7 +115,7 @@ fn extract_room_key(headers: &HeaderMap) -> Option<String> {
 }
 
 fn require_room_key(headers: &HeaderMap) -> Result<String, (StatusCode, Json<ApiResponse<()>>)> {
-    extract_room_key(headers).ok_or_else(|| {
+    let room_key = extract_room_key(headers).ok_or_else(|| {
         (
             StatusCode::UNAUTHORIZED,
             Json(ApiResponse {
@@ -123,7 +124,20 @@ fn require_room_key(headers: &HeaderMap) -> Result<String, (StatusCode, Json<Api
                 data: None,
             }),
         )
-    })
+    })?;
+
+    if let Err(msg) = validate_room_key(&room_key) {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(ApiResponse {
+                success: false,
+                message: Some(format!("Invalid room key format: {}", msg)),
+                data: None,
+            }),
+        ));
+    }
+
+    Ok(room_key)
 }
 
 // ============= Router =============
@@ -152,13 +166,13 @@ async fn create_room(
     State(state): State<AppState>,
     Json(payload): Json<CreateRoomRequest>,
 ) -> Result<Json<ApiResponse<RoomInfoResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
-    // Validate room key
-    if payload.room_key.len() < 6 || payload.room_key.len() > 50 {
+    // Validate room key format
+    if let Err(msg) = validate_room_key(&payload.room_key) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ApiResponse {
                 success: false,
-                message: Some("Room key must be 6-50 characters".to_string()),
+                message: Some(msg.to_string()),
                 data: None,
             }),
         ));
@@ -171,7 +185,7 @@ async fn create_room(
                 users: vec![],
                 message_count: 0,
                 created_at: info.created_at,
-                last_activity: info.created_at,
+                last_activity: info.last_activity,
                 has_password: info.has_password,
             };
             Ok(Json(ApiResponse {
@@ -181,7 +195,7 @@ async fn create_room(
             }))
         }
         Err(e) => Err((
-            StatusCode::CONFLICT,
+            StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse {
                 success: false,
                 message: Some(e),
@@ -217,7 +231,7 @@ async fn get_room_info(
         users: users.iter().map(UserResponse::from).collect(),
         message_count: messages.len(),
         created_at: info.created_at,
-        last_activity: info.created_at,
+        last_activity: info.last_activity,
         has_password: info.has_password,
     };
 
@@ -363,7 +377,7 @@ async fn get_room_by_path(
         users: users.iter().map(UserResponse::from).collect(),
         message_count: messages.len(),
         created_at: info.created_at,
-        last_activity: info.created_at,
+        last_activity: info.last_activity,
         has_password: info.has_password,
     };
 

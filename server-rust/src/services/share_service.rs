@@ -28,17 +28,22 @@ impl ShareService {
         room_key: String,
         created_by: String,
         expires_in_days: i64,
+        enable_password: bool,
         password: Option<&str>,
     ) -> Result<(ShareInfo, Option<String>), String> {
         let share_id = generate_share_id();
 
         let (password_hash, generated_password) = if let Some(pwd) = password {
+            // User specified a custom password
             (Some(bcrypt::hash(pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?), None)
-        } else {
-            // Generate random password if requested
+        } else if enable_password {
+            // User requested auto-generated password
             let pwd = generate_random_password();
             let hash = bcrypt::hash(&pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
             (Some(hash), Some(pwd))
+        } else {
+            // No password
+            (None, None)
         };
 
         let share = ShareInfo::new(
@@ -125,11 +130,12 @@ impl ShareService {
         success: bool,
         bytes: Option<u64>,
         error: Option<String>,
+        user_agent: Option<String>,
     ) -> Result<(), String> {
         let mut shares = self.shares.write().map_err(|_| "Lock error")?;
         match shares.get_mut(share_id) {
             Some(share) => {
-                share.record_access(ip_address, success, bytes, error);
+                share.record_access(ip_address, success, bytes, error, user_agent);
                 Ok(())
             }
             None => Err("Share not found".to_string()),
@@ -200,6 +206,19 @@ impl ShareService {
             tracing::info!("Cleaned up {} expired shares", expired.len());
         }
 
+        // Clean up access logs older than 30 days
+        let thirty_days_ago = chrono::Utc::now() - chrono::Duration::days(30);
+        if let Ok(mut shares) = self.shares.write() {
+            for share in shares.values_mut() {
+                let before = share.access_logs.len();
+                share.access_logs.retain(|log| log.timestamp > thirty_days_ago);
+                let removed = before - share.access_logs.len();
+                if removed > 0 {
+                    tracing::debug!("Cleaned {} old access logs from share {}", removed, share.share_id);
+                }
+            }
+        }
+
         expired
     }
 }
@@ -224,4 +243,66 @@ fn generate_random_password() -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_share_no_password() {
+        let service = ShareService::new();
+        let result = service.create_share(
+            "test.txt".into(), "test.txt".into(), 100,
+            "room1".into(), "user1".into(), 7,
+            false, None,
+        );
+        let (share, generated_pwd) = result.unwrap();
+        assert!(!share.has_password());
+        assert!(generated_pwd.is_none());
+    }
+
+    #[test]
+    fn test_create_share_auto_generate_password() {
+        let service = ShareService::new();
+        let result = service.create_share(
+            "test.txt".into(), "test.txt".into(), 100,
+            "room1".into(), "user1".into(), 7,
+            true, None,
+        );
+        let (share, generated_pwd) = result.unwrap();
+        assert!(share.has_password());
+        assert!(generated_pwd.is_some());
+        let pwd = generated_pwd.unwrap();
+        assert_eq!(pwd.len(), 6);
+    }
+
+    #[test]
+    fn test_create_share_custom_password() {
+        let service = ShareService::new();
+        let result = service.create_share(
+            "test.txt".into(), "test.txt".into(), 100,
+            "room1".into(), "user1".into(), 7,
+            false, Some("mypass123"),
+        );
+        let (share, generated_pwd) = result.unwrap();
+        assert!(share.has_password());
+        assert!(generated_pwd.is_none()); // custom password not returned
+        assert!(share.verify_password("mypass123"));
+        assert!(!share.verify_password("wrong"));
+    }
+
+    #[test]
+    fn test_create_share_custom_password_overrides_enable() {
+        let service = ShareService::new();
+        let result = service.create_share(
+            "test.txt".into(), "test.txt".into(), 100,
+            "room1".into(), "user1".into(), 7,
+            true, Some("custom"),
+        );
+        let (share, generated_pwd) = result.unwrap();
+        assert!(share.has_password());
+        assert!(generated_pwd.is_none()); // custom takes precedence
+        assert!(share.verify_password("custom"));
+    }
 }

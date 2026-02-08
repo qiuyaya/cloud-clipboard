@@ -33,6 +33,9 @@ anyhow = "1"
 # Password hashing
 bcrypt = "0.16"
 
+# Base64 encoding/decoding (for Basic Auth)
+base64 = "0.22"
+
 # SHA-256 hashing for file deduplication
 sha2 = "0.10"
 

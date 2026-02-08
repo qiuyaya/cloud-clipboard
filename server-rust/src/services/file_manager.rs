@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{RwLock, atomic::{AtomicU64, Ordering}};
 use chrono::{DateTime, Duration, Utc};
 use sha2::{Sha256, Digest};
 use tokio::fs;
@@ -33,6 +33,8 @@ pub struct FileManager {
     hash_to_file_id: RwLock<HashMap<String, String>>, // sha256_hash -> filename
     max_file_size: u64,
     retention_hours: i64,
+    deleted_file_count: AtomicU64,
+    total_deleted_size: AtomicU64,
 }
 
 impl FileManager {
@@ -61,6 +63,8 @@ impl FileManager {
             hash_to_file_id: RwLock::new(HashMap::new()),
             max_file_size,
             retention_hours,
+            deleted_file_count: AtomicU64::new(0),
+            total_deleted_size: AtomicU64::new(0),
         })
     }
 
@@ -244,6 +248,8 @@ impl FileManager {
             }
 
             tracing::info!("File deleted: {}", filename);
+            self.deleted_file_count.fetch_add(1, Ordering::Relaxed);
+            self.total_deleted_size.fetch_add(info.size, Ordering::Relaxed);
         }
 
         Ok(file_info)
@@ -326,10 +332,19 @@ impl FileManager {
     pub fn get_stats(&self) -> FileStats {
         let files = self.files.read().unwrap();
         let total_size: u64 = files.values().map(|f| f.size).sum();
+        let room_count = {
+            let rooms: std::collections::HashSet<&str> = files.values()
+                .map(|f| f.room_key.as_str())
+                .collect();
+            rooms.len()
+        };
 
         FileStats {
             total_files: files.len(),
             total_size,
+            room_count,
+            deleted_files: self.deleted_file_count.load(Ordering::Relaxed),
+            deleted_size: self.total_deleted_size.load(Ordering::Relaxed),
         }
     }
 
@@ -387,4 +402,7 @@ impl FileManager {
 pub struct FileStats {
     pub total_files: usize,
     pub total_size: u64,
+    pub room_count: usize,
+    pub deleted_files: u64,
+    pub deleted_size: u64,
 }

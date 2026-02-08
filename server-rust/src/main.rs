@@ -26,7 +26,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::services::{RoomService, RoomEvent, FileManager, ShareService};
 use crate::routes::{health, api_info, rooms, files, share};
-use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, general_rate_limiter, strict_rate_limiter, share_rate_limiter, download_rate_limiter, public_download_rate_limiter};
+use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, strict_rate_limiter, public_download_rate_limiter};
 
 /// Application state shared across all handlers
 #[derive(Clone)]
@@ -119,10 +119,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Initialize rate limiters
-    let general_limiter = general_rate_limiter(&rate_limit_config);
     let strict_limiter = strict_rate_limiter(&rate_limit_config);
-    let share_limiter = share_rate_limiter(&rate_limit_config);
-    let download_limiter = download_rate_limiter(&rate_limit_config);
     let public_download_limiter = public_download_rate_limiter(&rate_limit_config);
 
     // Initialize services
@@ -146,6 +143,8 @@ async fn main() -> anyhow::Result<()> {
     // Setup Socket.IO
     let (socket_layer, io) = SocketIo::builder()
         .with_state(app_state.clone())
+        .ping_timeout(Duration::from_secs(60))
+        .ping_interval(Duration::from_secs(25))
         .build_layer();
 
     // Register Socket.IO event handlers
@@ -208,18 +207,29 @@ async fn main() -> anyhow::Result<()> {
             .allow_headers(Any)
             .allow_credentials(false)
     } else {
-        CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-            .allow_headers(Any)
-            .allow_credentials(false)
+        let allowed_origins: Vec<HeaderValue> = std::env::var("CLIENT_URL")
+            .unwrap_or_else(|_| "http://localhost:3000,http://localhost:3002".to_string())
+            .split(',')
+            .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
+            .collect();
+
+        if allowed_origins.is_empty() {
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                .allow_headers(Any)
+                .allow_credentials(false)
+        } else {
+            CorsLayer::new()
+                .allow_origin(allowed_origins)
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                .allow_headers(Any)
+                .allow_credentials(true)
+        }
     };
 
     // Build rate limit middleware layers
-    let general_rate_limit = RateLimitMiddleware::new(general_limiter);
     let strict_rate_limit = RateLimitMiddleware::new(strict_limiter);
-    let share_rate_limit = RateLimitMiddleware::new(share_limiter);
-    let download_rate_limit = RateLimitMiddleware::new(download_limiter);
     let public_download_rate_limit = RateLimitMiddleware::new(public_download_limiter);
 
     // Clone services for background tasks
@@ -232,20 +242,18 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Build the API router (routes relative to base path)
+    // Each route group uses its own rate limiting (configured in respective router() functions)
     let api_router = Router::new()
-        // Health endpoints
+        // Health endpoints (no rate limit)
         .route("/health", get(health::health_check))
         .route("/api/health", get(health::health_check))
         .route("/api", get(api_info::api_info))
         // Room routes - strict rate limit
-        .nest("/api/rooms", rooms::router())
-        .layer(strict_rate_limit.clone())
-        // File routes - strict rate limit for uploads/downloads
+        .nest("/api/rooms", rooms::router().layer(strict_rate_limit))
+        // File routes - internal per-operation rate limiting
         .nest("/api/files", files::router())
-        .layer(strict_rate_limit.clone())
-        // Share routes - strict rate limit
+        // Share routes - internal per-operation rate limiting
         .nest("/api/share", share::router())
-        .layer(strict_rate_limit.clone())
         // Public file download - dedicated public download rate limit
         .route("/public/file/{share_id}", get(share::public_download))
         .layer(public_download_rate_limit)
