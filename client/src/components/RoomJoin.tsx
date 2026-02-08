@@ -100,6 +100,7 @@ export function RoomJoin({
       cachedFingerprint &&
       roomKey.trim().length > 0 &&
       !isConnecting &&
+      isConnected &&
       isFromShareLink
     ) {
       // This is a share link, auto-join the room
@@ -149,6 +150,7 @@ export function RoomJoin({
     username,
     urlPassword,
     isConnecting,
+    isConnected,
     isFromShareLink,
     onJoinRoom,
     onJoinRoomWithPassword,

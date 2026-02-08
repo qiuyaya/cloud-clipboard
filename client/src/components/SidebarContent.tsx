@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { formatTimestamp } from "@cloud-clipboard/shared";
 import type { User, RoomKey } from "@cloud-clipboard/shared";
-import { Users, LogOut, Share2, Lock, Unlock, Copy, Settings } from "lucide-react";
+import { Users, LogOut, Share2, Lock, Unlock, Settings } from "lucide-react";
 
 interface SidebarContentProps {
   roomKey: RoomKey;
@@ -74,18 +74,20 @@ export function SidebarContent({
       <div className="pl-6 pr-2 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="pr-3">
-            <div className="flex items-center gap-2 group">
+            <div className="relative flex items-center gap-2 group">
               <h2
-                className="text-lg font-semibold cursor-pointer select-all hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="text-lg font-semibold cursor-pointer"
                 onDoubleClick={handleDoubleClickRoomKey}
                 title={t("room.doubleClickToCopy")}
               >
-                {t("room.title", { roomKey })}
+                <span className="select-none">{t("room.label")}</span>
+                <span className="select-all hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  {roomKey}
+                </span>
               </h2>
               {copiedRoomKey && (
-                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 animate-in fade-in duration-200">
-                  <Copy className="h-3 w-3" />
-                  <span>{t("room.copied")}</span>
+                <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                  <span className="text-popover-foreground">{t("room.copied")}</span>
                 </div>
               )}
             </div>

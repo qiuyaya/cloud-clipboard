@@ -44,11 +44,15 @@
     }
   },
   "room": {
-    "title": "Room: {{roomKey}}",
-    "usersOnline": "{{count}} user online",
+    "label": "Room: ",
+    "usersOnline_one": "{{count}} user online",
     "usersOnline_other": "{{count}} users online",
     "leave": "Leave",
     "share": "Share",
+    "switchRoomTitle": "Switch Room",
+    "switchRoomDesc": "You are currently in room {{currentRoom}}. Leave and join room {{targetRoom}}?",
+    "switchRoomConfirm": "Switch",
+    "switchRoomCancel": "Cancel",
     "sidebarTitle": "Room Info",
     "sidebarDescription": "View room details and online users",
     "setPassword": "Set Password",
