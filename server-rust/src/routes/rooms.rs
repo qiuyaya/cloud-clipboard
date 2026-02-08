@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 use crate::models::Message;
+use super::ApiResponse;
 
 // ============= Request/Response Types =============
 
@@ -34,16 +35,6 @@ pub struct ValidateUserRequest {
 #[derive(Debug, Deserialize)]
 pub struct MessagesQuery {
     pub limit: Option<usize>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ApiResponse<T> {
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<T>,
 }
 
 #[derive(Debug, Serialize)]
@@ -76,8 +67,8 @@ impl From<&crate::models::User> for UserResponse {
             name: user.username.clone(),
             is_online: user.is_online,
             last_seen: user.last_seen,
-            device_type: "desktop".to_string(),
-            fingerprint: None,
+            device_type: user.device_type.clone(),
+            fingerprint: user.fingerprint.clone(),
         }
     }
 }
@@ -315,17 +306,37 @@ async fn validate_user(
         });
     }
 
-    // TODO: Implement fingerprint-based user lookup
-    // For now, just return room exists but user not found
-    Json(ApiResponse {
-        success: true,
-        message: None,
-        data: Some(ValidateUserData {
-            room_exists: true,
-            user_exists: false,
-            user: None,
-        }),
-    })
+    // Look up user by fingerprint
+    let found_user = state.room_service.find_user_by_fingerprint(
+        &payload.room_key,
+        &payload.user_fingerprint,
+    );
+
+    match found_user {
+        Some(user) => {
+            let user_response = UserResponse::from(&user);
+            Json(ApiResponse {
+                success: true,
+                message: None,
+                data: Some(ValidateUserData {
+                    room_exists: true,
+                    user_exists: true,
+                    user: Some(user_response),
+                }),
+            })
+        }
+        None => {
+            Json(ApiResponse {
+                success: true,
+                message: None,
+                data: Some(ValidateUserData {
+                    room_exists: true,
+                    user_exists: false,
+                    user: None,
+                }),
+            })
+        }
+    }
 }
 
 /// GET /api/rooms/:roomKey

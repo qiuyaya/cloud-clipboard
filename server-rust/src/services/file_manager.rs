@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use chrono::{DateTime, Duration, Utc};
+use sha2::{Sha256, Digest};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
@@ -16,6 +17,12 @@ pub struct FileInfo {
     pub room_key: String,
     pub uploaded_at: DateTime<Utc>,
     pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_duplicate: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_file_id: Option<String>,
 }
 
 /// File manager service
@@ -23,6 +30,7 @@ pub struct FileManager {
     upload_dir: PathBuf,
     files: RwLock<HashMap<String, FileInfo>>,
     room_files: RwLock<HashMap<String, Vec<String>>>, // room_key -> [filename]
+    hash_to_file_id: RwLock<HashMap<String, String>>, // sha256_hash -> filename
     max_file_size: u64,
     retention_hours: i64,
 }
@@ -50,6 +58,7 @@ impl FileManager {
             upload_dir,
             files: RwLock::new(HashMap::new()),
             room_files: RwLock::new(HashMap::new()),
+            hash_to_file_id: RwLock::new(HashMap::new()),
             max_file_size,
             retention_hours,
         })
@@ -65,7 +74,7 @@ impl FileManager {
         self.max_file_size
     }
 
-    /// Save uploaded file
+    /// Save uploaded file with SHA-256 deduplication
     pub async fn save_file(
         &self,
         room_key: &str,
@@ -75,6 +84,63 @@ impl FileManager {
     ) -> anyhow::Result<FileInfo> {
         if data.len() as u64 > self.max_file_size {
             anyhow::bail!("File too large");
+        }
+
+        // Compute SHA-256 hash
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        let hash_hex = format!("{:x}", hasher.finalize());
+
+        // Check for duplicate
+        let existing_file = {
+            let hash_map = self.hash_to_file_id.read().map_err(|_| anyhow::anyhow!("Lock error"))?;
+            hash_map.get(&hash_hex).and_then(|existing_filename| {
+                let files = self.files.read().ok()?;
+                files.get(existing_filename).cloned()
+            })
+        };
+
+        if let Some(existing) = existing_file {
+            // Duplicate found - reuse existing file, create new metadata entry
+            let ext = Path::new(original_name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            let filename = format!(
+                "{}_{}.{}",
+                uuid::Uuid::new_v4(),
+                Utc::now().timestamp_millis(),
+                ext
+            );
+
+            let file_info = FileInfo {
+                filename: filename.clone(),
+                original_name: original_name.to_string(),
+                size: data.len() as u64,
+                mime_type: mime_type.to_string(),
+                room_key: room_key.to_string(),
+                uploaded_at: Utc::now(),
+                path: existing.path.clone(),
+                hash: Some(hash_hex),
+                is_duplicate: Some(true),
+                original_file_id: Some(existing.filename.clone()),
+            };
+
+            {
+                let mut files = self.files.write().map_err(|_| anyhow::anyhow!("Lock error"))?;
+                files.insert(filename.clone(), file_info.clone());
+            }
+
+            {
+                let mut room_files = self.room_files.write().map_err(|_| anyhow::anyhow!("Lock error"))?;
+                room_files
+                    .entry(room_key.to_string())
+                    .or_default()
+                    .push(filename);
+            }
+
+            tracing::info!("File deduplicated: {} (duplicate of {})", original_name, existing.filename);
+            return Ok(file_info);
         }
 
         // Generate unique filename
@@ -104,6 +170,9 @@ impl FileManager {
             room_key: room_key.to_string(),
             uploaded_at: Utc::now(),
             path: file_path,
+            hash: Some(hash_hex.clone()),
+            is_duplicate: Some(false),
+            original_file_id: None,
         };
 
         // Track file
@@ -117,7 +186,13 @@ impl FileManager {
             room_files
                 .entry(room_key.to_string())
                 .or_default()
-                .push(filename);
+                .push(filename.clone());
+        }
+
+        // Track hash
+        {
+            let mut hash_map = self.hash_to_file_id.write().map_err(|_| anyhow::anyhow!("Lock error"))?;
+            hash_map.insert(hash_hex, filename);
         }
 
         tracing::info!("File uploaded: {} for room {}", original_name, room_key);
@@ -149,9 +224,23 @@ impl FileManager {
                 }
             }
 
-            // Delete physical file
-            if info.path.exists() {
-                fs::remove_file(&info.path).await?;
+            // Check if any other file references the same physical path
+            let other_references = {
+                let files = self.files.read().map_err(|_| anyhow::anyhow!("Lock error"))?;
+                files.values().any(|f| f.path == info.path)
+            };
+
+            if !other_references {
+                // No other references, safe to delete physical file
+                if info.path.exists() {
+                    fs::remove_file(&info.path).await?;
+                }
+                // Clean hash mapping
+                if let Some(ref hash) = info.hash {
+                    if let Ok(mut hash_map) = self.hash_to_file_id.write() {
+                        hash_map.remove(hash);
+                    }
+                }
             }
 
             tracing::info!("File deleted: {}", filename);
@@ -178,8 +267,20 @@ impl FileManager {
 
         for filename in filenames {
             if let Some(info) = files.remove(&filename) {
-                // Delete physical file (sync for simplicity in this context)
-                let _ = std::fs::remove_file(&info.path);
+                // Check if any other file references the same physical path
+                let other_references = files.values().any(|f| f.path == info.path);
+
+                if !other_references {
+                    // No other references, safe to delete physical file
+                    let _ = std::fs::remove_file(&info.path);
+                    // Clean hash mapping
+                    if let Some(ref hash) = info.hash {
+                        if let Ok(mut hash_map) = self.hash_to_file_id.write() {
+                            hash_map.remove(hash);
+                        }
+                    }
+                }
+
                 deleted.push(info);
             }
         }
@@ -230,6 +331,54 @@ impl FileManager {
             total_files: files.len(),
             total_size,
         }
+    }
+
+    /// Cleanup orphaned files (files in upload directory not tracked in memory)
+    /// Called at startup to clean up any files from previous sessions
+    pub async fn cleanup_orphaned_files(&self) -> usize {
+        let mut cleaned = 0;
+
+        if let Ok(entries) = std::fs::read_dir(&self.upload_dir) {
+            let tracked_files: std::collections::HashSet<String> = {
+                let files = match self.files.read() {
+                    Ok(f) => f,
+                    Err(_) => return 0,
+                };
+                files.keys().cloned().collect()
+            };
+
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                        // Check if file is tracked
+                        if !tracked_files.contains(filename) {
+                            // File is orphaned, delete it
+                            if let Ok(()) = std::fs::remove_file(&path) {
+                                tracing::warn!("Cleaned up orphaned file: {}", filename);
+                                cleaned += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if cleaned > 0 {
+            tracing::info!("Startup cleanup: removed {} orphaned files", cleaned);
+        }
+
+        cleaned
+    }
+
+    /// Get upload directory path for external use
+    pub fn get_upload_dir_path(&self) -> &Path {
+        &self.upload_dir
+    }
+
+    /// Get retention hours for external use
+    pub fn get_retention_hours(&self) -> i64 {
+        self.retention_hours
     }
 }
 

@@ -1,24 +1,39 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 use chrono::{Duration, Utc};
+use tokio::sync::broadcast;
 
 use crate::models::{Room, User, Message};
 use crate::models::room::RoomInfo;
+
+/// Events emitted by RoomService
+#[derive(Debug, Clone)]
+pub enum RoomEvent {
+    RoomDestroyed { room_key: String },
+}
 
 /// Service for managing rooms
 pub struct RoomService {
     rooms: RwLock<HashMap<String, Room>>,
     socket_users: RwLock<HashMap<String, User>>,  // socket_id -> User
     user_sockets: RwLock<HashMap<String, String>>, // user_id -> socket_id
+    event_sender: broadcast::Sender<RoomEvent>,
 }
 
 impl RoomService {
     pub fn new() -> Self {
+        let (event_sender, _) = broadcast::channel(64);
         Self {
             rooms: RwLock::new(HashMap::new()),
             socket_users: RwLock::new(HashMap::new()),
             user_sockets: RwLock::new(HashMap::new()),
+            event_sender,
         }
+    }
+
+    /// Subscribe to room events
+    pub fn subscribe(&self) -> broadcast::Receiver<RoomEvent> {
+        self.event_sender.subscribe()
     }
 
     /// Create a new room
@@ -33,7 +48,7 @@ impl RoomService {
             bcrypt::hash(p, bcrypt::DEFAULT_COST).unwrap_or_default()
         });
 
-        let room = Room::new(room_key.to_string(), password_hash);
+        let room = Room::new(room_key.to_string(), password.map(|p| p.to_string()), password_hash);
         let info = room.to_info();
         rooms.insert(room_key.to_string(), room);
 
@@ -62,6 +77,13 @@ impl RoomService {
             .unwrap_or(false)
     }
 
+    /// Get room password (plaintext) for share link generation
+    pub fn get_room_password(&self, room_key: &str) -> Option<String> {
+        self.rooms.read()
+            .ok()
+            .and_then(|rooms| rooms.get(room_key).and_then(|r| r.password.clone()))
+    }
+
     /// Verify room password
     pub fn verify_room_password(&self, room_key: &str, password: &str) -> Result<bool, String> {
         let rooms = self.rooms.read().map_err(|_| "Lock error")?;
@@ -79,12 +101,14 @@ impl RoomService {
         username: &str,
         socket_id: &str,
         password: Option<&str>,
+        device_type: &str,
+        fingerprint: Option<&str>,
     ) -> Result<(User, Vec<User>), String> {
         let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
 
         // Create room if it doesn't exist
         let room = rooms.entry(room_key.to_string())
-            .or_insert_with(|| Room::new(room_key.to_string(), None));
+            .or_insert_with(|| Room::new(room_key.to_string(), None, None));
 
         // Verify password if room has one
         if room.has_password() {
@@ -95,11 +119,42 @@ impl RoomService {
             }
         }
 
+        // Check if user with this fingerprint already exists (reconnection)
+        if let Some(fp) = fingerprint {
+            if let Some(existing_user) = room.find_user_by_fingerprint(fp) {
+                let mut user = existing_user.clone();
+                user.update_activity();
+
+                // Update socket mappings
+                {
+                    let mut socket_users = self.socket_users.write().map_err(|_| "Lock error")?;
+                    let mut user_sockets = self.user_sockets.write().map_err(|_| "Lock error")?;
+                    // Remove old socket mapping
+                    if let Some(old_socket) = user_sockets.get(&user.id) {
+                        socket_users.remove(old_socket);
+                    }
+                    socket_users.insert(socket_id.to_string(), user.clone());
+                    user_sockets.insert(user.id.clone(), socket_id.to_string());
+                }
+
+                // Update user in room
+                if let Some(u) = room.get_user_mut(&user.id) {
+                    u.update_activity();
+                }
+
+                let users: Vec<User> = room.get_users().into_iter().cloned().collect();
+                tracing::info!("User {} reconnected to room {} via fingerprint", user.username, room_key);
+                return Ok((user, users));
+            }
+        }
+
         // Generate unique username
         let unique_username = room.generate_unique_username(username);
 
         // Create user
-        let user = User::new(user_id.to_string(), unique_username, room_key.to_string());
+        let mut user = User::new(user_id.to_string(), unique_username, room_key.to_string());
+        user.device_type = device_type.to_string();
+        user.fingerprint = fingerprint.map(|f| f.to_string());
         room.add_user(user.clone());
 
         // Track socket mapping
@@ -116,6 +171,41 @@ impl RoomService {
         Ok((user, users))
     }
 
+    /// Update user online status
+    pub fn update_user_status(&self, room_key: &str, user_id: &str, is_online: bool) {
+        let should_destroy = {
+            let mut rooms = match self.rooms.write() {
+                Ok(r) => r,
+                Err(_) => return,
+            };
+            if let Some(room) = rooms.get_mut(room_key) {
+                if let Some(u) = room.get_user_mut(user_id) {
+                    if is_online {
+                        u.update_activity();
+                    } else {
+                        u.set_offline();
+                    }
+                }
+                // Check if room should be destroyed after status change
+                if !is_online && room.all_users_offline() {
+                    rooms.remove(room_key);
+                    tracing::info!("Room {} destroyed (all users offline)", room_key);
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+
+        if should_destroy {
+            let _ = self.event_sender.send(RoomEvent::RoomDestroyed {
+                room_key: room_key.to_string(),
+            });
+        }
+    }
+
     /// Leave a room
     pub fn leave_room(&self, socket_id: &str) -> Option<(String, User)> {
         let user = {
@@ -129,6 +219,7 @@ impl RoomService {
         }
 
         let room_key = user.room_key.clone();
+        let mut room_destroyed = false;
 
         {
             let mut rooms = self.rooms.write().ok()?;
@@ -139,32 +230,35 @@ impl RoomService {
                 if room.is_empty() || room.all_users_offline() {
                     let key = room_key.clone();
                     rooms.remove(&key);
-                    tracing::info!("Room {} destroyed (empty)", key);
+                    tracing::info!("Room {} destroyed (empty/all offline after leave)", key);
+                    room_destroyed = true;
                 }
             }
+        }
+
+        if room_destroyed {
+            let _ = self.event_sender.send(RoomEvent::RoomDestroyed {
+                room_key: room_key.clone(),
+            });
         }
 
         tracing::info!("User {} left room {}", user.username, room_key);
         Some((room_key, user))
     }
 
-    /// Set user offline (disconnect without removing)
+    /// Set user offline (disconnect without removing from room)
     pub fn set_user_offline(&self, socket_id: &str) -> Option<(String, User)> {
         let user = {
             let socket_users = self.socket_users.read().ok()?;
             socket_users.get(socket_id).cloned()?
         };
 
-        {
-            let mut rooms = self.rooms.write().ok()?;
-            if let Some(room) = rooms.get_mut(&user.room_key) {
-                if let Some(u) = room.get_user_mut(&user.id) {
-                    u.set_offline();
-                }
-            }
-        }
+        let room_key = user.room_key.clone();
 
-        Some((user.room_key.clone(), user))
+        // Use update_user_status which handles room destruction check
+        self.update_user_status(&room_key, &user.id, false);
+
+        Some((room_key, user))
     }
 
     /// Get users in a room
@@ -176,6 +270,16 @@ impl RoomService {
                     .unwrap_or_default()
             })
             .unwrap_or_default()
+    }
+
+    /// Find user by fingerprint in a room
+    pub fn find_user_by_fingerprint(&self, room_key: &str, fingerprint_hash: &str) -> Option<User> {
+        self.rooms.read()
+            .ok()
+            .and_then(|rooms| {
+                rooms.get(room_key)
+                    .and_then(|r| r.find_user_by_fingerprint(fingerprint_hash).cloned())
+            })
     }
 
     /// Add message to room
@@ -219,9 +323,11 @@ impl RoomService {
                 if let Some(pwd) = password {
                     let hash = bcrypt::hash(pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
                     room.password_hash = Some(hash);
+                    room.password = Some(pwd.to_string());
                     Ok(true)
                 } else {
                     room.password_hash = None;
+                    room.password = None;
                     Ok(false)
                 }
             }
@@ -249,12 +355,23 @@ impl RoomService {
 
         if let Ok(mut rooms) = self.rooms.write() {
             rooms.retain(|key, room| {
-                let should_keep = room.last_activity > cutoff || !room.all_users_offline();
+                // Destroy if inactive for 24h OR all users are offline
+                let inactive = room.last_activity < cutoff;
+                let all_offline = !room.is_empty() && room.all_users_offline();
+                let should_keep = !inactive && !all_offline;
+
                 if !should_keep {
                     destroyed.push(key.clone());
-                    tracing::info!("Room {} destroyed (inactive)", key);
+                    tracing::info!("Room {} destroyed (cleanup: inactive={}, all_offline={})", key, inactive, all_offline);
                 }
                 should_keep
+            });
+        }
+
+        // Send events for destroyed rooms
+        for room_key in &destroyed {
+            let _ = self.event_sender.send(RoomEvent::RoomDestroyed {
+                room_key: room_key.clone(),
             });
         }
 

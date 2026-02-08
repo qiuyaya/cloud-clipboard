@@ -1,11 +1,14 @@
 use socketioxide::SocketIo;
 use socketioxide::extract::{Data, SocketRef};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
+use tokio::sync::RwLock;
 
 use crate::services::RoomService;
 use crate::models::Message;
-use crate::utils::generate_message_id;
+use crate::utils::{generate_message_id, sanitize_message_content, detect_device_type};
 
 /// User info for client
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +26,7 @@ impl From<&crate::models::User> for UserInfo {
         Self {
             id: user.id.clone(),
             name: user.username.clone(),
-            device_type: "desktop".to_string(),
+            device_type: user.device_type.clone(),
             is_online: user.is_online,
             last_seen: user.last_seen,
         }
@@ -81,22 +84,22 @@ pub struct ShareRoomLinkRequest {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct P2POfferRequest {
+    #[serde(rename = "to")]
     pub target_user_id: String,
     pub offer: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct P2PAnswerRequest {
+    #[serde(rename = "to")]
     pub target_user_id: String,
     pub answer: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct P2PIceCandidateRequest {
+    #[serde(rename = "to")]
     pub target_user_id: String,
     pub candidate: serde_json::Value,
 }
@@ -131,8 +134,7 @@ pub struct RoomPasswordSetEvent {
 #[serde(rename_all = "camelCase")]
 pub struct RoomLinkGeneratedEvent {
     pub room_key: String,
-    pub share_url: String,
-    pub expires_at: Option<String>,
+    pub share_link: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -143,20 +145,127 @@ pub struct P2PSignalEvent {
     pub data: serde_json::Value,
 }
 
+/// System message event for broadcasting system notifications
+#[derive(Debug, Serialize)]
+pub struct SystemMessageEvent {
+    #[serde(rename = "type")]
+    pub msg_type: String,
+    pub data: serde_json::Value,
+}
+
+/// Socket-level rate limiter
+struct SocketRateLimiter {
+    /// socket_id -> (event_key -> RateLimitEntry)
+    limits: HashMap<String, HashMap<String, RateLimitEntry>>,
+}
+
+struct RateLimitEntry {
+    count: u32,
+    reset_time: Instant,
+}
+
+impl SocketRateLimiter {
+    fn new() -> Self {
+        Self {
+            limits: HashMap::new(),
+        }
+    }
+
+    fn check_rate_limit(&mut self, socket_id: &str, event: &str, max_requests: u32, window_ms: u64) -> bool {
+        let now = Instant::now();
+        let entries = self.limits.entry(socket_id.to_string()).or_default();
+        let entry = entries.entry(event.to_string()).or_insert(RateLimitEntry {
+            count: 0,
+            reset_time: now + std::time::Duration::from_millis(window_ms),
+        });
+
+        if now >= entry.reset_time {
+            entry.count = 1;
+            entry.reset_time = now + std::time::Duration::from_millis(window_ms);
+            return true;
+        }
+
+        if entry.count >= max_requests {
+            return false;
+        }
+
+        entry.count += 1;
+        true
+    }
+
+    fn cleanup(&mut self) {
+        let now = Instant::now();
+        self.limits.retain(|_, entries| {
+            entries.retain(|_, entry| now < entry.reset_time);
+            !entries.is_empty()
+        });
+    }
+
+    fn remove_socket(&mut self, socket_id: &str) {
+        self.limits.remove(socket_id);
+    }
+}
+
+/// Rate limit configurations matching Node.js SOCKET_RATE_LIMITS
+struct SocketRateLimitConfig {
+    max_requests: u32,
+    window_ms: u64,
+}
+
+fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
+    match event {
+        "joinRoom" | "joinRoomWithPassword" => SocketRateLimitConfig { max_requests: 5, window_ms: 10_000 },
+        "leaveRoom" => SocketRateLimitConfig { max_requests: 10, window_ms: 10_000 },
+        "sendMessage" => SocketRateLimitConfig { max_requests: 30, window_ms: 10_000 },
+        "requestUserList" => SocketRateLimitConfig { max_requests: 10, window_ms: 10_000 },
+        "setRoomPassword" => SocketRateLimitConfig { max_requests: 3, window_ms: 30_000 },
+        "shareRoomLink" => SocketRateLimitConfig { max_requests: 5, window_ms: 30_000 },
+        _ => SocketRateLimitConfig { max_requests: 30, window_ms: 10_000 },
+    }
+}
+
 /// Setup Socket.IO event handlers
 pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
+    let rate_limiter = Arc::new(RwLock::new(SocketRateLimiter::new()));
+
+    // Spawn background task to cleanup rate limit data every 5 minutes
+    {
+        let rate_limiter = rate_limiter.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                let mut limiter = rate_limiter.write().await;
+                limiter.cleanup();
+            }
+        });
+    }
+
     io.ns("/", move |socket: SocketRef| {
         let room_service = room_service.clone();
+        let rate_limiter = rate_limiter.clone();
 
         tracing::info!("Client connected: {}", socket.id);
 
         // Handle join room
         socket.on("joinRoom", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<JoinRoomRequest>(data)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_join_room(socket, data, room_service).await;
+                    let config = get_rate_limit_config("joinRoom");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "joinRoom", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_join_room(socket, data, room_service).await;
+                    } else {
+                        tracing::warn!("Rate limit exceeded for joinRoom: {}", socket.id);
+                        let _ = socket.emit("error", &"Too many join attempts. Please wait.");
+                    }
                 }
             }
         });
@@ -164,10 +273,21 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle join room with password
         socket.on("joinRoomWithPassword", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<JoinRoomWithPasswordRequest>(data)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_join_room_with_password(socket, data, room_service).await;
+                    let config = get_rate_limit_config("joinRoomWithPassword");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "joinRoomWithPassword", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_join_room_with_password(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many join attempts. Please wait.");
+                    }
                 }
             }
         });
@@ -175,10 +295,21 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle send message
         socket.on("sendMessage", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<SendMessageRequest>(data)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_send_message(socket, data, room_service).await;
+                    let config = get_rate_limit_config("sendMessage");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "sendMessage", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_send_message(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many messages. Please wait.");
+                    }
                 }
             }
         });
@@ -186,10 +317,21 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle leave room
         socket.on("leaveRoom", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<LeaveRoomRequest>(data)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_leave_room(socket, data, room_service).await;
+                    let config = get_rate_limit_config("leaveRoom");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "leaveRoom", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_leave_room(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many leave attempts. Please wait.");
+                    }
                 }
             }
         });
@@ -197,10 +339,21 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle request user list
         socket.on("requestUserList", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<String>(room_key)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_request_user_list(socket, room_key, room_service).await;
+                    let config = get_rate_limit_config("requestUserList");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "requestUserList", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_request_user_list(socket, room_key, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many requests. Please wait.");
+                    }
                 }
             }
         });
@@ -208,10 +361,21 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle set room password
         socket.on("setRoomPassword", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<SetRoomPasswordRequest>(data)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_set_room_password(socket, data, room_service).await;
+                    let config = get_rate_limit_config("setRoomPassword");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "setRoomPassword", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_set_room_password(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many requests. Please wait.");
+                    }
                 }
             }
         });
@@ -219,15 +383,26 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle share room link
         socket.on("shareRoomLink", {
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef, Data::<ShareRoomLinkRequest>(data)| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
-                    handle_share_room_link(socket, data, room_service).await;
+                    let config = get_rate_limit_config("shareRoomLink");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(&socket.id.to_string(), "shareRoomLink", config.max_requests, config.window_ms)
+                    };
+                    if allowed {
+                        handle_share_room_link(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many requests. Please wait.");
+                    }
                 }
             }
         });
 
-        // Handle P2P offer
+        // Handle P2P offer (no rate limit, same as Node)
         socket.on("p2pOffer", {
             let room_service = room_service.clone();
             move |socket: SocketRef, Data::<P2POfferRequest>(data)| {
@@ -238,7 +413,7 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
             }
         });
 
-        // Handle P2P answer
+        // Handle P2P answer (no rate limit, same as Node)
         socket.on("p2pAnswer", {
             let room_service = room_service.clone();
             move |socket: SocketRef, Data::<P2PAnswerRequest>(data)| {
@@ -249,7 +424,7 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
             }
         });
 
-        // Handle P2P ICE candidate
+        // Handle P2P ICE candidate (no rate limit, same as Node)
         socket.on("p2pIceCandidate", {
             let room_service = room_service.clone();
             move |socket: SocketRef, Data::<P2PIceCandidateRequest>(data)| {
@@ -263,9 +438,16 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         // Handle disconnect
         socket.on_disconnect({
             let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
             move |socket: SocketRef| {
                 let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
                 async move {
+                    // Clean up rate limiter entries for disconnected socket
+                    {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.remove_socket(&socket.id.to_string());
+                    }
                     handle_disconnect(socket, room_service).await;
                 }
             }
@@ -300,6 +482,21 @@ async fn handle_join_room(
         .and_then(|u| u.name.clone())
         .unwrap_or_else(|| format!("User_{}", &user_id[5..11]));
 
+    // Detect device type: prefer client-provided value, fallback to User-Agent detection
+    let device_type = data.user
+        .as_ref()
+        .and_then(|u| u.device_type.clone())
+        .unwrap_or_else(|| {
+            let req_parts = socket.req_parts();
+            let ua = req_parts.headers
+                .get("user-agent")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            detect_device_type(ua)
+        });
+
+    let fingerprint_hash = data.fingerprint.as_ref().map(|f| f.hash.as_str());
+
     let socket_id = socket.id.to_string();
 
     match room_service.join_room(
@@ -308,6 +505,8 @@ async fn handle_join_room(
         &username,
         &socket_id,
         None,
+        &device_type,
+        fingerprint_hash,
     ) {
         Ok((user, users)) => {
             // Join socket.io room
@@ -355,6 +554,21 @@ async fn handle_join_room_with_password(
         .and_then(|u| u.name.clone())
         .unwrap_or_else(|| format!("User_{}", &user_id[5..11]));
 
+    // Detect device type: prefer client-provided value, fallback to User-Agent detection
+    let device_type = data.user
+        .as_ref()
+        .and_then(|u| u.device_type.clone())
+        .unwrap_or_else(|| {
+            let req_parts = socket.req_parts();
+            let ua = req_parts.headers
+                .get("user-agent")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            detect_device_type(ua)
+        });
+
+    let fingerprint_hash = data.fingerprint.as_ref().map(|f| f.hash.as_str());
+
     let socket_id = socket.id.to_string();
 
     match room_service.join_room(
@@ -363,6 +577,8 @@ async fn handle_join_room_with_password(
         &username,
         &socket_id,
         Some(&data.password),
+        &device_type,
+        fingerprint_hash,
     ) {
         Ok((user, users)) => {
             // Join socket.io room
@@ -398,12 +614,14 @@ async fn handle_send_message(
 
     if let Some(user) = room_service.get_user_by_socket(&socket_id) {
         let message = if data.msg_type == "text" {
+            // Sanitize text content to prevent XSS
+            let sanitized_content = sanitize_message_content(&data.content.unwrap_or_default());
             Message::new_text(
                 generate_message_id(),
                 data.room_key.clone(),
                 user.id.clone(),
                 user.username.clone(),
-                data.content.unwrap_or_default(),
+                sanitized_content,
             )
         } else {
             Message::new_file(
@@ -489,15 +707,32 @@ async fn handle_set_room_password(
 async fn handle_share_room_link(
     socket: SocketRef,
     data: ShareRoomLinkRequest,
-    _room_service: Arc<RoomService>,
+    room_service: Arc<RoomService>,
 ) {
-    // Generate a simple share URL (in real implementation, this would create a proper share link)
-    let share_url = format!("/join/{}", data.room_key);
+    // Get client origin from socket handshake headers, matching Node.js behavior
+    let client_origin = std::env::var("CLIENT_URL").ok().unwrap_or_else(|| {
+        let req_parts = socket.req_parts();
+        let headers = &req_parts.headers;
+
+        if let Some(origin) = headers.get("origin").and_then(|v| v.to_str().ok()) {
+            origin.to_string()
+        } else if let Some(referer) = headers.get("referer").and_then(|v| v.to_str().ok()) {
+            referer.split('?').next().unwrap_or(referer).trim_end_matches('/').to_string()
+        } else {
+            "http://localhost:3000".to_string()
+        }
+    });
+
+    let mut share_link = format!("{}/?room={}", client_origin, data.room_key);
+
+    // Append password if room has one
+    if let Some(password) = room_service.get_room_password(&data.room_key) {
+        share_link.push_str(&format!("&password={}", password));
+    }
 
     let event = RoomLinkGeneratedEvent {
         room_key: data.room_key.clone(),
-        share_url,
-        expires_at: None,
+        share_link,
     };
 
     let _ = socket.emit("roomLinkGenerated", &event);
@@ -515,7 +750,7 @@ async fn handle_p2p_offer(
         // Find target user's socket
         if let Some(target_socket_id) = room_service.get_socket_by_user(&data.target_user_id) {
             let event = serde_json::json!({
-                "fromUserId": sender.id,
+                "from": sender.id,
                 "offer": data.offer
             });
             let _ = socket.to(target_socket_id).emit("p2pOffer", &event);
@@ -534,7 +769,7 @@ async fn handle_p2p_answer(
         // Find target user's socket
         if let Some(target_socket_id) = room_service.get_socket_by_user(&data.target_user_id) {
             let event = serde_json::json!({
-                "fromUserId": sender.id,
+                "from": sender.id,
                 "answer": data.answer
             });
             let _ = socket.to(target_socket_id).emit("p2pAnswer", &event);
@@ -553,7 +788,7 @@ async fn handle_p2p_ice_candidate(
         // Find target user's socket
         if let Some(target_socket_id) = room_service.get_socket_by_user(&data.target_user_id) {
             let event = serde_json::json!({
-                "fromUserId": sender.id,
+                "from": sender.id,
                 "candidate": data.candidate
             });
             let _ = socket.to(target_socket_id).emit("p2pIceCandidate", &event);

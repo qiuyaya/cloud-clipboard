@@ -8,20 +8,117 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio_util::io::ReaderStream;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
 
 use crate::AppState;
+use crate::middleware::rate_limit::extract_client_ip;
+use super::ApiResponse;
+
+// ============= Stream & Bandwidth Tracking =============
+
+/// Track concurrent download streams
+static MAX_CONCURRENT_STREAMS: AtomicUsize = AtomicUsize::new(100);
+
+/// Global concurrent stream counter
+static ACTIVE_STREAMS: AtomicUsize = AtomicUsize::new(0);
+
+/// RAII guard for stream tracking - decrements counter on drop
+struct StreamGuard;
+
+impl StreamGuard {
+    fn acquire() -> Result<Self, ()> {
+        let max = MAX_CONCURRENT_STREAMS.load(Ordering::Relaxed);
+        loop {
+            let current = ACTIVE_STREAMS.load(Ordering::Relaxed);
+            if current >= max {
+                return Err(());
+            }
+            match ACTIVE_STREAMS.compare_exchange(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return Ok(StreamGuard),
+                Err(_) => continue,
+            }
+        }
+    }
+}
+
+impl Drop for StreamGuard {
+    fn drop(&mut self) {
+        ACTIVE_STREAMS.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// Per-IP bandwidth tracker
+pub struct BandwidthTracker {
+    entries: std::sync::RwLock<HashMap<String, BandwidthEntry>>,
+    max_bytes_per_minute: u64,
+}
+
+struct BandwidthEntry {
+    bytes: u64,
+    window_start: Instant,
+}
+
+impl BandwidthTracker {
+    pub fn new() -> Self {
+        let max_bytes = std::env::var("MAX_DOWNLOAD_BYTES_PER_MINUTE")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(500 * 1024 * 1024); // 500MB/min default
+
+        Self {
+            entries: std::sync::RwLock::new(HashMap::new()),
+            max_bytes_per_minute: max_bytes,
+        }
+    }
+
+    pub fn check_and_record(&self, ip: &str, bytes: u64) -> bool {
+        let now = Instant::now();
+        let mut entries = match self.entries.write() {
+            Ok(e) => e,
+            Err(_) => return true, // Allow on lock error
+        };
+
+        let entry = entries.entry(ip.to_string()).or_insert(BandwidthEntry {
+            bytes: 0,
+            window_start: now,
+        });
+
+        // Reset window if expired (1 minute)
+        if now.duration_since(entry.window_start).as_secs() >= 60 {
+            entry.bytes = 0;
+            entry.window_start = now;
+        }
+
+        if entry.bytes + bytes > self.max_bytes_per_minute {
+            return false;
+        }
+
+        entry.bytes += bytes;
+        true
+    }
+
+    pub fn cleanup(&self) {
+        let now = Instant::now();
+        if let Ok(mut entries) = self.entries.write() {
+            entries.retain(|_, entry| {
+                now.duration_since(entry.window_start).as_secs() < 120
+            });
+        }
+    }
+}
+
+/// Lazy-initialized global bandwidth tracker
+static BANDWIDTH_TRACKER: std::sync::LazyLock<BandwidthTracker> =
+    std::sync::LazyLock::new(BandwidthTracker::new);
 
 // ============= Request/Response Types =============
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ApiResponse<T> {
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<T>,
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -145,7 +242,12 @@ async fn create_share(
         payload.password.as_deref(),
     ) {
         Ok((share, generated_password)) => {
-            let share_url = format!("/public/file/{}", share.share_id);
+            // Generate full share URL using BASE_PATH if configured
+            let base_path = std::env::var("BASE_PATH")
+                .unwrap_or_default()
+                .trim_end_matches('/')
+                .to_string();
+            let share_url = format!("{}/public/file/{}", base_path, share.share_id);
             Ok(Json(ApiResponse {
                 success: true,
                 message: Some("Share created".to_string()),
@@ -408,9 +510,22 @@ async fn get_user_shares(
 /// GET /public/file/:shareId
 pub async fn public_download(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(share_id): Path<String>,
     Query(query): Query<DownloadQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<ApiResponse<()>>)> {
+    // P2.1: Check concurrent stream limit
+    let _stream_guard = StreamGuard::acquire().map_err(|_| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Too many concurrent downloads. Please try again later.".to_string()),
+                data: None,
+            }),
+        )
+    })?;
+
     let share = state.share_service.get_share(&share_id).ok_or_else(|| {
         (
             StatusCode::NOT_FOUND,
@@ -447,13 +562,14 @@ pub async fn public_download(
     }
 
     // Verify password if required
+    let client_ip = extract_client_ip(&headers);
     if share.has_password() {
         match &query.password {
             Some(pwd) if share.verify_password(pwd) => {}
             Some(_) => {
                 let _ = state.share_service.record_access(
                     &share_id,
-                    "unknown".to_string(),
+                    client_ip,
                     false,
                     None,
                     Some("Invalid password".to_string()),
@@ -492,7 +608,78 @@ pub async fn public_download(
         )
     })?;
 
-    let file = tokio::fs::File::open(&file_info.path).await.map_err(|_| {
+    // P2.1: Check per-IP bandwidth limit
+    if !BANDWIDTH_TRACKER.check_and_record(&client_ip, file_info.size) {
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Download bandwidth limit exceeded. Please try again later.".to_string()),
+                data: None,
+            }),
+        ));
+    }
+
+    // P2.3: TOCTOU prevention - use symlink_metadata to detect symlinks
+    let metadata = std::fs::symlink_metadata(&file_info.path).map_err(|_| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                message: Some("File not found".to_string()),
+                data: None,
+            }),
+        )
+    })?;
+
+    if metadata.file_type().is_symlink() {
+        tracing::warn!("Symlink detected for file: {:?}", file_info.path);
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Access denied".to_string()),
+                data: None,
+            }),
+        ));
+    }
+
+    // P2.3: Open file by path and verify it's within upload directory
+    let upload_dir = state.file_manager.upload_dir().canonicalize().map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Server error".to_string()),
+                data: None,
+            }),
+        )
+    })?;
+
+    let canonical_path = file_info.path.canonicalize().map_err(|_| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                message: Some("File not found".to_string()),
+                data: None,
+            }),
+        )
+    })?;
+
+    if !canonical_path.starts_with(&upload_dir) {
+        tracing::warn!("Path traversal attempt: {:?}", file_info.path);
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Access denied".to_string()),
+                data: None,
+            }),
+        ));
+    }
+
+    let file = tokio::fs::File::open(&canonical_path).await.map_err(|_| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse {
@@ -506,7 +693,7 @@ pub async fn public_download(
     // Record successful access
     let _ = state.share_service.record_access(
         &share_id,
-        "unknown".to_string(),
+        client_ip,
         true,
         Some(file_info.size),
         None,

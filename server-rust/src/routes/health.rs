@@ -24,6 +24,26 @@ pub struct HealthData {
     pub online_users: usize,
     pub total_files: usize,
     pub total_size: u64,
+    pub memory: MemoryInfo,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryInfo {
+    pub rss: u64,
+}
+
+fn get_rss_bytes() -> u64 {
+    // Read RSS from /proc/self/statm (Linux)
+    std::fs::read_to_string("/proc/self/statm")
+        .ok()
+        .and_then(|content| {
+            content.split_whitespace()
+                .nth(1) // RSS is the second field (in pages)
+                .and_then(|rss| rss.parse::<u64>().ok())
+                .map(|pages| pages * 4096) // Convert pages to bytes
+        })
+        .unwrap_or(0)
 }
 
 pub async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
@@ -44,6 +64,9 @@ pub async fn health_check(State(state): State<AppState>) -> Json<HealthResponse>
             online_users: room_stats.online_users,
             total_files: file_stats.total_files,
             total_size: file_stats.total_size,
+            memory: MemoryInfo {
+                rss: get_rss_bytes(),
+            },
         },
     })
 }

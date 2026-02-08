@@ -11,18 +11,9 @@ use tokio_util::io::ReaderStream;
 use std::collections::HashSet;
 
 use crate::AppState;
+use super::ApiResponse;
 
 // ============= Response Types =============
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ApiResponse<T> {
-    pub success: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<T>,
-}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +24,10 @@ pub struct UploadResponse {
     pub size: u64,
     pub mime_type: String,
     pub download_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_duplicate: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_file_id: Option<String>,
 }
 
 // ============= Constants =============
@@ -238,6 +233,29 @@ async fn upload_file(
         ));
     }
 
+    // P2.2: Validate file type via magic bytes
+    if let Some(inferred) = infer::get(&data) {
+        let inferred_mime = inferred.mime_type();
+        // Block executable types detected by magic bytes
+        let blocked_mimes = [
+            "application/x-executable",
+            "application/x-mach-binary",
+            "application/x-elf",
+            "application/x-dosexec",
+            "application/vnd.microsoft.portable-executable",
+        ];
+        if blocked_mimes.iter().any(|m| inferred_mime == *m) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse {
+                    success: false,
+                    message: Some("File type not allowed (executable detected)".to_string()),
+                    data: None,
+                }),
+            ));
+        }
+    }
+
     let file_info = state
         .file_manager
         .save_file(&room_key, &filename, &content_type, &data)
@@ -265,6 +283,8 @@ async fn upload_file(
             size: file_info.size,
             mime_type: file_info.mime_type,
             download_url,
+            is_duplicate: file_info.is_duplicate,
+            original_file_id: file_info.original_file_id,
         }),
     }))
 }
@@ -299,6 +319,29 @@ async fn download_file(
             }),
         )
     })?;
+
+    // P2.3: Check for symlinks before canonicalizing
+    let metadata = std::fs::symlink_metadata(&file_info.path).map_err(|_| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                message: Some("File not found".to_string()),
+                data: None,
+            }),
+        )
+    })?;
+
+    if metadata.file_type().is_symlink() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Access denied".to_string()),
+                data: None,
+            }),
+        ));
+    }
 
     let file_path = file_info.path.canonicalize().map_err(|_| {
         (

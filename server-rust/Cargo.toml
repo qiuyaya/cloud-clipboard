@@ -33,6 +33,12 @@ anyhow = "1"
 # Password hashing
 bcrypt = "0.16"
 
+# SHA-256 hashing for file deduplication
+sha2 = "0.10"
+
+# File type detection via magic bytes
+infer = "0.16"
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }

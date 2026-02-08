@@ -10,6 +10,14 @@ pub struct User {
     pub room_key: String,
     pub is_online: bool,
     pub last_seen: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+    #[serde(default = "default_device_type")]
+    pub device_type: String,
+}
+
+fn default_device_type() -> String {
+    "desktop".to_string()
 }
 
 impl User {
@@ -20,6 +28,8 @@ impl User {
             room_key,
             is_online: true,
             last_seen: Utc::now(),
+            fingerprint: None,
+            device_type: "desktop".to_string(),
         }
     }
 

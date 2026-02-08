@@ -9,10 +9,14 @@ use super::{Message, User};
 pub struct Room {
     pub room_key: String,
     pub password_hash: Option<String>,
+    pub password: Option<String>,
     pub users: HashMap<String, User>,
     pub messages: Vec<Message>,
     pub created_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
+    max_messages: usize,
+    message_count: u64,
+    message_dropped_count: u64,
 }
 
 /// Room info for API responses
@@ -26,15 +30,19 @@ pub struct RoomInfo {
 }
 
 impl Room {
-    pub fn new(room_key: String, password_hash: Option<String>) -> Self {
+    pub fn new(room_key: String, password: Option<String>, password_hash: Option<String>) -> Self {
         let now = Utc::now();
         Self {
             room_key,
             password_hash,
+            password,
             users: HashMap::new(),
             messages: Vec::new(),
             created_at: now,
             last_activity: now,
+            max_messages: 1000,
+            message_count: 0,
+            message_dropped_count: 0,
         }
     }
 
@@ -75,6 +83,15 @@ impl Room {
 
     pub fn add_message(&mut self, message: Message) {
         self.messages.push(message);
+        self.message_count += 1;
+
+        // Drop oldest 20% when exceeding max to avoid frequent removals
+        if self.messages.len() > self.max_messages {
+            let remove_count = self.max_messages / 5;
+            self.messages.drain(..remove_count);
+            self.message_dropped_count += remove_count as u64;
+        }
+
         self.update_activity();
     }
 
@@ -141,4 +158,29 @@ impl Room {
 
         format!("{}_{}", base_username, suffix)
     }
+
+    /// Get message statistics
+    pub fn get_message_stats(&self) -> MessageStats {
+        MessageStats {
+            total: self.messages.len() as u64,
+            total_processed: self.message_count,
+            dropped: self.message_dropped_count,
+        }
+    }
+
+    /// Find user by fingerprint hash
+    pub fn find_user_by_fingerprint(&self, hash: &str) -> Option<&User> {
+        self.users.values().find(|u| {
+            u.fingerprint.as_deref() == Some(hash)
+        })
+    }
+}
+
+/// Message statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageStats {
+    pub total: u64,
+    pub total_processed: u64,
+    pub dropped: u64,
 }
