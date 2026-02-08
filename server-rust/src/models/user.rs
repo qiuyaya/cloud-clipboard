@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: String,
+    #[serde(rename = "name")]
     pub username: String,
     pub room_key: String,
     pub is_online: bool,

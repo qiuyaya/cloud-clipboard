@@ -151,15 +151,9 @@ static BANDWIDTH_TRACKER: std::sync::LazyLock<BandwidthTracker> =
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateShareRequest {
-    pub file_path: String,
-    pub file_name: String,
-    pub file_size: u64,
-    pub room_key: String,
-    pub user_id: String,
+    pub file_id: String,
     pub expires_in_days: Option<i64>,
     pub password: Option<String>,
-    pub enable_password: Option<bool>,
-    pub original_filename: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -168,7 +162,7 @@ pub struct CreateShareResponse {
     pub share_id: String,
     pub file_id: String,
     pub created_by: String,
-    pub share_url: String,
+    pub url: String,
     pub password: Option<String>,
     pub created_at: String,
     pub expires_at: String,
@@ -206,6 +200,12 @@ pub struct ShareListResponse {
     pub total: usize,
     pub limit: usize,
     pub offset: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AccessLogsResponse {
+    pub logs: Vec<crate::models::ShareAccessLog>,
+    pub total: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -324,22 +324,44 @@ async fn create_share(
         ));
     }
 
-    // Build metadata from original_filename if provided
-    let metadata = payload.original_filename.as_ref().map(|name| {
+    // Look up file info from FileManager using fileId (matching Node.js behavior)
+    let file_info = state.file_manager.get_file(&payload.file_id).ok_or_else(|| (
+        StatusCode::NOT_FOUND,
+        Json(ApiResponse {
+            success: false,
+            message: Some("File not found".to_string()),
+            data: None,
+        }),
+    ))?;
+
+    let file_path = file_info.path.to_string_lossy().to_string();
+    let file_name = file_info.filename.clone();
+    let file_size = file_info.size;
+    let room_key = file_info.room_key.clone();
+    let original_filename = file_info.original_name.clone();
+
+    // Use createdBy from request body or fallback
+    let user_id = extract_user_id(&headers).unwrap_or_else(|| "temp-user-id".to_string());
+
+    // Determine password handling (matching Node.js: password="auto-generate" means enable)
+    let enable_password = payload.password.is_some();
+
+    // Build metadata from original filename
+    let metadata = {
         let mut map = std::collections::HashMap::new();
-        map.insert("originalFilename".to_string(), serde_json::Value::String(name.clone()));
-        map
-    });
+        map.insert("originalFilename".to_string(), serde_json::Value::String(original_filename));
+        Some(map)
+    };
 
     match state.share_service.create_share(
-        payload.file_path,
-        payload.file_name,
-        payload.file_size,
-        payload.room_key,
-        payload.user_id,
+        file_path,
+        file_name,
+        file_size,
+        room_key,
+        user_id,
         expires_in_days,
-        payload.enable_password.unwrap_or(false),
-        payload.password.as_deref(),
+        enable_password,
+        None, // Never pass password directly; auto-generate if enabled
         metadata,
     ) {
         Ok((share, generated_password)) => {
@@ -353,13 +375,13 @@ async fn create_share(
             let has_password = share.has_password();
             Ok(Json(ApiResponse {
                 success: true,
-                message: Some("Share created".to_string()),
+                message: Some("Share link created successfully".to_string()),
                 data: Some(CreateShareResponse {
                     share_id: share.share_id,
-                    file_id: share.file_name.clone(),
+                    file_id: payload.file_id,
                     has_password,
                     created_by: share.created_by,
-                    share_url,
+                    url: share_url,
                     password: generated_password,
                     created_at: share.created_at.to_rfc3339(),
                     expires_at: share.expires_at.to_rfc3339(),
@@ -431,9 +453,15 @@ async fn list_shares(
                 "expired"
             };
             let url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            // Use originalFilename from metadata if available, fallback to file_name
+            let original_filename = share.metadata.as_ref()
+                .and_then(|m| m.get("originalFilename"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| share.file_name.clone());
             ShareListItem {
                 share_id: share.share_id,
-                original_filename: share.file_name,
+                original_filename,
                 file_size: share.file_size,
                 created_at: share.created_at.to_rfc3339(),
                 expires_at: share.expires_at.to_rfc3339(),
@@ -546,11 +574,11 @@ async fn permanent_delete(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(share_id): Path<String>,
-    Json(payload): Json<PermanentDeleteRequest>,
+    payload: Option<Json<PermanentDeleteRequest>>,
 ) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
     // Get user_id from header or body
     let user_id = extract_user_id(&headers)
-        .or(payload.user_id)
+        .or_else(|| payload.and_then(|p| p.0.user_id))
         .unwrap_or_else(|| "temp-user-id".to_string());
 
     // Check if share exists
@@ -607,7 +635,7 @@ async fn permanent_delete(
 async fn get_access_logs(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-) -> Result<Json<ApiResponse<Vec<crate::models::ShareAccessLog>>>, (StatusCode, Json<ApiResponse<()>>)> {
+) -> Result<Json<ApiResponse<AccessLogsResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
     if state.share_service.get_share(&share_id).is_none() {
         return Err((
             StatusCode::NOT_FOUND,
@@ -620,10 +648,11 @@ async fn get_access_logs(
     }
 
     let logs = state.share_service.get_access_logs(&share_id);
+    let total = logs.len();
     Ok(Json(ApiResponse {
         success: true,
         message: None,
-        data: Some(logs),
+        data: Some(AccessLogsResponse { logs, total }),
     }))
 }
 
@@ -733,8 +762,8 @@ pub async fn public_download(
         }
     }
 
-    // Get file
-    let file_info = state.file_manager.get_file(&share.file_path).ok_or_else(|| {
+    // Get file (use file_name which is the storage filename, not the full disk path)
+    let file_info = state.file_manager.get_file(&share.file_name).ok_or_else(|| {
         download_error(StatusCode::NOT_FOUND, "File not found")
     })?;
 

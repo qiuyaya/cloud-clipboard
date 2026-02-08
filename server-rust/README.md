@@ -5,11 +5,13 @@
 ## 前置要求
 
 1. **Rust 工具链** (已安装)
+
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 2. **C 编译器** (用于编译依赖)
+
    ```bash
    # Ubuntu/Debian
    sudo apt-get install build-essential
@@ -59,37 +61,41 @@ server-rust/
 ## 构建和运行
 
 ### 开发模式
+
 ```bash
 cargo run
 ```
 
 ### 发布构建
+
 ```bash
 cargo build --release
 ./target/release/cloud-clipboard-server
 ```
 
 ### 检查代码
+
 ```bash
 cargo check
 cargo clippy
 ```
 
 ### 运行测试
+
 ```bash
 cargo test
 ```
 
 ## 环境变量
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `PORT` | 3001 | 服务器端口 |
-| `NODE_ENV` | development | 环境模式 |
-| `UPLOAD_DIR` | ./uploads | 文件上传目录 |
-| `MAX_FILE_SIZE` | 104857600 (100MB) | 最大文件大小 |
-| `FILE_RETENTION_HOURS` | 12 | 文件保留时间 |
-| `RUST_LOG` | info | 日志级别 |
+| 变量                   | 默认值            | 说明         |
+| ---------------------- | ----------------- | ------------ |
+| `PORT`                 | 3001              | 服务器端口   |
+| `NODE_ENV`             | development       | 环境模式     |
+| `UPLOAD_DIR`           | ./uploads         | 文件上传目录 |
+| `MAX_FILE_SIZE`        | 104857600 (100MB) | 最大文件大小 |
+| `FILE_RETENTION_HOURS` | 12                | 文件保留时间 |
+| `RUST_LOG`             | info              | 日志级别     |
 
 ## 技术栈
 
@@ -122,11 +128,13 @@ cargo test
 ## Socket.IO 事件
 
 ### 客户端 -> 服务器
+
 - `joinRoom` - 加入房间
 - `sendMessage` - 发送消息
 - `leaveRoom` - 离开房间
 
 ### 服务器 -> 客户端
+
 - `joinedRoom` - 加入房间结果
 - `userJoined` - 用户加入通知
 - `userLeft` - 用户离开通知
@@ -135,9 +143,9 @@ cargo test
 
 ## 与 TypeScript 版本的对比
 
-| 特性 | TypeScript | Rust |
-|------|------------|------|
-| 内存占用 | ~50-100MB | ~5-15MB |
-| 启动时间 | ~2s | ~0.1s |
-| 并发处理 | 事件循环 | 多线程 |
-| 类型安全 | 编译时 | 编译时 |
+| 特性     | TypeScript | Rust    |
+| -------- | ---------- | ------- |
+| 内存占用 | ~50-100MB  | ~5-15MB |
+| 启动时间 | ~2s        | ~0.1s   |
+| 并发处理 | 事件循环   | 多线程  |
+| 类型安全 | 编译时     | 编译时  |

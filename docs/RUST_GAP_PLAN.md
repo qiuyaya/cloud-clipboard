@@ -15,8 +15,8 @@
 
 ## 总体进度：23/23 完成 ✅
 
-| 阶段 | 内容 | 进度 |
-|------|------|------|
+| 阶段   | 内容                | 进度            |
+| ------ | ------------------- | --------------- |
 | 阶段 1 | P0 安全基础（9 项） | 9/9 ✅ 全部完成 |
 | 阶段 2 | P1 功能补齐（6 项） | 6/6 ✅ 全部完成 |
 | 阶段 3 | P2 安全增强（3 项） | 3/3 ✅ 全部完成 |
@@ -66,9 +66,9 @@
   - 严重性：**P2P 传输完全不可用**
   - 问题：P2P 事件字段名与 Node.js 完全不一致
 
-    | | Node.js 输入 | Rust 输入 | Node.js 输出 | Rust 输出 |
-    |---|---|---|---|---|
-    | 字段名 | `to` | `targetUserId` | `from` | `fromUserId` |
+    |        | Node.js 输入 | Rust 输入      | Node.js 输出 | Rust 输出    |
+    | ------ | ------------ | -------------- | ------------ | ------------ |
+    | 字段名 | `to`         | `targetUserId` | `from`       | `fromUserId` |
 
   - Node 行为：`SocketService.ts` 中 P2P 事件接收 `{ to, offer/answer/candidate }`，发送 `{ from, offer/answer/candidate }`
   - 改动：
@@ -275,42 +275,45 @@ P3.* ── 互不依赖（P3.2c 除外），可并行
 ## 验证清单
 
 ### 功能回归测试
-| 功能 | 验证项 | 状态 |
-|------|--------|------|
-| 消息缓冲区 | 超过 1000 条消息后自动裁剪 | ⬜ |
-| XSS 过滤 | `<script>` 标签被转义 | ⬜ |
-| Socket 限流 | 超频请求返回 error 事件 | ⬜ |
-| 房间销毁 | 所有用户离线后房间被销毁、文件被清理、客户端收到 roomDestroyed | ⬜ |
-| P2P 传输 | P2P offer/answer/ice 字段名与前端一致，传输正常 | ⬜ |
-| 分享链接 | shareRoomLink 返回正确的 shareLink 字段和 URL 格式 | ⬜ |
-| 设备检测 | 移动端连接显示正确的设备类型（非硬编码 desktop） | ⬜ |
-| 文件去重 | 相同文件上传两次返回同一 fileId | ⬜ |
-| 指纹重连 | 断线重连后 userId 不变 | ⬜ |
-| validate-user | 通过 fingerprint 查询用户返回正确结果 | ⬜ |
-| 子路径 | `BASE_PATH=/app` 下所有功能正常 | ⬜ |
-| 静态服务 | 生产模式下前端页面可正常加载 | ⬜ |
+
+| 功能          | 验证项                                                         | 状态 |
+| ------------- | -------------------------------------------------------------- | ---- |
+| 消息缓冲区    | 超过 1000 条消息后自动裁剪                                     | ⬜   |
+| XSS 过滤      | `<script>` 标签被转义                                          | ⬜   |
+| Socket 限流   | 超频请求返回 error 事件                                        | ⬜   |
+| 房间销毁      | 所有用户离线后房间被销毁、文件被清理、客户端收到 roomDestroyed | ⬜   |
+| P2P 传输      | P2P offer/answer/ice 字段名与前端一致，传输正常                | ⬜   |
+| 分享链接      | shareRoomLink 返回正确的 shareLink 字段和 URL 格式             | ⬜   |
+| 设备检测      | 移动端连接显示正确的设备类型（非硬编码 desktop）               | ⬜   |
+| 文件去重      | 相同文件上传两次返回同一 fileId                                | ⬜   |
+| 指纹重连      | 断线重连后 userId 不变                                         | ⬜   |
+| validate-user | 通过 fingerprint 查询用户返回正确结果                          | ⬜   |
+| 子路径        | `BASE_PATH=/app` 下所有功能正常                                | ⬜   |
+| 静态服务      | 生产模式下前端页面可正常加载                                   | ⬜   |
 
 ### API 对齐验证
-| 端点 | 对比项 | 状态 |
-|------|--------|------|
-| `POST /api/rooms/create` | 请求/响应格式一致 | ⬜ |
-| `POST /api/rooms/validate-user` | fingerprint 查询行为一致 | ⬜ |
-| `GET /api/health` | 返回字段一致（含 memory） | ⬜ |
-| `POST /api/files/upload` | 去重行为一致 | ⬜ |
-| `GET /public/file/:shareId` | 安全验证流程一致 | ⬜ |
+
+| 端点                            | 对比项                    | 状态 |
+| ------------------------------- | ------------------------- | ---- |
+| `POST /api/rooms/create`        | 请求/响应格式一致         | ⬜   |
+| `POST /api/rooms/validate-user` | fingerprint 查询行为一致  | ⬜   |
+| `GET /api/health`               | 返回字段一致（含 memory） | ⬜   |
+| `POST /api/files/upload`        | 去重行为一致              | ⬜   |
+| `GET /public/file/:shareId`     | 安全验证流程一致          | ⬜   |
 
 ### Socket 事件验证
-| 事件 | 对比项 | 状态 |
-|------|--------|------|
-| `joinRoom` | 指纹重连行为一致 | ⬜ |
-| `sendMessage` | XSS 过滤生效 | ⬜ |
-| `disconnect` | 房间销毁联动一致 | ⬜ |
-| `roomDestroyed` | 事件格式和触发时机一致 | ⬜ |
-| `systemMessage` | 事件类型和数据格式一致 | ⬜ |
-| `p2pOffer` | 输入 `to`/输出 `from` 字段名一致 | ⬜ |
-| `p2pAnswer` | 输入 `to`/输出 `from` 字段名一致 | ⬜ |
-| `p2pIceCandidate` | 输入 `to`/输出 `from` 字段名一致 | ⬜ |
-| `roomLinkGenerated` | 返回 `shareLink` 字段、URL 格式一致 | ⬜ |
+
+| 事件                | 对比项                              | 状态 |
+| ------------------- | ----------------------------------- | ---- |
+| `joinRoom`          | 指纹重连行为一致                    | ⬜   |
+| `sendMessage`       | XSS 过滤生效                        | ⬜   |
+| `disconnect`        | 房间销毁联动一致                    | ⬜   |
+| `roomDestroyed`     | 事件格式和触发时机一致              | ⬜   |
+| `systemMessage`     | 事件类型和数据格式一致              | ⬜   |
+| `p2pOffer`          | 输入 `to`/输出 `from` 字段名一致    | ⬜   |
+| `p2pAnswer`         | 输入 `to`/输出 `from` 字段名一致    | ⬜   |
+| `p2pIceCandidate`   | 输入 `to`/输出 `from` 字段名一致    | ⬜   |
+| `roomLinkGenerated` | 返回 `shareLink` 字段、URL 格式一致 | ⬜   |
 
 ## 风险与注意事项
 

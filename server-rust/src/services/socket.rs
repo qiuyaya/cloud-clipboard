@@ -114,10 +114,19 @@ pub struct SendMessageRequest {
     #[serde(rename = "type")]
     pub msg_type: String,
     pub content: Option<String>,
-    pub file_name: Option<String>,
-    pub file_size: Option<u64>,
-    pub file_type: Option<String>,
+    pub file_info: Option<SendMessageFileInfo>,
     pub download_url: Option<String>,
+    pub file_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SendMessageFileInfo {
+    pub name: String,
+    pub size: u64,
+    #[serde(rename = "type")]
+    pub file_type: String,
+    pub last_modified: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -474,10 +483,10 @@ async fn handle_join_room(
         return;
     }
 
-    // Generate user ID from fingerprint or random
+    // Generate user ID from fingerprint or random (UUID format to match shared schema)
     let user_id = data.fingerprint
         .as_ref()
-        .map(|f| format!("user_{}", &f.hash[..12.min(f.hash.len())]))
+        .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
         .unwrap_or_else(crate::utils::generate_user_id);
 
     let username = data.user
@@ -560,10 +569,10 @@ async fn handle_join_room_with_password(
 ) {
     tracing::info!("joinRoomWithPassword event received: room_key={}", data.room_key);
 
-    // Generate user ID from fingerprint or random
+    // Generate user ID from fingerprint or random (UUID format to match shared schema)
     let user_id = data.fingerprint
         .as_ref()
-        .map(|f| format!("user_{}", &f.hash[..12.min(f.hash.len())]))
+        .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
         .unwrap_or_else(crate::utils::generate_user_id);
 
     let username = data.user
@@ -655,15 +664,23 @@ async fn handle_send_message(
                 sanitized_content,
             )
         } else {
-            Message::new_file(
+            let file_info = data.file_info.unwrap_or(SendMessageFileInfo {
+                name: "unknown".to_string(),
+                size: 0,
+                file_type: "application/octet-stream".to_string(),
+                last_modified: None,
+            });
+            let mut msg = Message::new_file(
                 generate_message_id(),
                 data.room_key.clone(),
                 sender,
-                data.file_name.unwrap_or_default(),
-                data.file_size.unwrap_or(0),
-                data.file_type.unwrap_or_default(),
+                file_info.name,
+                file_info.size,
+                file_info.file_type,
                 data.download_url.unwrap_or_default(),
-            )
+            );
+            msg.file_id = data.file_id;
+            msg
         };
 
         if room_service.add_message(&data.room_key, message.clone()).is_ok() {

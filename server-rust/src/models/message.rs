@@ -47,7 +47,18 @@ impl MessageSender {
     }
 }
 
-/// Message in a room
+/// File info embedded in file messages (matches frontend FileInfoSchema)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileInfo {
+    pub name: String,
+    pub size: u64,
+    #[serde(rename = "type")]
+    pub file_type: String,
+    pub last_modified: u64,
+}
+
+/// Message in a room (matches frontend TextMessage / FileMessage schemas)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
@@ -56,16 +67,17 @@ pub struct Message {
     pub sender: MessageSender,
     #[serde(rename = "type")]
     pub message_type: MessageType,
-    pub content: String,
+    /// Text content for text messages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
     pub timestamp: DateTime<Utc>,
+    /// File info for file messages
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub file_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub file_size: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub file_type: Option<String>,
+    pub file_info: Option<FileInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<String>,
 }
 
 impl Message {
@@ -80,12 +92,11 @@ impl Message {
             room_key,
             sender,
             message_type: MessageType::Text,
-            content,
+            content: Some(content),
             timestamp: Utc::now(),
-            file_name: None,
-            file_size: None,
-            file_type: None,
+            file_info: None,
             download_url: None,
+            file_id: None,
         }
     }
 
@@ -103,12 +114,16 @@ impl Message {
             room_key,
             sender,
             message_type: MessageType::File,
-            content: format!("Shared file: {}", file_name),
+            content: None,
             timestamp: Utc::now(),
-            file_name: Some(file_name),
-            file_size: Some(file_size),
-            file_type: Some(file_type),
+            file_info: Some(FileInfo {
+                name: file_name,
+                size: file_size,
+                file_type,
+                last_modified: Utc::now().timestamp_millis() as u64,
+            }),
             download_url: Some(download_url),
+            file_id: None,
         }
     }
 
@@ -118,12 +133,11 @@ impl Message {
             room_key,
             sender: MessageSender::system(),
             message_type: MessageType::System,
-            content,
+            content: Some(content),
             timestamp: Utc::now(),
-            file_name: None,
-            file_size: None,
-            file_type: None,
+            file_info: None,
             download_url: None,
+            file_id: None,
         }
     }
 }

@@ -1,13 +1,19 @@
 use uuid::Uuid;
 
-/// Generate a unique user ID
+/// Generate a unique user ID (UUID v4 format to match shared schema validation)
 pub fn generate_user_id() -> String {
-    format!("user_{}", Uuid::new_v4().to_string().replace("-", "")[..12].to_string())
+    Uuid::new_v4().to_string()
 }
 
-/// Generate a unique message ID
+/// Generate a user ID from fingerprint hash (deterministic UUID v5)
+pub fn generate_user_id_from_fingerprint(fingerprint_hash: &str) -> String {
+    let namespace = Uuid::NAMESPACE_OID;
+    Uuid::new_v5(&namespace, fingerprint_hash.as_bytes()).to_string()
+}
+
+/// Generate a unique message ID (UUID v4 format to match shared schema validation)
 pub fn generate_message_id() -> String {
-    format!("msg_{}", Uuid::new_v4().to_string().replace("-", "")[..12].to_string())
+    Uuid::new_v4().to_string()
 }
 
 /// Generate a unique share ID (8-10 characters)
@@ -35,15 +41,23 @@ mod tests {
     #[test]
     fn test_generate_user_id() {
         let id = generate_user_id();
-        assert!(id.starts_with("user_"));
-        assert_eq!(id.len(), 17); // "user_" + 12 chars
+        assert!(Uuid::parse_str(&id).is_ok(), "User ID should be valid UUID: {}", id);
+    }
+
+    #[test]
+    fn test_generate_user_id_from_fingerprint() {
+        let id1 = generate_user_id_from_fingerprint("abc123");
+        let id2 = generate_user_id_from_fingerprint("abc123");
+        let id3 = generate_user_id_from_fingerprint("def456");
+        assert!(Uuid::parse_str(&id1).is_ok(), "Fingerprint ID should be valid UUID: {}", id1);
+        assert_eq!(id1, id2, "Same fingerprint should produce same ID");
+        assert_ne!(id1, id3, "Different fingerprints should produce different IDs");
     }
 
     #[test]
     fn test_generate_message_id() {
         let id = generate_message_id();
-        assert!(id.starts_with("msg_"));
-        assert_eq!(id.len(), 16); // "msg_" + 12 chars
+        assert!(Uuid::parse_str(&id).is_ok(), "Message ID should be valid UUID: {}", id);
     }
 
     #[test]

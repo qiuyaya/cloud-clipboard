@@ -118,9 +118,15 @@ impl ShareInfo {
     pub fn to_response(&self) -> ShareInfoResponse {
         let is_expired = self.is_expired();
         let is_active = self.is_active && !is_expired;
+        // Use originalFilename from metadata if available, fallback to file_name
+        let display_name = self.metadata.as_ref()
+            .and_then(|m| m.get("originalFilename"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| self.file_name.clone());
         ShareInfoResponse {
             share_id: self.share_id.clone(),
-            file_name: self.file_name.clone(),
+            file_name: display_name,
             file_size: self.file_size,
             created_at: self.created_at,
             expires_at: self.expires_at,

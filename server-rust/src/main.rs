@@ -21,7 +21,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     services::{ServeDir, ServeFile},
 };
-use axum::http::{HeaderValue, HeaderName};
+use axum::http::{HeaderValue, HeaderName, header};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::services::{RoomService, RoomEvent, FileManager, ShareService};
@@ -223,7 +223,13 @@ async fn main() -> anyhow::Result<()> {
             CorsLayer::new()
                 .allow_origin(allowed_origins)
                 .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-                .allow_headers(Any)
+                .allow_headers([
+                    header::CONTENT_TYPE,
+                    header::AUTHORIZATION,
+                    header::ACCEPT,
+                    header::ORIGIN,
+                    header::CACHE_CONTROL,
+                ])
                 .allow_credentials(true)
         }
     };
@@ -268,7 +274,6 @@ async fn main() -> anyhow::Result<()> {
     } else {
         Router::new().nest(&base_path, api_router)
     }
-        .layer(socket_layer)
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(cors)
@@ -330,7 +335,8 @@ async fn main() -> anyhow::Result<()> {
     } else {
         tracing::info!("Static directory '{}' not found, skipping static file serving", static_dir);
         app
-    };
+    }
+    .layer(socket_layer);
 
     // Start server
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;

@@ -63,6 +63,7 @@ export default [
       "*.config.ts",
       "client/public/**",
       "assets/**",
+      "server-rust/**",
     ],
   },
 ];
