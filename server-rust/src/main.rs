@@ -255,8 +255,10 @@ async fn main() -> anyhow::Result<()> {
         // Share routes - internal per-operation rate limiting
         .nest("/api/share", share::router())
         // Public file download - dedicated public download rate limit
-        .route("/public/file/{share_id}", get(share::public_download))
-        .layer(public_download_rate_limit)
+        .nest("/public/file", Router::new()
+            .route("/{share_id}", get(share::public_download))
+            .layer(public_download_rate_limit)
+        )
         .fallback(api_not_found)
         .with_state(app_state);
 

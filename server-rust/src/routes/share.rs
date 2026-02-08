@@ -13,6 +13,15 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
+// Download timeout configuration (matching Node.js DOWNLOAD_TIMEOUT env var, default 30s)
+fn get_download_timeout() -> std::time::Duration {
+    let timeout_ms: u64 = std::env::var("DOWNLOAD_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(30_000);
+    std::time::Duration::from_millis(timeout_ms)
+}
+
 use crate::AppState;
 use crate::middleware::rate_limit::extract_client_ip;
 use super::ApiResponse;
@@ -79,10 +88,17 @@ struct BandwidthEntry {
 
 impl BandwidthTracker {
     pub fn new() -> Self {
+        // Default: MAX_FILE_SIZE * 10 per minute (matching Node.js behavior)
+        // Node.js uses MAX_FILE_SIZE (default 100MB) * 10 = 1000MB/min
+        let max_file_size: u64 = std::env::var("MAX_FILE_SIZE")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(100 * 1024 * 1024); // 100MB default
+
         let max_bytes = std::env::var("MAX_DOWNLOAD_BYTES_PER_MINUTE")
             .ok()
             .and_then(|v| v.parse().ok())
-            .unwrap_or(500 * 1024 * 1024); // 500MB/min default
+            .unwrap_or(max_file_size * 10); // MAX_FILE_SIZE * 10 default
 
         Self {
             entries: std::sync::RwLock::new(HashMap::new()),
@@ -761,9 +777,18 @@ pub async fn public_download(
         return Err(download_error(StatusCode::FORBIDDEN, "Access denied"));
     }
 
-    let file = tokio::fs::File::open(&canonical_path).await.map_err(|_| {
-        download_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to open file")
-    })?;
+    // Open file with timeout protection (matching Node.js DOWNLOAD_TIMEOUT)
+    let download_timeout = get_download_timeout();
+    let file = match tokio::time::timeout(download_timeout, tokio::fs::File::open(&canonical_path)).await {
+        Ok(Ok(f)) => f,
+        Ok(Err(_)) => {
+            return Err(download_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to open file"));
+        }
+        Err(_) => {
+            tracing::warn!("Download timeout for shareId: {} from IP: {}", share_id, client_ip);
+            return Err(download_error(StatusCode::REQUEST_TIMEOUT, "Download timeout"));
+        }
+    };
 
     // Record successful access
     let _ = state.share_service.record_access(
