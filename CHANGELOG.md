@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.12] - 2026-02-08
+
+- chore: 添加 release skill 支持一站式版本发布
+- feat: 优化房间切换体验并在消息卡片显示用户指纹
+- fix: 优化房间号交互和分享链接处理逻辑
+- chore: 添加 Claude Code hooks 防止自动发布和推送
+
 ## [1.4.11] - 2026-02-08
 
 - fix: 修复 Service Worker 缓存策略导致分享链接下载失败的问题

@@ -78,6 +78,7 @@ export function RoomJoin({
     const urlParams = new URLSearchParams(window.location.search);
     const roomKeyFromUrl = urlParams.get("room");
     const passwordFromUrl = urlParams.get("password");
+    const usernameFromUrl = urlParams.get("username");
 
     if (roomKeyFromUrl) {
       setRoomKey(roomKeyFromUrl);
@@ -85,6 +86,10 @@ export function RoomJoin({
 
       if (passwordFromUrl) {
         setUrlPassword(passwordFromUrl);
+      }
+
+      if (usernameFromUrl) {
+        setUsername(usernameFromUrl);
       }
 
       // Clear the URL parameters to avoid confusion

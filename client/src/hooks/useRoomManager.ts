@@ -186,31 +186,36 @@ export const useRoomManager = () => {
     localStorage.removeItem("cloudClipboard_roomKey");
   }, []);
 
-  const handleLeaveRoom = useCallback(() => {
-    if (currentUser && roomKey) {
-      const leaveData: LeaveRoomRequest = {
-        type: "leave_room",
-        roomKey,
-        userId: currentUser.id,
-      };
+  const handleLeaveRoom = useCallback(
+    (options?: { silent?: boolean }) => {
+      if (currentUser && roomKey) {
+        const leaveData: LeaveRoomRequest = {
+          type: "leave_room",
+          roomKey,
+          userId: currentUser.id,
+        };
 
-      socketService.leaveRoom(leaveData);
-    }
+        socketService.leaveRoom(leaveData);
+      }
 
-    setCurrentUser(null);
-    setRoomKey(null);
-    setUsers([]);
-    setMessages([]);
-    setIsConnecting(false);
+      setCurrentUser(null);
+      setRoomKey(null);
+      setUsers([]);
+      setMessages([]);
+      setIsConnecting(false);
 
-    localStorage.removeItem("cloudClipboard_user");
-    localStorage.removeItem("cloudClipboard_roomKey");
+      localStorage.removeItem("cloudClipboard_user");
+      localStorage.removeItem("cloudClipboard_roomKey");
 
-    toast({
-      title: t("toast.leftRoom"),
-      description: t("toast.leftRoomDesc"),
-    });
-  }, [currentUser, roomKey, toast, t]);
+      if (!options?.silent) {
+        toast({
+          title: t("toast.leftRoom"),
+          description: t("toast.leftRoomDesc"),
+        });
+      }
+    },
+    [currentUser, roomKey, toast, t],
+  );
 
   const handleSetRoomPassword = useCallback(
     (shouldHavePassword: boolean) => {
