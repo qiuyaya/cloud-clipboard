@@ -5,6 +5,7 @@ dev-dist/
 .DS_Store
 .env
 .claude/log/
+.claude/settings.local.json
 .history/
 
 # Tests
