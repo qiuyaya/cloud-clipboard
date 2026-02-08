@@ -19,6 +19,8 @@ pub struct UserInfo {
     pub device_type: String,
     pub is_online: bool,
     pub last_seen: chrono::DateTime<chrono::Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
 }
 
 impl From<&crate::models::User> for UserInfo {
@@ -29,6 +31,7 @@ impl From<&crate::models::User> for UserInfo {
             device_type: user.device_type.clone(),
             is_online: user.is_online,
             last_seen: user.last_seen,
+            fingerprint: user.fingerprint.clone(),
         }
     }
 }
@@ -641,22 +644,21 @@ async fn handle_send_message(
     let socket_id = socket.id.to_string();
 
     if let Some(user) = room_service.get_user_by_socket(&socket_id) {
+        let sender = crate::models::message::MessageSender::from_user(&user);
         let message = if data.msg_type == "text" {
             // Sanitize text content to prevent XSS
             let sanitized_content = sanitize_message_content(&data.content.unwrap_or_default());
             Message::new_text(
                 generate_message_id(),
                 data.room_key.clone(),
-                user.id.clone(),
-                user.username.clone(),
+                sender,
                 sanitized_content,
             )
         } else {
             Message::new_file(
                 generate_message_id(),
                 data.room_key.clone(),
-                user.id.clone(),
-                user.username.clone(),
+                sender,
                 data.file_name.unwrap_or_default(),
                 data.file_size.unwrap_or(0),
                 data.file_type.unwrap_or_default(),
