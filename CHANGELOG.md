@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.11] - 2026-02-08
+
+- fix: 修复 Service Worker 缓存策略导致分享链接下载失败的问题
+
 ## [1.4.10] - 2026-02-08
 
 - fix: 全面优化国际化、输入验证、分享功能和无障碍性
