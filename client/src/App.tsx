@@ -104,12 +104,13 @@ export function App(): JSX.Element {
   const handleConfirmSwitchRoom = useCallback(() => {
     if (!switchRoomTarget) return;
 
-    // Store target room info before leaving
+    // Store target room info and current username before leaving
     const target = switchRoomTarget;
+    const currentUsername = currentUser?.name;
     setSwitchRoomTarget(null);
 
-    // Leave current room (without toast)
-    handleLeaveRoom();
+    // Leave current room silently (no toast)
+    handleLeaveRoom({ silent: true });
 
     // Set URL params so RoomJoin can pick them up on mount
     const url = new URL(window.location.href);
@@ -117,8 +118,11 @@ export function App(): JSX.Element {
     if (target.password) {
       url.searchParams.set("password", target.password);
     }
+    if (currentUsername) {
+      url.searchParams.set("username", currentUsername);
+    }
     window.history.replaceState({}, "", url.toString());
-  }, [switchRoomTarget, handleLeaveRoom]);
+  }, [switchRoomTarget, handleLeaveRoom, currentUser]);
 
   const handleCancelSwitchRoom = useCallback(() => {
     setSwitchRoomTarget(null);

@@ -252,6 +252,14 @@ export function ClipboardRoom({
                         {message.sender.name}
                         {message.sender.id === currentUser.id && ` ${t("message.you")}`}
                       </span>
+                      {message.sender.fingerprint && (
+                        <span
+                          className="text-xs text-muted-foreground/50 font-mono"
+                          title={message.sender.fingerprint}
+                        >
+                          {message.sender.fingerprint.substring(0, 8)}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {formatTimestamp(message.timestamp, i18n.language)}
                       </span>
