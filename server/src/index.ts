@@ -128,11 +128,10 @@ roomService.on("roomDestroyed", (roomKey: string) => {
   }
 });
 
-// Serve static files in production
+// Serve static files in production (no extra rate limit - global limit applies)
 if (isProduction) {
   // Serve static files from the built client
   app.use(
-    generalRateLimit.middleware(),
     express.static(staticPath, {
       maxAge: "1d", // Cache static assets for 1 day
       etag: true,

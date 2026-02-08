@@ -290,10 +290,12 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
             onCheckedChange={(checked) => setEnablePassword(!!checked)}
           />
           <Label htmlFor="enable-password" className="text-sm font-medium cursor-pointer">
-            启用密码保护
+            {t("share.modal.password.enableLabel")}
           </Label>
           {enablePassword && (
-            <span className="text-xs text-muted-foreground">(将自动生成6位安全密码)</span>
+            <span className="text-xs text-muted-foreground">
+              {t("share.modal.password.autoGenerateHint")}
+            </span>
           )}
         </div>
 

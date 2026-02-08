@@ -29,6 +29,7 @@ export interface ShareLinkSummary {
   status: "active" | "expired";
   accessCount: number;
   hasPassword: boolean;
+  url: string;
 }
 
 export interface ListShareLinksResponse {

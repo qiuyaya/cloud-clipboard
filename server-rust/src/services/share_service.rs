@@ -30,6 +30,7 @@ impl ShareService {
         expires_in_days: i64,
         enable_password: bool,
         password: Option<&str>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<(ShareInfo, Option<String>), String> {
         let share_id = generate_share_id();
 
@@ -55,6 +56,7 @@ impl ShareService {
             created_by.clone(),
             expires_in_days,
             password_hash,
+            metadata,
         );
 
         {
@@ -255,7 +257,7 @@ mod tests {
         let result = service.create_share(
             "test.txt".into(), "test.txt".into(), 100,
             "room1".into(), "user1".into(), 7,
-            false, None,
+            false, None, None,
         );
         let (share, generated_pwd) = result.unwrap();
         assert!(!share.has_password());
@@ -268,7 +270,7 @@ mod tests {
         let result = service.create_share(
             "test.txt".into(), "test.txt".into(), 100,
             "room1".into(), "user1".into(), 7,
-            true, None,
+            true, None, None,
         );
         let (share, generated_pwd) = result.unwrap();
         assert!(share.has_password());
@@ -283,7 +285,7 @@ mod tests {
         let result = service.create_share(
             "test.txt".into(), "test.txt".into(), 100,
             "room1".into(), "user1".into(), 7,
-            false, Some("mypass123"),
+            false, Some("mypass123"), None,
         );
         let (share, generated_pwd) = result.unwrap();
         assert!(share.has_password());
@@ -298,7 +300,7 @@ mod tests {
         let result = service.create_share(
             "test.txt".into(), "test.txt".into(), 100,
             "room1".into(), "user1".into(), 7,
-            true, Some("custom"),
+            true, Some("custom"), None,
         );
         let (share, generated_pwd) = result.unwrap();
         assert!(share.has_password());

@@ -531,6 +531,12 @@ async fn handle_join_room(
             // Send user list
             let _ = socket.emit("userList", &user_list);
 
+            // Send message history to joining user
+            let messages = room_service.get_messages(&data.room_key);
+            if !messages.is_empty() {
+                let _ = socket.emit("messageHistory", &messages);
+            }
+
             // Broadcast to others in the room
             let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
@@ -607,6 +613,12 @@ async fn handle_join_room_with_password(
             // Send userJoined event to the joining user
             let _ = socket.emit("userJoined", &user_info);
             let _ = socket.emit("userList", &user_list);
+
+            // Send message history to joining user
+            let messages = room_service.get_messages(&data.room_key);
+            if !messages.is_empty() {
+                let _ = socket.emit("messageHistory", &messages);
+            }
 
             // Broadcast to others in the room
             let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
@@ -772,8 +784,12 @@ async fn handle_share_room_link(
         return;
     }
 
-    // Get client origin from socket handshake headers, matching Node.js behavior
-    let client_origin = std::env::var("CLIENT_URL").ok().unwrap_or_else(|| {
+    // Get client origin from PUBLIC_URL or CLIENT_URL env, or socket handshake headers
+    let client_origin = std::env::var("PUBLIC_URL")
+        .or_else(|_| std::env::var("CLIENT_URL"))
+        .ok()
+        .map(|url| url.trim_end_matches('/').to_string())
+        .unwrap_or_else(|| {
         let req_parts = socket.req_parts();
         let headers = &req_parts.headers;
 

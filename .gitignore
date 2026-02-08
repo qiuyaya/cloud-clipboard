@@ -5,12 +5,16 @@ dev-dist/
 .DS_Store
 .env
 .claude/log/
+.claude/settings.local.json
 .history/
 
 # Tests
 coverage
 test-results
 playwright-report
+
+# mcp
+.playwright-mcp
 
 # Generated icons (keep source in assets/icons)
 client/public/favicon-*.svg

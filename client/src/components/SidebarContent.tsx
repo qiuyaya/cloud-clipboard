@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { formatTimestamp } from "@cloud-clipboard/shared";
 import type { User, RoomKey } from "@cloud-clipboard/shared";
-import { Users, LogOut, Share2, Lock, Unlock, Copy, Settings } from "lucide-react";
+import { Users, LogOut, Share2, Lock, Unlock, Settings } from "lucide-react";
 
 interface SidebarContentProps {
   roomKey: RoomKey;
@@ -31,7 +31,7 @@ export function SidebarContent({
   hasRoomPassword = false,
   isMobile,
 }: SidebarContentProps): JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [copiedRoomKey, setCopiedRoomKey] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState<boolean | null>(null);
@@ -74,18 +74,20 @@ export function SidebarContent({
       <div className="pl-6 pr-2 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="pr-3">
-            <div className="flex items-center gap-2 group">
+            <div className="relative flex items-center gap-2 group">
               <h2
-                className="text-lg font-semibold cursor-pointer select-all hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                className="text-lg font-semibold cursor-pointer"
                 onDoubleClick={handleDoubleClickRoomKey}
                 title={t("room.doubleClickToCopy")}
               >
-                {t("room.title", { roomKey })}
+                <span className="select-none">{t("room.label")}</span>
+                <span className="select-all hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  {roomKey}
+                </span>
               </h2>
               {copiedRoomKey && (
-                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 animate-in fade-in duration-200">
-                  <Copy className="h-3 w-3" />
-                  <span>{t("room.copied")}</span>
+                <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                  <span className="text-popover-foreground">{t("room.copied")}</span>
                 </div>
               )}
             </div>
@@ -189,7 +191,7 @@ export function SidebarContent({
                       size="sm"
                       onClick={onNavigateToShare}
                       className="flex items-center gap-2 min-w-fit mobile-touch"
-                      title="Share Management"
+                      title={t("share.list.title")}
                     >
                       <Settings className="h-4 w-4" />
                     </Button>
@@ -228,7 +230,7 @@ export function SidebarContent({
                   {user.isOnline
                     ? t("room.online")
                     : t("room.lastSeen", {
-                        time: formatTimestamp(user.lastSeen),
+                        time: formatTimestamp(user.lastSeen, i18n.language),
                       })}
                 </p>
               </div>

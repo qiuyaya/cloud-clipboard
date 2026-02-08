@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Share access log entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +31,8 @@ pub struct ShareInfo {
     pub access_count: u64,
     pub has_password: bool,
     pub access_logs: Vec<ShareAccessLog>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<HashMap<String, serde_json::Value>>,
 }
 
 /// Share info for API responses (without sensitive data)
@@ -61,6 +64,7 @@ impl ShareInfo {
         created_by: String,
         expires_in_days: i64,
         password_hash: Option<String>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         let now = Utc::now();
         let has_password = password_hash.is_some();
@@ -78,6 +82,7 @@ impl ShareInfo {
             access_count: 0,
             has_password,
             access_logs: Vec::new(),
+            metadata,
         }
     }
 

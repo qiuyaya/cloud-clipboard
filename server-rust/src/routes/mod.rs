@@ -18,8 +18,12 @@ pub struct ApiResponse<T> {
     pub data: Option<T>,
 }
 
-/// Build base URL from request headers for constructing absolute URLs
+/// Build base URL from PUBLIC_URL env var or request headers for constructing absolute URLs
+/// Priority: PUBLIC_URL > request headers (X-Forwarded-Proto + Host)
 pub fn build_base_url(headers: &HeaderMap) -> String {
+    if let Ok(public_url) = std::env::var("PUBLIC_URL") {
+        return public_url.trim_end_matches('/').to_string();
+    }
     let proto = headers
         .get("x-forwarded-proto")
         .and_then(|v| v.to_str().ok())

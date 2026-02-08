@@ -143,6 +143,7 @@ pub struct CreateShareRequest {
     pub expires_in_days: Option<i64>,
     pub password: Option<String>,
     pub enable_password: Option<bool>,
+    pub original_filename: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -179,6 +180,7 @@ pub struct ShareListItem {
     pub status: String,
     pub access_count: u64,
     pub has_password: bool,
+    pub url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -208,6 +210,15 @@ fn extract_user_id(headers: &HeaderMap) -> Option<String> {
         .get("x-user-id")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
+}
+
+/// Build a standard error response for public_download (3-tuple with empty headers)
+fn download_error(status: StatusCode, message: &str) -> (StatusCode, HeaderMap, Json<ApiResponse<()>>) {
+    (status, HeaderMap::new(), Json(ApiResponse {
+        success: false,
+        message: Some(message.to_string()),
+        data: None,
+    }))
 }
 
 /// Extract password from Authorization: Basic <base64> header
@@ -297,6 +308,13 @@ async fn create_share(
         ));
     }
 
+    // Build metadata from original_filename if provided
+    let metadata = payload.original_filename.as_ref().map(|name| {
+        let mut map = std::collections::HashMap::new();
+        map.insert("originalFilename".to_string(), serde_json::Value::String(name.clone()));
+        map
+    });
+
     match state.share_service.create_share(
         payload.file_path,
         payload.file_name,
@@ -306,6 +324,7 @@ async fn create_share(
         expires_in_days,
         payload.enable_password.unwrap_or(false),
         payload.password.as_deref(),
+        metadata,
     ) {
         Ok((share, generated_password)) => {
             // Generate full share URL using base URL and BASE_PATH
@@ -358,6 +377,13 @@ async fn list_shares(
     let limit = query.limit.unwrap_or(50);
     let offset = query.offset.unwrap_or(0);
 
+    // Build base URL for share links
+    let base_url = super::build_base_url(&headers);
+    let base_path = std::env::var("BASE_PATH")
+        .unwrap_or_default()
+        .trim_end_matches('/')
+        .to_string();
+
     // Get all user's shares
     let all_shares = state.share_service.get_user_shares(&user_id);
 
@@ -388,6 +414,7 @@ async fn list_shares(
             } else {
                 "expired"
             };
+            let url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
             ShareListItem {
                 share_id: share.share_id,
                 original_filename: share.file_name,
@@ -397,6 +424,7 @@ async fn list_shares(
                 status: status.to_string(),
                 access_count: share.access_count,
                 has_password: share.has_password,
+                url,
             }
         })
         .collect();
@@ -603,19 +631,12 @@ pub async fn public_download(
     headers: HeaderMap,
     Path(share_id): Path<String>,
     Query(query): Query<DownloadQuery>,
-) -> Result<impl IntoResponse, (StatusCode, Json<ApiResponse<()>>)> {
+) -> Result<impl IntoResponse, (StatusCode, HeaderMap, Json<ApiResponse<()>>)> {
     // Validate shareId format (8-10 character base62: [a-zA-Z0-9])
     if share_id.len() < 8 || share_id.len() > 10
         || !share_id.chars().all(|c| c.is_ascii_alphanumeric())
     {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Invalid share ID format".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(download_error(StatusCode::BAD_REQUEST, "Invalid share ID format"));
     }
 
     // Extract client IP early for per-IP stream limiting
@@ -628,49 +649,21 @@ pub async fn public_download(
 
     // P2.1: Check concurrent stream limit (per-IP + global)
     let _stream_guard = StreamGuard::acquire(client_ip.clone()).map_err(|_| {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Too many concurrent downloads. Please try again later.".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::SERVICE_UNAVAILABLE, "Too many concurrent downloads. Please try again later.")
     })?;
 
     let share = state.share_service.get_share(&share_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::NOT_FOUND, "Share not found")
     })?;
 
     // Check expiration
     if share.is_expired() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(download_error(StatusCode::NOT_FOUND, "Share not found"));
     }
 
     // Check if share is active
     if !share.is_active {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(download_error(StatusCode::NOT_FOUND, "Share not found"));
     }
 
     // Verify password if required
@@ -690,8 +683,14 @@ pub async fn public_download(
                     Some("Invalid password".to_string()),
                     user_agent,
                 );
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "WWW-Authenticate",
+                    "Basic realm=\"File Download\", charset=\"UTF-8\"".parse().unwrap(),
+                );
                 return Err((
                     StatusCode::UNAUTHORIZED,
+                    headers,
                     Json(ApiResponse {
                         success: false,
                         message: Some("Invalid password".to_string()),
@@ -700,8 +699,14 @@ pub async fn public_download(
                 ));
             }
             None => {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "WWW-Authenticate",
+                    "Basic realm=\"File Download\", charset=\"UTF-8\"".parse().unwrap(),
+                );
                 return Err((
                     StatusCode::UNAUTHORIZED,
+                    headers,
                     Json(ApiResponse {
                         success: false,
                         message: Some("Password required".to_string()),
@@ -714,50 +719,22 @@ pub async fn public_download(
 
     // Get file
     let file_info = state.file_manager.get_file(&share.file_path).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("File not found".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::NOT_FOUND, "File not found")
     })?;
 
     // P2.1: Check per-IP bandwidth limit
     if !BANDWIDTH_TRACKER.check_and_record(&client_ip, file_info.size) {
-        return Err((
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Download bandwidth limit exceeded. Please try again later.".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(download_error(StatusCode::TOO_MANY_REQUESTS, "Download bandwidth limit exceeded. Please try again later."));
     }
 
     // P2.3: TOCTOU prevention - use symlink_metadata to detect symlinks
     let metadata = std::fs::symlink_metadata(&file_info.path).map_err(|_| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("File not found".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::NOT_FOUND, "File not found")
     })?;
 
     if metadata.file_type().is_symlink() {
         tracing::warn!("Symlink detected for file: {:?}", file_info.path);
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Access denied".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(download_error(StatusCode::FORBIDDEN, "Access denied"));
     }
 
     // Detect hard link attacks
@@ -766,61 +743,26 @@ pub async fn public_download(
         use std::os::unix::fs::MetadataExt;
         if metadata.nlink() > 1 {
             tracing::warn!("Hard link detected for file: {:?}", file_info.path);
-            return Err((
-                StatusCode::FORBIDDEN,
-                Json(ApiResponse {
-                    success: false,
-                    message: Some("Access denied".to_string()),
-                    data: None,
-                }),
-            ));
+            return Err(download_error(StatusCode::FORBIDDEN, "Access denied"));
         }
     }
 
     // P2.3: Open file by path and verify it's within upload directory
     let upload_dir = state.file_manager.upload_dir().canonicalize().map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Server error".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error")
     })?;
 
     let canonical_path = file_info.path.canonicalize().map_err(|_| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("File not found".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::NOT_FOUND, "File not found")
     })?;
 
     if !canonical_path.starts_with(&upload_dir) {
         tracing::warn!("Path traversal attempt: {:?}", file_info.path);
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Access denied".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(download_error(StatusCode::FORBIDDEN, "Access denied"));
     }
 
     let file = tokio::fs::File::open(&canonical_path).await.map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Failed to open file".to_string()),
-                data: None,
-            }),
-        )
+        download_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to open file")
     })?;
 
     // Record successful access

@@ -224,10 +224,11 @@ describe("Schema Validation Tests", () => {
     it("should validate lastModified timestamp", () => {
       const now = Date.now();
       expect(() => FileInfoSchema.parse({ ...validFileInfo, lastModified: -1 })).toThrow();
+      // Use a larger offset (48 hours) to avoid race conditions with Date.now() in the schema
       expect(() =>
         FileInfoSchema.parse({
           ...validFileInfo,
-          lastModified: now + 86400001,
+          lastModified: now + 86400000 * 2,
         }),
       ).toThrow();
       expect(() => FileInfoSchema.parse({ ...validFileInfo, lastModified: now })).not.toThrow();

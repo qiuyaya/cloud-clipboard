@@ -2,7 +2,13 @@ import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/useToast";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileNav } from "@/components/MobileNav";
@@ -53,7 +59,7 @@ export function ClipboardRoom({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width: 1024px)");
 
   useEffect(() => {
@@ -152,7 +158,8 @@ export function ClipboardRoom({
         <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
           <SheetContent className="w-80 p-0">
             <SheetHeader className="sr-only">
-              <SheetTitle>房间信息</SheetTitle>
+              <SheetTitle>{t("room.sidebarTitle")}</SheetTitle>
+              <SheetDescription>{t("room.sidebarDescription")}</SheetDescription>
             </SheetHeader>
             <SidebarContent
               roomKey={roomKey}
@@ -197,7 +204,7 @@ export function ClipboardRoom({
                 size="mobile-sm"
                 onClick={onLeaveRoom}
                 className="mobile-touch"
-                title="Leave Room"
+                title={t("room.leave")}
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -215,7 +222,7 @@ export function ClipboardRoom({
                   size="mobile-sm"
                   onClick={shareRoom}
                   className="mobile-touch"
-                  title="Share Room"
+                  title={t("room.share")}
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
@@ -246,7 +253,7 @@ export function ClipboardRoom({
                         {message.sender.id === currentUser.id && ` ${t("message.you")}`}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {formatTimestamp(message.timestamp)}
+                        {formatTimestamp(message.timestamp, i18n.language)}
                       </span>
                     </div>
                     {message.type === "text" && (

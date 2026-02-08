@@ -19,6 +19,7 @@ describe("FileManager", () => {
       mkdirSync: vi.fn(),
       statSync: vi.fn(),
       unlinkSync: vi.fn(),
+      readdirSync: vi.fn().mockReturnValue([]),
       promises: {
         unlink: vi.fn().mockResolvedValue(undefined),
       },
@@ -28,6 +29,7 @@ describe("FileManager", () => {
     vi.spyOn(fs, "mkdirSync").mockImplementation(mockFs.mkdirSync);
     vi.spyOn(fs, "statSync").mockImplementation(mockFs.statSync);
     vi.spyOn(fs, "unlinkSync").mockImplementation(mockFs.unlinkSync);
+    vi.spyOn(fs, "readdirSync").mockImplementation(mockFs.readdirSync);
     vi.spyOn(fs.promises, "unlink").mockImplementation(mockFs.promises.unlink);
 
     // Mock setInterval and clearInterval

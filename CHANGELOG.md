@@ -2,8 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.11] - 2026-02-08
+
+- fix: 修复 Service Worker 缓存策略导致分享链接下载失败的问题
+
+## [1.4.10] - 2026-02-08
+
+- fix: 全面优化国际化、输入验证、分享功能和无障碍性
+
+## [1.4.9] - 2026-02-07
+
+- fix: 带密码的分享链接返回正确的 401 响应和 WWW-Authenticate 头
+
+## [1.4.8] - 2026-02-07
+
+- fix: 全局限流支持环境变量覆盖并添加房间消息历史同步
+- fix: 修复分享链接在浏览器中打开时被 Service Worker 拦截返回 SPA 页面的问题
+- fix: 房间分享链接支持 PUBLIC_URL 环境变量
+
+## [1.4.7] - 2026-02-07
+
+- feat: 添加 PUBLIC_URL 环境变量支持用于反向代理场景
+
+## [1.4.6] - 2026-02-06
+
+- fix: Docker容器以非root用户运行
+
 ## [1.4.5] - 2026-02-06
 
+- fix: 修复单元测试并简化Dockerfile
 - fix: 修复Docker容器文件上传权限问题和Socket.IO路径拼接
 
 ## [1.4.4] - 2026-02-06

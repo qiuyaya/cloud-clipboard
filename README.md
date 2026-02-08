@@ -237,6 +237,7 @@ bun run server:dev
 - `SHARE_DEFAULT_EXPIRY_DAYS` - 分享链接默认过期天数（默认：7）
 - `SHARE_MAX_EXPIRY_DAYS` - 分享链接最大过期天数（默认：30）
 - `SHARE_MIN_PASSWORD_LENGTH` - 密码保护最小密码长度（默认：8）
+- `PUBLIC_URL` - 公网访问地址，用于生成分享链接（例如：https://clipboard.example.com）
 
 ### 客户端
 
@@ -543,6 +544,7 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 - `SHARE_DEFAULT_EXPIRY_DAYS` - Default share link expiration in days (default: 7)
 - `SHARE_MAX_EXPIRY_DAYS` - Max share link expiration in days (default: 30)
 - `SHARE_MIN_PASSWORD_LENGTH` - Minimum password length for password protection (default: 8)
+- `PUBLIC_URL` - Public access URL for generating share links (e.g., https://clipboard.example.com)
 
 ### Client
 

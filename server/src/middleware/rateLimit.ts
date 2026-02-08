@@ -74,9 +74,10 @@ class RateLimiter {
 }
 
 // Different rate limiters for different endpoints
+// General rate limit supports env var overrides: RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS
 export const generalRateLimit = new RateLimiter(
-  HTTP_RATE_LIMITS.GENERAL.WINDOW_MS,
-  HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS,
+  parseInt(process.env.RATE_LIMIT_WINDOW_MS || "") || HTTP_RATE_LIMITS.GENERAL.WINDOW_MS,
+  parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "") || HTTP_RATE_LIMITS.GENERAL.MAX_REQUESTS,
 );
 
 export const uploadRateLimit = new RateLimiter(

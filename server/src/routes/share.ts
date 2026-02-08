@@ -12,6 +12,7 @@ import {
   rateLimitAccessLogs,
   concurrentDownloadTracker,
 } from "../middleware/rateLimiter";
+import { getPublicUrl } from "../utils/url";
 
 // Bandwidth tracking for rate limiting
 class BandwidthTracker {
@@ -106,6 +107,15 @@ export const validateShareId = (req: Request, res: Response, next: NextFunction)
 
 // Uniform error response function
 const sendErrorResponse = (res: Response, statusCode: number): void => {
+  if (statusCode === 401) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="File Download", charset="UTF-8"');
+    res.status(401).json({
+      success: false,
+      error: "UNAUTHORIZED",
+      message: "Password required to access this file",
+    });
+    return;
+  }
   res.status(statusCode).json({
     success: false,
     error: "NOT_FOUND",
@@ -123,9 +133,6 @@ const CreateShareSchema = z.object({
 // Export the download handler for public file routes
 // The fileManager parameter is captured in closure and used for file retrieval
 export const createShareDownloadHandler = (fileManager: FileManager) => {
-  // fileManager is used in closure for file retrieval
-  void fileManager;
-
   // Get configuration from environment
   const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600"); // 100MB in bytes
   const DOWNLOAD_TIMEOUT = parseInt(process.env.DOWNLOAD_TIMEOUT || "30000"); // 30 seconds in ms
@@ -594,8 +601,6 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 };
 
 export const createShareRoutes = (fileManager: FileManager): Router => {
-  // fileManager parameter is for API compatibility but not used in this route group
-  void fileManager;
   const router = Router();
 
   /**
@@ -611,6 +616,10 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
       // const userId = req.user?.id;
       const userId = req.body.createdBy || "temp-user-id"; // Use provided userId or fallback
 
+      // Get original filename from file manager
+      const fileRecord = fileManager.getFile(validatedData.fileId);
+      const originalFilename = fileRecord?.filename;
+
       // Create share link
       const shouldUsePassword = !!validatedData.password; // If password field is present
       const share = await shareService.createShare({
@@ -618,6 +627,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
         createdBy: userId,
         ...(validatedData.expiresInDays && { expiresInDays: validatedData.expiresInDays }),
         ...(shouldUsePassword && { enablePassword: true }),
+        ...(originalFilename && { originalFilename }),
       });
 
       // Return success response
@@ -628,7 +638,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
           shareId: share.shareId,
           fileId: share.fileId,
           createdBy: share.createdBy,
-          url: `${req.protocol}://${req.get("host")}/public/file/${share.shareId}`,
+          url: getPublicUrl(req, `/public/file/${share.shareId}`),
           ...(share.password && { password: share.password }),
           createdAt: share.createdAt.toISOString(),
           expiresAt: share.expiresAt.toISOString(),
@@ -701,16 +711,25 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
           : filteredShares;
 
       // Format response
-      const shares = paginatedShares.map((share) => ({
-        shareId: share.shareId,
-        originalFilename: share.fileId, // Would get from file service in real implementation
-        fileSize: 0, // Would get from file service in real implementation
-        createdAt: share.createdAt.toISOString(),
-        expiresAt: share.expiresAt.toISOString(),
-        status: share.isActive && share.expiresAt > now ? "active" : "expired",
-        accessCount: share.accessCount,
-        hasPassword: share.passwordHash !== null,
-      }));
+      const shares = paginatedShares.map((share) => {
+        // Try to get file info from file manager
+        const fileRecord = fileManager.getFile(share.fileId);
+        const originalFilename =
+          share.metadata?.originalFilename || fileRecord?.filename || share.fileId;
+        const fileSize = fileRecord?.size || 0;
+
+        return {
+          shareId: share.shareId,
+          originalFilename,
+          fileSize,
+          createdAt: share.createdAt.toISOString(),
+          expiresAt: share.expiresAt.toISOString(),
+          status: share.isActive && share.expiresAt > now ? "active" : "expired",
+          accessCount: share.accessCount,
+          hasPassword: share.passwordHash !== null,
+          url: getPublicUrl(req, `/public/file/${share.shareId}`),
+        };
+      });
 
       res.status(200).json({
         success: true,

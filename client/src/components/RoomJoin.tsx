@@ -100,6 +100,7 @@ export function RoomJoin({
       cachedFingerprint &&
       roomKey.trim().length > 0 &&
       !isConnecting &&
+      isConnected &&
       isFromShareLink
     ) {
       // This is a share link, auto-join the room
@@ -149,6 +150,7 @@ export function RoomJoin({
     username,
     urlPassword,
     isConnecting,
+    isConnected,
     isFromShareLink,
     onJoinRoom,
     onJoinRoomWithPassword,
@@ -259,6 +261,15 @@ export function RoomJoin({
     return "unknown";
   };
 
+  const isValidRoomKey = (key: string): boolean => {
+    const trimmed = key.trim();
+    if (trimmed.length < 6) return false;
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) return false;
+    if (!/[a-zA-Z]/.test(trimmed)) return false;
+    if (!/[0-9]/.test(trimmed)) return false;
+    return true;
+  };
+
   const handleQuickCreate = () => {
     if (!cachedFingerprint) {
       toast({
@@ -345,7 +356,9 @@ export function RoomJoin({
                 placeholder={t("roomJoin.usernamePlaceholder")}
                 value={username}
                 onChange={(e) =>
-                  setUsername(e.target.value.replace(/[^a-zA-Z0-9\s._-]/g, "").slice(0, 50))
+                  setUsername(
+                    e.target.value.replace(/[^a-zA-Z0-9\s._\u4e00-\u9fff-]/g, "").slice(0, 50),
+                  )
                 }
                 disabled={isConnecting}
                 className="w-full"
@@ -358,7 +371,7 @@ export function RoomJoin({
               type="submit"
               className="w-full mobile-touch"
               size="mobile"
-              disabled={isConnecting || !roomKey.trim()}
+              disabled={isConnecting || !isValidRoomKey(roomKey)}
             >
               {isConnecting ? t("roomJoin.joining") : t("roomJoin.joinButton")}
             </Button>

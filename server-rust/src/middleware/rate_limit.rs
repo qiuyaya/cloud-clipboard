@@ -30,7 +30,7 @@ impl Default for RateLimitConfig {
     fn default() -> Self {
         Self {
             window_secs: 60,
-            general_max: 100,
+            general_max: 500,
             strict_max: 20,
             share_max: 10,
             download_max: 100,
@@ -46,12 +46,25 @@ impl RateLimitConfig {
             std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
         };
 
-        Self {
-            window_secs: std::env::var("RATE_LIMIT_WINDOW")
+        // Support RATE_LIMIT_WINDOW_MS (milliseconds) or RATE_LIMIT_WINDOW (seconds)
+        let window_secs = if let Ok(ms) = std::env::var("RATE_LIMIT_WINDOW_MS") {
+            ms.parse::<u64>().ok().map(|v| v / 1000).unwrap_or(60)
+        } else {
+            std::env::var("RATE_LIMIT_WINDOW")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(60),
-            general_max: parse_u32("RATE_LIMIT_MAX", 100),
+                .unwrap_or(60)
+        };
+
+        // Support RATE_LIMIT_MAX_REQUESTS or RATE_LIMIT_MAX
+        let general_max = std::env::var("RATE_LIMIT_MAX_REQUESTS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or_else(|| parse_u32("RATE_LIMIT_MAX", 500));
+
+        Self {
+            window_secs,
+            general_max,
             strict_max: parse_u32("STRICT_LIMIT_MAX", 20),
             share_max: parse_u32("SHARE_LIMIT_MAX", 10),
             download_max: parse_u32("DOWNLOAD_LIMIT_MAX", 100),
@@ -70,7 +83,7 @@ pub fn create_rate_limiter(_config: &RateLimitConfig, requests_per_window: u32) 
     Arc::new(GovRateLimiter::keyed(quota))
 }
 
-/// General rate limiter: configured from RATE_LIMIT_MAX (default 100) per window
+/// General rate limiter: configured from RATE_LIMIT_MAX_REQUESTS or RATE_LIMIT_MAX (default 500) per window
 pub fn general_rate_limiter(config: &RateLimitConfig) -> KeyedRateLimiter {
     create_rate_limiter(config, config.general_max)
 }
@@ -129,7 +142,7 @@ pub fn rate_limit_headers(config: &RateLimitConfig, remaining: u32, retry_after:
 
     headers.insert(
         "X-RateLimit-Limit",
-        HeaderValue::from_str(&limit).unwrap_or_else(|_| HeaderValue::from_static("100"))
+        HeaderValue::from_str(&limit).unwrap_or_else(|_| HeaderValue::from_static("500"))
     );
     headers.insert(
         "X-RateLimit-Remaining",

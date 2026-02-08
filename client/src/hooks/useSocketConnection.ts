@@ -222,6 +222,25 @@ export const useSocketConnection = ({
       });
     };
 
+    const handleMessageHistory = (messages: (TextMessage | FileMessage)[]) => {
+      debug.info("Received message history", { count: messages.length });
+
+      const messagesWithDates = messages.map((message) => ({
+        ...message,
+        timestamp:
+          typeof message.timestamp === "string" ? new Date(message.timestamp) : message.timestamp,
+        sender: {
+          ...message.sender,
+          lastSeen:
+            typeof message.sender.lastSeen === "string"
+              ? new Date(message.sender.lastSeen)
+              : message.sender.lastSeen,
+        },
+      }));
+
+      callbacksRef.current.onSetMessages(messagesWithDates);
+    };
+
     const handleUserJoined = (user: User) => {
       debug.debug("User joined event received", { user });
 
@@ -387,6 +406,7 @@ export const useSocketConnection = ({
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socketService.onMessage(handleMessage);
+    socketService.onMessageHistory(handleMessageHistory);
     socketService.onUserJoined(handleUserJoined);
     socketService.onUserLeft(handleUserLeft);
     socketService.onUserList(handleUserList);

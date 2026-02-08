@@ -24,11 +24,15 @@ export const generateRoomKey = (): string => {
     result += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
 
-  // Shuffle the result to avoid predictable patterns
-  return result
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
+  // Shuffle the result using Fisher-Yates algorithm
+  const chars = result.split("");
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = chars[i] as string;
+    chars[i] = chars[j] as string;
+    chars[j] = temp;
+  }
+  return chars.join("");
 };
 
 export const generateDefaultUsername = (): string => {
@@ -161,7 +165,7 @@ export const sanitizeFileName = (fileName: string): string => {
   return sanitized;
 };
 
-export const formatTimestamp = (date: Date | string): string => {
+export const formatTimestamp = (date: Date | string, locale: string = "zh"): string => {
   const dateObj = typeof date === "string" ? new Date(date) : date;
 
   // Check if the date is valid
@@ -173,34 +177,42 @@ export const formatTimestamp = (date: Date | string): string => {
   const diffMs = now.getTime() - dateObj.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffDays = Math.floor(diffMs / 86400000);
+  const isZh = locale.startsWith("zh");
 
   // If within last hour, show relative time
   if (diffMins < 1) {
-    return "刚刚";
+    return isZh ? "刚刚" : "Just now";
   } else if (diffMins < 60) {
-    return `${diffMins}分钟前`;
+    return isZh ? `${diffMins}分钟前` : `${diffMins}m ago`;
   }
   // If today, show time only
   else if (dateObj.toDateString() === now.toDateString()) {
-    return new Intl.DateTimeFormat("zh-CN", {
+    return new Intl.DateTimeFormat(isZh ? "zh-CN" : "en-US", {
       hour: "2-digit",
       minute: "2-digit",
     }).format(dateObj);
   }
   // If yesterday
   else if (diffDays === 1) {
-    return `昨天 ${new Intl.DateTimeFormat("zh-CN", {
+    const time = new Intl.DateTimeFormat(isZh ? "zh-CN" : "en-US", {
       hour: "2-digit",
       minute: "2-digit",
-    }).format(dateObj)}`;
+    }).format(dateObj);
+    return isZh ? `昨天 ${time}` : `Yesterday ${time}`;
   }
   // If within this year
   else if (dateObj.getFullYear() === now.getFullYear()) {
-    return `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+    if (isZh) {
+      return `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+    }).format(dateObj);
   }
   // For older dates, show full date
   else {
-    return new Intl.DateTimeFormat("zh-CN", {
+    return new Intl.DateTimeFormat(isZh ? "zh-CN" : "en-US", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -208,6 +220,31 @@ export const formatTimestamp = (date: Date | string): string => {
       minute: "2-digit",
     }).format(dateObj);
   }
+};
+
+export const formatExpiryTime = (date: Date | string, locale: string = "zh"): string => {
+  const dateObj = typeof date === "string" ? new Date(date) : date;
+
+  if (isNaN(dateObj.getTime())) {
+    return "Invalid Date";
+  }
+
+  const now = new Date();
+  const diffMs = dateObj.getTime() - now.getTime();
+  const isZh = locale.startsWith("zh");
+
+  if (diffMs <= 0) {
+    return isZh ? "已过期" : "Expired";
+  }
+
+  const diffDays = Math.ceil(diffMs / 86400000);
+  const diffHours = Math.ceil(diffMs / 3600000);
+
+  if (diffHours < 24) {
+    return isZh ? `${diffHours}小时后过期` : `Expires in ${diffHours}h`;
+  }
+
+  return isZh ? `${diffDays}天后过期` : `Expires in ${diffDays}d`;
 };
 
 // Browser fingerprinting utilities (client-side only)
