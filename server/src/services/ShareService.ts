@@ -51,8 +51,15 @@ export class ShareService {
     createdBy: string;
     expiresInDays?: number;
     enablePassword?: boolean;
+    originalFilename?: string;
   }): Promise<ShareLink> {
-    const { fileId, createdBy, expiresInDays = 7, enablePassword = false } = params;
+    const {
+      fileId,
+      createdBy,
+      expiresInDays = 7,
+      enablePassword = false,
+      originalFilename,
+    } = params;
 
     // Generate unique share ID
     const shareId = generateShareId();
@@ -72,6 +79,7 @@ export class ShareService {
       lastAccessedAt: null,
       isActive: true,
       createdBy,
+      ...(originalFilename && { metadata: { originalFilename } }),
     };
 
     // Generate password if enabled

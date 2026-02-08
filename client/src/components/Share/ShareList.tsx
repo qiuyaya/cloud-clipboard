@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { shareApi } from "../../services/shareApi";
-import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
+import { formatFileSize, formatTimestamp, formatExpiryTime } from "@cloud-clipboard/shared";
 import { Clock, Download, Lock, Unlock, Trash2, Eye, Copy } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/useToast";
@@ -29,6 +29,7 @@ interface ShareItem {
   status: "active" | "expired";
   accessCount: number;
   hasPassword: boolean;
+  url: string;
 }
 
 export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
@@ -42,7 +43,7 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [shareToDelete, setShareToDelete] = useState<ShareItem | null>(null);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -138,10 +139,6 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
     }
   };
 
-  const getShareUrl = (shareId: string) => {
-    return `${window.location.origin}/api/share/${shareId}/download`;
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -206,10 +203,12 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
 
                   <div className="text-sm text-muted-foreground space-y-1">
                     <p>
-                      {t("share.list.fields.created")}: {formatTimestamp(new Date(share.createdAt))}
+                      {t("share.list.fields.created")}:{" "}
+                      {formatTimestamp(new Date(share.createdAt), i18n.language)}
                     </p>
                     <p>
-                      {t("share.list.fields.expires")}: {formatTimestamp(new Date(share.expiresAt))}
+                      {t("share.list.fields.expires")}:{" "}
+                      {formatExpiryTime(new Date(share.expiresAt), i18n.language)}
                     </p>
                     <p className="flex items-center gap-1">
                       <Download className="h-3 w-3" />
@@ -225,14 +224,14 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
 
                 <div className="flex gap-2 ml-4">
                   <button
-                    onClick={() => copyToClipboard(getShareUrl(share.shareId), share.shareId)}
+                    onClick={() => copyToClipboard(share.url, share.shareId)}
                     className="p-2 text-muted-foreground hover:text-primary hover:bg-accent rounded transition-colors relative"
                     title={t("share.list.actions.copy")}
                   >
                     <Copy className="h-4 w-4" />
                     {copiedShareId === share.shareId && (
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">Copied!</span>
+                        <span className="text-popover-foreground">{t("room.copied")}</span>
                       </div>
                     )}
                   </button>
@@ -254,7 +253,7 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
               </div>
 
               <div className="mt-3 p-2 bg-muted rounded text-xs font-mono break-all text-muted-foreground">
-                {getShareUrl(share.shareId)}
+                {share.url}
               </div>
             </div>
           ))}

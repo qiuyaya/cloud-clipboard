@@ -28,7 +28,7 @@
     },
     "hints": {
       "roomKeyFormat": "Must be 6+ characters with letters and numbers (can include _ and -)",
-      "usernameFormat": "Letters, numbers, spaces, dots, underscores and hyphens only"
+      "usernameFormat": "Chinese characters, letters, numbers, spaces, dots, underscores and hyphens only"
     }
   },
   "passwordInput": {
@@ -49,6 +49,8 @@
     "usersOnline_other": "{{count}} users online",
     "leave": "Leave",
     "share": "Share",
+    "sidebarTitle": "Room Info",
+    "sidebarDescription": "View room details and online users",
     "setPassword": "Set Password",
     "removePassword": "Remove Password",
     "usersInRoom": "Users in room",
@@ -171,7 +173,9 @@
         "description": "A secure 6-character password will be automatically generated for this share",
         "label": "Password",
         "copy": "Copy Password",
-        "generatedHint": "This password is generated automatically for security"
+        "generatedHint": "This password is generated automatically for security",
+        "enableLabel": "Enable password protection",
+        "autoGenerateHint": "(A 6-character secure password will be auto-generated)"
       },
       "actions": {
         "copy": "Copy Link",

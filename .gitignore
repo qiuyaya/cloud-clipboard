@@ -12,6 +12,9 @@ coverage
 test-results
 playwright-report
 
+# mcp
+.playwright-mcp
+
 # Generated icons (keep source in assets/icons)
 client/public/favicon-*.svg
 server/public/

@@ -31,7 +31,7 @@ export function SidebarContent({
   hasRoomPassword = false,
   isMobile,
 }: SidebarContentProps): JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [copiedRoomKey, setCopiedRoomKey] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState<boolean | null>(null);
@@ -189,7 +189,7 @@ export function SidebarContent({
                       size="sm"
                       onClick={onNavigateToShare}
                       className="flex items-center gap-2 min-w-fit mobile-touch"
-                      title="Share Management"
+                      title={t("share.list.title")}
                     >
                       <Settings className="h-4 w-4" />
                     </Button>
@@ -228,7 +228,7 @@ export function SidebarContent({
                   {user.isOnline
                     ? t("room.online")
                     : t("room.lastSeen", {
-                        time: formatTimestamp(user.lastSeen),
+                        time: formatTimestamp(user.lastSeen, i18n.language),
                       })}
                 </p>
               </div>

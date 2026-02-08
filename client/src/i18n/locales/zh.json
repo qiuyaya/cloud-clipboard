@@ -28,7 +28,7 @@
     },
     "hints": {
       "roomKeyFormat": "需要6个以上字符，包含字母和数字（可包含_和-）",
-      "usernameFormat": "仅允许字母、数字、空格、点、下划线和连字符"
+      "usernameFormat": "仅允许中文、字母、数字、空格、点、下划线和连字符"
     }
   },
   "passwordInput": {
@@ -49,6 +49,8 @@
     "usersOnline_other": "{{count}} 名用户在线",
     "leave": "离开",
     "share": "分享",
+    "sidebarTitle": "房间信息",
+    "sidebarDescription": "查看房间详情和在线用户",
     "setPassword": "设置密钥",
     "removePassword": "移除密钥",
     "usersInRoom": "房间用户",
@@ -171,7 +173,9 @@
         "description": "系统将为该分享自动生成一个6位安全密钥",
         "label": "密钥",
         "copy": "复制密钥",
-        "generatedHint": "此密钥由系统自动生成，确保安全性"
+        "generatedHint": "此密钥由系统自动生成，确保安全性",
+        "enableLabel": "启用密码保护",
+        "autoGenerateHint": "(将自动生成6位安全密码)"
       },
       "actions": {
         "copy": "复制链接",

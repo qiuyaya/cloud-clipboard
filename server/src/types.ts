@@ -40,6 +40,7 @@ export interface ShareListItem {
   status: "active" | "expired" | "revoked";
   accessCount: number;
   hasPassword: boolean;
+  url: string;
 }
 
 // Share list response

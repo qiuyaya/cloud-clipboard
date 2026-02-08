@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Always respond in 中文
 - After any changes, verify whether related documentation needs to be updated.
-- After any module’s code is modified, add or improve its test cases accordingly.
+- After any module's code is modified, add or improve its test cases accordingly.
 - Before committing any code, run the tests for the corresponding module; only commit if all test cases pass.
+- 不要自动提交代码或推送到远程，必须等用户明确要求
+- 不要自动发布版本，必须等用户明确要求
 
 ## Essential Commands
 
