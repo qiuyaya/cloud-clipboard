@@ -75,19 +75,20 @@ export default defineConfig({
               },
             },
           },
+          // API 请求使用 NetworkOnly，确保每次都获取最新数据
           {
-            urlPattern: /\/api\/.*/i,
-            handler: "NetworkFirst",
+            urlPattern: /\/api\//i,
+            handler: "NetworkOnly",
             options: {
               cacheName: "api-cache",
-              networkTimeoutSeconds: 10,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5, // 5 minutes
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
+            },
+          },
+          // 分享文件下载使用 NetworkOnly，完全不缓存
+          {
+            urlPattern: /\/public\/file\//i,
+            handler: "NetworkOnly",
+            options: {
+              cacheName: "file-download-cache",
             },
           },
         ],
