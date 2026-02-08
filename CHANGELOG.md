@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.10] - 2026-02-08
+
+- fix: 全面优化国际化、输入验证、分享功能和无障碍性
+
 ## [1.4.9] - 2026-02-07
 
 - fix: 带密码的分享链接返回正确的 401 响应和 WWW-Authenticate 头
