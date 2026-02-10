@@ -23,6 +23,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run copy-client` - Copy client build to server public directory
 - `bun run start` - Start production server (runs on port 3001)
 
+### Rust Backend (server-rust/)
+
+本地环境没有 gcc，Rust 后端必须使用 Docker 编译：
+
+- `cd server-rust && docker build -t cloud-clipboard-rust .` - 使用 Docker 构建 Rust 后端
+- `cd server-rust && docker build --target builder -t cloud-clipboard-rust-builder .` - 仅编译不导出
+- 编译检查（不产生二进制）：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo check"`
+- 运行测试：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test"`
+- Dockerfile 位于 `server-rust/Dockerfile`，基于 `rust:1.93-alpine`
+
 ### Code Quality
 
 - `bun run lint` - Run ESLint on all TypeScript files

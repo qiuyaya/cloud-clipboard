@@ -201,6 +201,15 @@ export class ShareService {
     }
 
     this.accessLogs.get(shareId)!.push(log);
+
+    // Update access count on successful download
+    if (success) {
+      const share = this.shares.get(shareId);
+      if (share) {
+        share.accessCount++;
+        share.lastAccessedAt = new Date();
+      }
+    }
   }
 
   /**

@@ -329,6 +329,31 @@ export const useSocketConnection = ({
       }
     };
 
+    const translateServerError = (error: string): string => {
+      const errorMap: Record<string, string> = {
+        "Invalid password": t("toast.connectionErrorMessages.invalidPassword"),
+        "Room not found": t("toast.connectionErrorMessages.roomNotFound"),
+        "Room does not require a password": t("toast.connectionErrorMessages.roomNoPassword"),
+        "Failed to join room": t("toast.connectionErrorMessages.failedToJoinRoom"),
+        "Failed to join room with password": t(
+          "toast.connectionErrorMessages.failedToJoinRoomWithPassword",
+        ),
+        "Too many join attempts. Please wait.": t("toast.connectionErrorMessages.tooManyAttempts"),
+        "Too many leave attempts. Please wait.": t("toast.connectionErrorMessages.tooManyAttempts"),
+        "Too many messages. Please wait.": t("toast.connectionErrorMessages.tooManyMessages"),
+        "Too many requests. Please wait.": t("toast.connectionErrorMessages.tooManyAttempts"),
+        "User not authenticated": t("toast.connectionErrorMessages.userNotAuthenticated"),
+        "User not in room": t("toast.connectionErrorMessages.userNotInRoom"),
+        "Failed to leave room": t("toast.connectionErrorMessages.failedToLeaveRoom"),
+        "Failed to send message": t("toast.connectionErrorMessages.failedToSendMessage"),
+        "Failed to set room password": t("toast.connectionErrorMessages.failedToSetPassword"),
+        "Failed to generate share link": t(
+          "toast.connectionErrorMessages.failedToGenerateShareLink",
+        ),
+      };
+      return errorMap[error] || error;
+    };
+
     const handleError = (error: string) => {
       debug.error("Socket error", { error, currentRoomKey: roomKeyRef.current });
       callbacksRef.current.onSetIsConnecting(false);
@@ -336,7 +361,7 @@ export const useSocketConnection = ({
       toast({
         variant: "destructive",
         title: t("toast.connectionError"),
-        description: error,
+        description: translateServerError(error),
       });
     };
 

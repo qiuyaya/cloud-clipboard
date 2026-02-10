@@ -12,57 +12,9 @@ on:
         type: string
 
 jobs:
-  # Build web client
-  build-web:
-    name: Build Web Client
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Cache Bun dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build application
-        run: bun run build
-
-      - name: Create web distribution
-        run: |
-          mkdir -p dist
-          cp -r client/dist dist/client
-          cp -r server/dist dist/server
-          cp -r server/package*.json dist/server/
-          cp package.json dist/
-          cp README.md dist/
-
-          # Create deployment package
-          tar -czf cloud-clipboard-web.tar.gz -C dist .
-
-      - name: Upload web artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: cloud-clipboard-web.tar.gz
-          retention-days: 5
-
-  # Build and push Docker image
+  # Build and push Docker image (Node.js backend)
   build-docker:
-    name: Build Docker Image
+    name: Build Docker Image (Node.js)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -147,11 +99,127 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Build and push Docker image (Rust backend)
+  build-docker-rust:
+    name: Build Docker Image (Rust)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Root path image
+      - name: Build frontend (root path)
+        run: |
+          bun run icons:generate && bun run client:build
+          cp -r client/dist server-rust/public
+
+      - name: Extract metadata for Docker (Rust root path)
+        id: meta_rust
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-rust
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push Docker image (Rust root path)
+        uses: docker/build-push-action@v4
+        with:
+          context: ./server-rust
+          file: ./server-rust/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta_rust.outputs.tags }}
+          labels: ${{ steps.meta_rust.outputs.labels }}
+          cache-from: type=gha,scope=rust
+          cache-to: type=gha,mode=max,scope=rust
+
+      # Clipboard subpath image
+      - name: Build frontend (clipboard subpath)
+        run: |
+          VITE_BASE_PATH=/clipboard/ bun run client:build
+          rm -rf server-rust/public
+          cp -r client/dist server-rust/public
+
+      - name: Extract metadata for Docker (Rust clipboard subpath)
+        id: meta_rust_clipboard
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-rust
+          flavor: |
+            suffix=-clipboard
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build and push Docker image (Rust clipboard subpath)
+        uses: docker/build-push-action@v4
+        with:
+          context: ./server-rust
+          file: ./server-rust/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta_rust_clipboard.outputs.tags }}
+          labels: ${{ steps.meta_rust_clipboard.outputs.labels }}
+          cache-from: type=gha,scope=rust
+          cache-to: type=gha,mode=max,scope=rust
+
   # Create GitHub release
   create-release:
     name: Create Release
-    needs: [build-web, build-docker]
-    if: always() && needs.build-web.result == 'success' && needs.build-docker.result == 'success'
+    needs: [build-docker, build-docker-rust]
+    if: always() && needs.build-docker.result == 'success' && needs.build-docker-rust.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -183,9 +251,6 @@ jobs:
             COMMITS=$(git log --pretty=format:"- %s" --no-merges -10)
           fi
 
-          # Check if desktop was built
-          DESKTOP_BUILT="false"
-
           # Create release notes
           cat > release_notes.md << EOF
           ## 🚀 Cloud Clipboard ${{ steps.get_version.outputs.version }}
@@ -193,46 +258,29 @@ jobs:
           ### 📋 What's New
           ${COMMITS}
 
-          ### 📦 Downloads
+          ### 📦 Docker Images
 
-          EOF
-
-          cat >> release_notes.md << EOF
-          #### 🌐 Web Application
-          - **Full Package**: Download \`cloud-clipboard-web.tar.gz\` for self-hosting
+          #### 🌐 Node.js Backend
           - **Docker (根路径)**: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}\`
           - **Docker (子路径 /clipboard/)**: \`docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}-clipboard\`
 
-          ### ✨ Features
-          - 🔄 **Auto clipboard sync**: Automatically sync clipboard content across devices
-          - ⚙️ **Configurable settings**: Customize server URL, sync interval, and more
-          - 🎨 **Modern UI**: Clean interface with theme support
-          - 📱 **Cross-platform**: Windows, macOS, Linux, iOS, Android support
-          - 🔔 **Native notifications**: System notifications for clipboard changes
-          - 🏠 **Self-hosted**: Run your own cloud clipboard server
+          #### 🦀 Rust Backend
+          - **Docker (根路径)**: \`docker pull ghcr.io/${{ github.repository }}-rust:${{ steps.get_version.outputs.version_number }}\`
+          - **Docker (子路径 /clipboard/)**: \`docker pull ghcr.io/${{ github.repository }}-rust:${{ steps.get_version.outputs.version_number }}-clipboard\`
 
-          ### 🛠️ Installation
+          ### 🛠️ Quick Start
 
-          #### Web App (Self-hosting)
-          1. Download \`cloud-clipboard-web.tar.gz\`
-          2. Extract and follow the README for deployment instructions
-          3. Access via web browser
-
-          #### Docker (Recommended for self-hosting)
-
-          **根路径部署 (默认)**:
+          **Node.js 后端**:
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}
           docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}
           \`\`\`
-          访问: http://localhost:3001
 
-          **子路径部署 (/clipboard/)**:
+          **Rust 后端 (推荐，更低内存占用)**:
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}-clipboard
-          docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version_number }}-clipboard
+          docker run -p 3001:3001 -v ./uploads:/app/uploads ghcr.io/${{ github.repository }}-rust:${{ steps.get_version.outputs.version_number }}
           \`\`\`
-          访问: http://localhost:3001 (配合 Nginx 反向代理到 /clipboard/ 路径)
+
+          访问: http://localhost:3001
 
           ---
 
@@ -240,19 +288,6 @@ jobs:
           EOF
 
           echo "Generated release notes"
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release assets
-        run: |
-          mkdir -p release_assets
-
-          # List all assets
-          echo "Release assets:"
-          ls -la release_assets/ || echo "No assets found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -262,7 +297,6 @@ jobs:
           body_path: release_notes.md
           draft: false
           prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
-          files: release_assets/*
           token: ${{ secrets.GITHUB_TOKEN }}
 
   # Notify on completion

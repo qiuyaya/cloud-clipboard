@@ -1,0 +1,31 @@
+# Build artifacts
+target/
+dist/
+cloud-clipboard-server
+
+# Generated public files (built from client)
+public/
+
+# Uploads directory
+uploads/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Docker
+.dockerignore

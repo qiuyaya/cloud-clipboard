@@ -90,10 +90,8 @@ export const useMessageHandler = ({ currentUser, roomKey }: UseMessageHandlerPro
                 : currentUser.lastSeen,
           };
 
-          const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
-          const absoluteDownloadUrl = result.data.downloadUrl.startsWith("http")
-            ? result.data.downloadUrl
-            : `${serverUrl}${result.data.downloadUrl}`;
+          // Rust backend returns absolute URL, use directly
+          const absoluteDownloadUrl = result.data.downloadUrl;
 
           debug.info("Creating file message", {
             fileName: file.name,

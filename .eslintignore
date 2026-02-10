@@ -40,5 +40,7 @@ Thumbs.db
 
 # Build outputs
 server/public/
+server-rust/public/
+server-rust/target/
 client/dist/
 client/dev-dist/

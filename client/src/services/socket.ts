@@ -27,10 +27,8 @@ class SocketService {
       return this.socket;
     }
 
-    // In production, use the same origin; in development, use environment variable or default
-    const serverUrl = import.meta.env.PROD
-      ? window.location.origin
-      : import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+    // Use relative path (Vite proxy handles routing in dev, same-origin in prod)
+    const serverUrl = window.location.origin;
 
     // Support subpath deployment for Socket.IO
     const basePath = import.meta.env.BASE_URL || "/";
