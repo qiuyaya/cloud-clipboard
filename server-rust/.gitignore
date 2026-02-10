@@ -1,6 +1,17 @@
 # Build artifacts
 target/
 dist/
+cloud-clipboard-server
+
+# Generated public files (built from client)
+public/
+
+# Uploads directory
+uploads/
+
+# Logs
+logs/
+*.log
 
 # IDE
 .idea/
@@ -12,9 +23,9 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
 # Environment
 .env
 .env.local
+
+# Docker
+.dockerignore

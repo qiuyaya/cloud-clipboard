@@ -126,7 +126,6 @@ pub struct SendMessageFileInfo {
     pub size: u64,
     #[serde(rename = "type")]
     pub file_type: String,
-    pub last_modified: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -147,22 +146,6 @@ pub struct RoomPasswordSetEvent {
 pub struct RoomLinkGeneratedEvent {
     pub room_key: String,
     pub share_link: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct P2PSignalEvent {
-    pub from_user_id: String,
-    #[serde(flatten)]
-    pub data: serde_json::Value,
-}
-
-/// System message event for broadcasting system notifications
-#[derive(Debug, Serialize)]
-pub struct SystemMessageEvent {
-    #[serde(rename = "type")]
-    pub msg_type: String,
-    pub data: serde_json::Value,
 }
 
 /// Socket-level rate limiter
@@ -549,6 +532,13 @@ async fn handle_join_room(
                 let _ = socket.emit("messageHistory", &messages);
             }
 
+            // Send room password status to joining user
+            let has_password = room_service.room_has_password(&data.room_key);
+            let _ = socket.emit("roomPasswordSet", &RoomPasswordSetEvent {
+                room_key: data.room_key.clone(),
+                has_password,
+            });
+
             // Broadcast to others in the room
             let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
@@ -632,6 +622,13 @@ async fn handle_join_room_with_password(
                 let _ = socket.emit("messageHistory", &messages);
             }
 
+            // Send room password status to joining user
+            let has_password = room_service.room_has_password(&data.room_key);
+            let _ = socket.emit("roomPasswordSet", &RoomPasswordSetEvent {
+                room_key: data.room_key.clone(),
+                has_password,
+            });
+
             // Broadcast to others in the room
             let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
@@ -668,7 +665,6 @@ async fn handle_send_message(
                 name: "unknown".to_string(),
                 size: 0,
                 file_type: "application/octet-stream".to_string(),
-                last_modified: None,
             });
             let mut msg = Message::new_file(
                 generate_message_id(),
@@ -725,7 +721,10 @@ async fn handle_disconnect(socket: SocketRef, room_service: Arc<RoomService>) {
 
     if let Some((room_key, user)) = room_service.set_user_offline(&socket_id) {
         // Broadcast user left
-        let _ = socket.to(room_key).emit("userLeft", &user.id);
+        let _ = socket.to(room_key.clone()).emit("userLeft", &user.id);
+
+        // Schedule delayed room destruction check to allow reconnection after browser refresh
+        room_service.schedule_room_destroy_check(&room_key);
     }
 }
 

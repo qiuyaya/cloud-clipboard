@@ -6,6 +6,7 @@ mod utils;
 
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     http::Method,
     routing::get,
     Json,
@@ -20,6 +21,7 @@ use tower_http::{
     trace::TraceLayer,
     set_header::SetResponseHeaderLayer,
     services::{ServeDir, ServeFile},
+    limit::RequestBodyLimitLayer,
 };
 use axum::http::{HeaderValue, HeaderName, header};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -34,6 +36,7 @@ pub struct AppState {
     pub room_service: Arc<RoomService>,
     pub file_manager: Arc<FileManager>,
     pub share_service: Arc<ShareService>,
+    pub start_time: std::time::Instant,
 }
 
 /// Cleanup task configuration
@@ -138,6 +141,7 @@ async fn main() -> anyhow::Result<()> {
         room_service: room_service.clone(),
         file_manager: file_manager.clone(),
         share_service: share_service.clone(),
+        start_time: std::time::Instant::now(),
     };
 
     // Setup Socket.IO
@@ -241,10 +245,11 @@ async fn main() -> anyhow::Result<()> {
     // Clone services for background tasks
     let cleanup_room_service = room_service.clone();
     let cleanup_file_manager = file_manager.clone();
+    let cleanup_share_service = share_service.clone();
 
     // Start background cleanup tasks
     tokio::spawn(async move {
-        run_cleanup_tasks(cleanup_room_service, cleanup_file_manager, cleanup_config).await;
+        run_cleanup_tasks(cleanup_room_service, cleanup_file_manager, cleanup_share_service, cleanup_config).await;
     });
 
     // Build the API router (routes relative to base path)
@@ -257,7 +262,8 @@ async fn main() -> anyhow::Result<()> {
         // Room routes - strict rate limit
         .nest("/api/rooms", rooms::router().layer(strict_rate_limit))
         // File routes - internal per-operation rate limiting
-        .nest("/api/files", files::router())
+        // Override axum's default 2MB body limit for file uploads (actual limit enforced by RequestBodyLimitLayer)
+        .nest("/api/files", files::router().layer(DefaultBodyLimit::disable()))
         // Share routes - internal per-operation rate limiting
         .nest("/api/share", share::router())
         // Public file download - dedicated public download rate limit
@@ -274,6 +280,8 @@ async fn main() -> anyhow::Result<()> {
     } else {
         Router::new().nest(&base_path, api_router)
     }
+        // Global request body size limit (100MB, matching MAX_FILE_SIZE)
+        .layer(RequestBodyLimitLayer::new(100 * 1024 * 1024))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(cors)
@@ -354,6 +362,7 @@ async fn main() -> anyhow::Result<()> {
 async fn run_cleanup_tasks(
     room_service: Arc<RoomService>,
     file_manager: Arc<FileManager>,
+    share_service: Arc<ShareService>,
     config: CleanupConfig,
 ) {
     tracing::info!(
@@ -375,12 +384,18 @@ async fn run_cleanup_tasks(
         tracing::info!("Initial cleanup: removed {} expired files", cleaned.len());
     }
 
+    {
+        tracing::info!("Running initial share cleanup...");
+        let cleaned = share_service.cleanup_expired_shares();
+        tracing::info!("Initial cleanup: removed {} expired shares", cleaned.len());
+    }
+
     // Room cleanup interval
     let room_interval = Duration::from_secs(config.room_cleanup_interval_secs);
     let mut room_interval = tokio::time::interval(room_interval);
     room_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-    // File cleanup interval
+    // File cleanup interval (same as share cleanup)
     let file_interval = Duration::from_secs(config.file_cleanup_interval_secs);
     let mut file_interval = tokio::time::interval(file_interval);
     file_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -396,10 +411,12 @@ async fn run_cleanup_tasks(
                 }
             }
             _ = file_interval.tick() => {
-                tracing::debug!("Running scheduled file cleanup...");
-                let cleaned = file_manager.cleanup_expired_files().await;
-                if !cleaned.is_empty() {
-                    tracing::info!("Scheduled file cleanup: removed {} expired files", cleaned.len());
+                tracing::debug!("Running scheduled file and share cleanup...");
+                let cleaned_files = file_manager.cleanup_expired_files().await;
+                let cleaned_shares = share_service.cleanup_expired_shares();
+                if !cleaned_files.is_empty() || !cleaned_shares.is_empty() {
+                    tracing::info!("Scheduled cleanup: removed {} expired files, {} expired shares",
+                        cleaned_files.len(), cleaned_shares.len());
                 }
             }
         }

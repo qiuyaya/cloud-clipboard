@@ -56,6 +56,9 @@ tokio-util = { version = "0.7", features = ["io"] }
 # Random ID generation
 rand = "0.9"
 
+# URL encoding for RFC 5987 Content-Disposition
+percent-encoding = "2"
+
 # Environment
 dotenvy = "0.15"
 

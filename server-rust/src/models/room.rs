@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::{Message, User};
 
@@ -11,7 +11,7 @@ pub struct Room {
     pub password_hash: Option<String>,
     pub password: Option<String>,
     pub users: HashMap<String, User>,
-    pub messages: Vec<Message>,
+    pub messages: VecDeque<Message>,
     pub created_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
     max_messages: usize,
@@ -38,7 +38,7 @@ impl Room {
             password_hash,
             password,
             users: HashMap::new(),
-            messages: Vec::new(),
+            messages: VecDeque::new(),
             created_at: now,
             last_activity: now,
             max_messages: 1000,
@@ -58,20 +58,12 @@ impl Room {
         user
     }
 
-    pub fn get_user(&self, user_id: &str) -> Option<&User> {
-        self.users.get(user_id)
-    }
-
     pub fn get_user_mut(&mut self, user_id: &str) -> Option<&mut User> {
         self.users.get_mut(user_id)
     }
 
     pub fn get_users(&self) -> Vec<&User> {
         self.users.values().collect()
-    }
-
-    pub fn get_online_users(&self) -> Vec<&User> {
-        self.users.values().filter(|u| u.is_online).collect()
     }
 
     pub fn user_count(&self) -> usize {
@@ -83,7 +75,7 @@ impl Room {
     }
 
     pub fn add_message(&mut self, message: Message) {
-        self.messages.push(message);
+        self.messages.push_back(message);
         self.message_count += 1;
 
         // Drop oldest 20% when exceeding max to avoid frequent removals
@@ -96,7 +88,7 @@ impl Room {
         self.update_activity();
     }
 
-    pub fn get_messages(&self) -> &[Message] {
+    pub fn get_messages(&self) -> &VecDeque<Message> {
         &self.messages
     }
 
@@ -179,30 +171,12 @@ impl Room {
         format!("{}_{}", base, &uuid::Uuid::new_v4().to_string()[..5])
     }
 
-    /// Get message statistics
-    pub fn get_message_stats(&self) -> MessageStats {
-        MessageStats {
-            total: self.messages.len() as u64,
-            total_processed: self.message_count,
-            dropped: self.message_dropped_count,
-        }
-    }
-
     /// Find user by fingerprint hash
     pub fn find_user_by_fingerprint(&self, hash: &str) -> Option<&User> {
         self.users.values().find(|u| {
             u.fingerprint.as_deref() == Some(hash)
         })
     }
-}
-
-/// Message statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MessageStats {
-    pub total: u64,
-    pub total_processed: u64,
-    pub dropped: u64,
 }
 
 #[cfg(test)]

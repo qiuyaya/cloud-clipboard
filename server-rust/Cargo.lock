@@ -265,6 +265,7 @@ dependencies = [
  "governor",
  "infer",
  "mime_guess",
+ "percent-encoding",
  "rand 0.9.2",
  "reqwest",
  "serde",

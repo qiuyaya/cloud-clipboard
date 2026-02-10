@@ -54,10 +54,7 @@ pub async fn health_check(State(state): State<AppState>) -> Json<HealthResponse>
         success: true,
         message: "Server is healthy".to_string(),
         data: HealthData {
-            uptime: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs_f64(),
+            uptime: state.start_time.elapsed().as_secs_f64(),
             timestamp: chrono::Utc::now().to_rfc3339(),
             total_rooms: room_stats.total_rooms,
             total_users: room_stats.total_users,

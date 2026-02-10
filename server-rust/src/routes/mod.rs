@@ -7,6 +7,13 @@ pub mod share;
 use axum::http::HeaderMap;
 use serde::Serialize;
 
+static BASE_PATH: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    std::env::var("BASE_PATH")
+        .unwrap_or_default()
+        .trim_end_matches('/')
+        .to_string()
+});
+
 /// Unified API response type used across all route modules
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,4 +40,8 @@ pub fn build_base_url(headers: &HeaderMap) -> String {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("localhost:3001");
     format!("{}://{}", proto, host)
+}
+
+pub fn get_base_path() -> &'static str {
+    &BASE_PATH
 }

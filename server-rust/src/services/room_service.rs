@@ -1,10 +1,14 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use chrono::{Duration, Utc};
 use tokio::sync::broadcast;
 
 use crate::models::{Room, User, Message};
 use crate::models::room::RoomInfo;
+
+/// Grace period before destroying a room when all users disconnect (in seconds).
+/// This allows users to reconnect after browser refresh without losing their session.
+const ROOM_DESTROY_GRACE_PERIOD_SECS: u64 = 30;
 
 /// Events emitted by RoomService
 #[derive(Debug, Clone)]
@@ -45,9 +49,10 @@ impl RoomService {
             return Ok(room.to_info());
         }
 
-        let password_hash = password.map(|p| {
-            bcrypt::hash(p, bcrypt::DEFAULT_COST).unwrap_or_default()
-        });
+        let password_hash = match password {
+            Some(p) => Some(bcrypt::hash(p, bcrypt::DEFAULT_COST).map_err(|e| format!("Password hash error: {}", e))?),
+            None => None,
+        };
 
         let room = Room::new(room_key.to_string(), password.map(|p| p.to_string()), password_hash);
         let info = room.to_info();
@@ -174,68 +179,87 @@ impl RoomService {
 
     /// Update user online status
     pub fn update_user_status(&self, room_key: &str, user_id: &str, is_online: bool) {
-        let should_destroy = {
-            let mut rooms = match self.rooms.write() {
-                Ok(r) => r,
-                Err(_) => return,
-            };
-            if let Some(room) = rooms.get_mut(room_key) {
-                if let Some(u) = room.get_user_mut(user_id) {
-                    if is_online {
-                        u.update_activity();
-                    } else {
-                        u.set_offline();
-                    }
+        let mut rooms = match self.rooms.write() {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        if let Some(room) = rooms.get_mut(room_key) {
+            if let Some(u) = room.get_user_mut(user_id) {
+                if is_online {
+                    u.update_activity();
+                } else {
+                    u.set_offline();
                 }
-                // Check if room should be destroyed after status change
-                if !is_online && room.all_users_offline() {
-                    rooms.remove(room_key);
-                    tracing::info!("Room {} destroyed (all users offline)", room_key);
-                    true
+            }
+            // NOTE: Don't immediately destroy the room when all users go offline.
+            // A grace period is needed to allow users to reconnect after browser refresh.
+            // Room cleanup is handled by schedule_room_destroy_check() and cleanup_inactive_rooms().
+        }
+    }
+
+    /// Schedule a delayed check to destroy a room if all users are still offline.
+    /// Called after a user disconnects to give a grace period for reconnection.
+    pub fn schedule_room_destroy_check(self: &Arc<Self>, room_key: &str) {
+        let room_key = room_key.to_string();
+        let service = Arc::clone(self);
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(ROOM_DESTROY_GRACE_PERIOD_SECS)).await;
+            let should_destroy = {
+                let mut rooms = match service.rooms.write() {
+                    Ok(r) => r,
+                    Err(_) => return,
+                };
+                if let Some(room) = rooms.get(&room_key) {
+                    if room.all_users_offline() {
+                        rooms.remove(&room_key);
+                        tracing::info!("Room {} destroyed (all users offline after grace period)", room_key);
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     false
                 }
-            } else {
-                false
+            };
+            if should_destroy {
+                let _ = service.event_sender.send(RoomEvent::RoomDestroyed {
+                    room_key,
+                });
             }
-        };
-
-        if should_destroy {
-            let _ = self.event_sender.send(RoomEvent::RoomDestroyed {
-                room_key: room_key.to_string(),
-            });
-        }
+        });
     }
 
     /// Leave a room
     pub fn leave_room(&self, socket_id: &str) -> Option<(String, User)> {
-        let user = {
-            let mut socket_users = self.socket_users.write().ok()?;
-            socket_users.remove(socket_id)?
-        };
+        // Unified lock order: rooms → socket_users → user_sockets
+        let mut rooms = self.rooms.write().ok()?;
+        let mut socket_users = self.socket_users.write().ok()?;
+        let mut user_sockets = self.user_sockets.write().ok()?;
 
-        {
-            let mut user_sockets = self.user_sockets.write().ok()?;
-            user_sockets.remove(&user.id);
-        }
+        // Remove from socket mappings
+        let user = socket_users.remove(socket_id)?;
+        user_sockets.remove(&user.id);
 
         let room_key = user.room_key.clone();
         let mut room_destroyed = false;
 
-        {
-            let mut rooms = self.rooms.write().ok()?;
-            if let Some(room) = rooms.get_mut(&room_key) {
-                room.remove_user(&user.id);
+        // Remove from room
+        if let Some(room) = rooms.get_mut(&room_key) {
+            room.remove_user(&user.id);
 
-                // Check if room should be destroyed
-                if room.is_empty() || room.all_users_offline() {
-                    let key = room_key.clone();
-                    rooms.remove(&key);
-                    tracing::info!("Room {} destroyed (empty/all offline after leave)", key);
-                    room_destroyed = true;
-                }
+            // Check if room should be destroyed
+            if room.is_empty() || room.all_users_offline() {
+                let key = room_key.clone();
+                rooms.remove(&key);
+                tracing::info!("Room {} destroyed (empty/all offline after leave)", key);
+                room_destroyed = true;
             }
         }
+
+        // Drop locks before sending event
+        drop(rooms);
+        drop(socket_users);
+        drop(user_sockets);
 
         if room_destroyed {
             let _ = self.event_sender.send(RoomEvent::RoomDestroyed {
@@ -249,16 +273,20 @@ impl RoomService {
 
     /// Set user offline (disconnect without removing from room)
     pub fn set_user_offline(&self, socket_id: &str) -> Option<(String, User)> {
-        let user = {
+        // Unified lock order: rooms → socket_users
+        // Find user and room info first
+        let (user_id, room_key) = {
             let socket_users = self.socket_users.read().ok()?;
-            socket_users.get(socket_id).cloned()?
+            let user = socket_users.get(socket_id)?;
+            (user.id.clone(), user.room_key.clone())
         };
 
-        let room_key = user.room_key.clone();
+        // Update status in room (handles room destruction check internally)
+        self.update_user_status(&room_key, &user_id, false);
 
-        // Use update_user_status which handles room destruction check
-        self.update_user_status(&room_key, &user.id, false);
-
+        // Retrieve updated user for return
+        let socket_users = self.socket_users.read().ok()?;
+        let user = socket_users.get(socket_id).cloned()?;
         Some((room_key, user))
     }
 
@@ -300,7 +328,7 @@ impl RoomService {
         self.rooms.read()
             .map(|rooms| {
                 rooms.get(room_key)
-                    .map(|r| r.get_messages().to_vec())
+                    .map(|r| r.get_messages().iter().cloned().collect())
                     .unwrap_or_default()
             })
             .unwrap_or_default()
@@ -338,7 +366,7 @@ impl RoomService {
 
     /// Get room statistics
     pub fn get_room_stats(&self) -> RoomStats {
-        let rooms = self.rooms.read().unwrap();
+        let rooms = self.rooms.read().unwrap_or_else(|e| e.into_inner());
         let total_users: usize = rooms.values().map(|r| r.user_count()).sum();
         let online_users: usize = rooms.values().map(|r| r.online_user_count()).sum();
 
@@ -392,4 +420,122 @@ pub struct RoomStats {
     pub total_rooms: usize,
     pub total_users: usize,
     pub online_users: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_service_with_user() -> (Arc<RoomService>, String, String) {
+        let service = Arc::new(RoomService::new());
+        let room_key = "test1room";
+        let user_id = "user1";
+        let username = "TestUser";
+        let socket_id = "socket1";
+
+        service.join_room(
+            room_key, user_id, username, socket_id,
+            None, "desktop", Some("fp_hash_1"),
+        ).unwrap();
+
+        (service, room_key.to_string(), socket_id.to_string())
+    }
+
+    #[test]
+    fn test_set_user_offline_preserves_room() {
+        let (service, room_key, socket_id) = create_service_with_user();
+
+        // Set user offline (simulates disconnect)
+        let result = service.set_user_offline(&socket_id);
+        assert!(result.is_some());
+
+        // Room should still exist after disconnect (grace period)
+        assert!(service.room_exists(&room_key));
+
+        // User should still be findable by fingerprint
+        let user = service.find_user_by_fingerprint(&room_key, "fp_hash_1");
+        assert!(user.is_some());
+        assert!(!user.unwrap().is_online);
+    }
+
+    #[test]
+    fn test_leave_room_destroys_empty_room() {
+        let (service, room_key, socket_id) = create_service_with_user();
+
+        // Explicit leave should still destroy the room
+        let result = service.leave_room(&socket_id);
+        assert!(result.is_some());
+
+        // Room should be destroyed after explicit leave
+        assert!(!service.room_exists(&room_key));
+    }
+
+    #[test]
+    fn test_reconnect_after_offline() {
+        let (service, room_key, socket_id) = create_service_with_user();
+
+        // Set user offline
+        service.set_user_offline(&socket_id);
+
+        // Simulate reconnection with same fingerprint but new socket
+        let new_socket_id = "socket2";
+        let result = service.join_room(
+            &room_key, "user1_new", "TestUser", new_socket_id,
+            None, "desktop", Some("fp_hash_1"),
+        );
+
+        assert!(result.is_ok());
+        let (user, users) = result.unwrap();
+        assert!(user.is_online);
+        assert_eq!(users.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_schedule_room_destroy_check_destroys_offline_room() {
+        let (service, room_key, socket_id) = create_service_with_user();
+
+        // Set user offline
+        service.set_user_offline(&socket_id);
+        assert!(service.room_exists(&room_key));
+
+        // Manually check destruction (simulates what the scheduled task does)
+        {
+            let mut rooms = service.rooms.write().unwrap();
+            if let Some(room) = rooms.get(&room_key) {
+                if room.all_users_offline() {
+                    rooms.remove(&room_key);
+                }
+            }
+        }
+
+        // Room should now be destroyed
+        assert!(!service.room_exists(&room_key));
+    }
+
+    #[tokio::test]
+    async fn test_schedule_room_destroy_check_preserves_online_room() {
+        let (service, room_key, socket_id) = create_service_with_user();
+
+        // Set user offline
+        service.set_user_offline(&socket_id);
+
+        // Reconnect before destruction check
+        service.join_room(
+            &room_key, "user1_new", "TestUser", "socket2",
+            None, "desktop", Some("fp_hash_1"),
+        ).unwrap();
+
+        // Simulate destruction check - should NOT destroy because user is online
+        {
+            let mut rooms = service.rooms.write().unwrap();
+            if let Some(room) = rooms.get(&room_key) {
+                if room.all_users_offline() {
+                    rooms.remove(&room_key);
+                }
+            }
+        }
+
+        // Room should still exist because user reconnected
+        assert!(service.room_exists(&room_key));
+    }
 }

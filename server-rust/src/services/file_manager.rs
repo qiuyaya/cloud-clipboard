@@ -95,13 +95,13 @@ impl FileManager {
         hasher.update(data);
         let hash_hex = format!("{:x}", hasher.finalize());
 
-        // Check for duplicate
+        // Unified lock order: files → hash_to_file_id
+        // Check for duplicate (acquire files read lock first)
         let existing_file = {
+            let files = self.files.read().map_err(|_| anyhow::anyhow!("Lock error"))?;
             let hash_map = self.hash_to_file_id.read().map_err(|_| anyhow::anyhow!("Lock error"))?;
-            hash_map.get(&hash_hex).and_then(|existing_filename| {
-                let files = self.files.read().ok()?;
-                files.get(existing_filename).cloned()
-            })
+            hash_map.get(&hash_hex)
+                .and_then(|existing_filename| files.get(existing_filename).cloned())
         };
 
         if let Some(existing) = existing_file {
@@ -257,6 +257,12 @@ impl FileManager {
 
     /// Delete all files for a room
     pub fn delete_room_files(&self, room_key: &str) -> Vec<FileInfo> {
+        // Unified lock order: files → room_files → hash_to_file_id
+        let mut files = match self.files.write() {
+            Ok(f) => f,
+            Err(_) => return Vec::new(),
+        };
+
         let filenames = {
             let mut room_files = match self.room_files.write() {
                 Ok(rf) => rf,
@@ -266,10 +272,6 @@ impl FileManager {
         };
 
         let mut deleted = Vec::new();
-        let mut files = match self.files.write() {
-            Ok(f) => f,
-            Err(_) => return Vec::new(),
-        };
 
         for filename in filenames {
             if let Some(info) = files.remove(&filename) {
@@ -301,8 +303,8 @@ impl FileManager {
     /// Cleanup expired files
     pub async fn cleanup_expired_files(&self) -> Vec<FileInfo> {
         let cutoff = Utc::now() - Duration::hours(self.retention_hours);
-        let mut expired = Vec::new();
 
+        // Collect expired filenames first (avoid nested locking)
         let filenames: Vec<String> = {
             let files = match self.files.read() {
                 Ok(f) => f,
@@ -315,6 +317,8 @@ impl FileManager {
                 .collect()
         };
 
+        // Delete files one by one (delete_file handles its own locking)
+        let mut expired = Vec::new();
         for filename in filenames {
             if let Ok(Some(info)) = self.delete_file(&filename).await {
                 expired.push(info);
@@ -330,7 +334,7 @@ impl FileManager {
 
     /// Get statistics
     pub fn get_stats(&self) -> FileStats {
-        let files = self.files.read().unwrap();
+        let files = self.files.read().unwrap_or_else(|e| e.into_inner());
         let total_size: u64 = files.values().map(|f| f.size).sum();
         let room_count = {
             let rooms: std::collections::HashSet<&str> = files.values()

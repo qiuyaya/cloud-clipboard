@@ -26,11 +26,12 @@ pub struct ApiEndpoints {
 }
 
 pub async fn api_info() -> Json<ApiInfoResponse> {
+    let version = env!("CARGO_PKG_VERSION");
     Json(ApiInfoResponse {
         success: true,
-        message: "Cloud Clipboard API v1.0.0 (Rust)".to_string(),
+        message: format!("Cloud Clipboard API v{} (Rust)", version),
         data: ApiInfoData {
-            version: "1.0.0".to_string(),
+            version: version.to_string(),
             endpoints: ApiEndpoints {
                 rooms: "/api/rooms".to_string(),
                 files: "/api/files".to_string(),

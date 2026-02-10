@@ -36,7 +36,7 @@ impl ShareService {
 
         let (password_hash, generated_password) = if let Some(pwd) = password {
             // User specified a custom password
-            (Some(bcrypt::hash(pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?), None)
+            (Some(bcrypt::hash(pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?), Some(pwd.to_string()))
         } else if enable_password {
             // User requested auto-generated password
             let pwd = generate_random_password();
@@ -45,6 +45,15 @@ impl ShareService {
         } else {
             // No password
             (None, None)
+        };
+
+        // Store plain password in metadata for URL construction
+        let metadata = if let Some(ref pwd) = generated_password {
+            let mut m = metadata.unwrap_or_default();
+            m.insert("plainPassword".to_string(), serde_json::Value::String(pwd.clone()));
+            Some(m)
+        } else {
+            metadata
         };
 
         let share = ShareInfo::new(
@@ -88,17 +97,19 @@ impl ShareService {
 
     /// Get all shares for a user (with full ShareInfo for filtering)
     pub fn get_user_shares(&self, user_id: &str) -> Vec<ShareInfo> {
+        // Unified lock order: shares → user_shares
+        // First acquire shares read lock, then user_shares
+        let shares = match self.shares.read() {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+
         let share_ids = {
             let user_shares = match self.user_shares.read() {
                 Ok(us) => us,
                 Err(_) => return Vec::new(),
             };
             user_shares.get(user_id).cloned().unwrap_or_default()
-        };
-
-        let shares = match self.shares.read() {
-            Ok(s) => s,
-            Err(_) => return Vec::new(),
         };
 
         share_ids
@@ -185,6 +196,7 @@ impl ShareService {
 
     /// Cleanup expired shares
     pub fn cleanup_expired_shares(&self) -> Vec<ShareInfo> {
+        // Collect expired share IDs first (avoid nested locking)
         let expired_ids: Vec<String> = {
             let shares = match self.shares.read() {
                 Ok(s) => s,
@@ -197,6 +209,7 @@ impl ShareService {
                 .collect()
         };
 
+        // Delete shares one by one (delete_share handles its own locking)
         let mut expired = Vec::new();
         for id in expired_ids {
             if let Ok(Some(share)) = self.delete_share(&id) {
@@ -289,7 +302,8 @@ mod tests {
         );
         let (share, generated_pwd) = result.unwrap();
         assert!(share.has_password());
-        assert!(generated_pwd.is_none()); // custom password not returned
+        assert!(generated_pwd.is_some()); // custom password returned for URL construction
+        assert_eq!(generated_pwd.unwrap(), "mypass123");
         assert!(share.verify_password("mypass123"));
         assert!(!share.verify_password("wrong"));
     }
@@ -304,7 +318,8 @@ mod tests {
         );
         let (share, generated_pwd) = result.unwrap();
         assert!(share.has_password());
-        assert!(generated_pwd.is_none()); // custom takes precedence
+        assert!(generated_pwd.is_some()); // custom password returned for URL construction
+        assert_eq!(generated_pwd.unwrap(), "custom");
         assert!(share.verify_password("custom"));
     }
 }

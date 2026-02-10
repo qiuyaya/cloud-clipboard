@@ -9,6 +9,7 @@ use axum::{
 use serde::Serialize;
 use tokio_util::io::ReaderStream;
 use std::collections::HashSet;
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
 use crate::AppState;
 use super::ApiResponse;
@@ -34,14 +35,14 @@ pub struct UploadResponse {
 
 // ============= Constants =============
 
-fn dangerous_extensions() -> HashSet<&'static str> {
+static DANGEROUS_EXTENSIONS: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
     [
         ".exe", ".bat", ".cmd", ".com", ".scr", ".pif", ".msi", ".jar",
         ".sh", ".bash", ".ps1", ".vbs", ".php", ".asp", ".aspx", ".jsp",
         ".py", ".rb", ".pl", ".c", ".cpp", ".cs", ".java", ".go", ".rs",
         ".swift", ".dll", ".so", ".dylib", ".app", ".deb", ".rpm", ".dmg",
     ].into_iter().collect()
-}
+});
 
 fn is_valid_filename(filename: &str) -> bool {
     !filename.contains("..")
@@ -59,7 +60,7 @@ fn is_valid_filename(filename: &str) -> bool {
 fn is_dangerous_extension(filename: &str) -> bool {
     let ext = filename.rsplit('.').next().map(|e| format!(".{}", e.to_lowercase()));
     if let Some(ext) = ext {
-        dangerous_extensions().contains(ext.as_str())
+        DANGEROUS_EXTENSIONS.contains(ext.as_str())
     } else {
         false
     }
@@ -147,10 +148,16 @@ async fn upload_file(
     mut multipart: Multipart,
 ) -> Result<Json<ApiResponse<UploadResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
     // First try to get room_key from header
-    let mut room_key = extract_room_key(&headers);
+    let room_key_header = extract_room_key(&headers);
+    let mut room_key = room_key_header;
     let mut file_data: Option<(String, String, Vec<u8>)> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|_| {
+    // Debug: Log room key from header
+    tracing::debug!(?room_key, "Room key from header");
+
+    let mut field_count = 0;
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        tracing::warn!(?e, "Multipart parse error");
         (
             StatusCode::BAD_REQUEST,
             Json(ApiResponse {
@@ -161,6 +168,8 @@ async fn upload_file(
         )
     })? {
         let name = field.name().unwrap_or("").to_string();
+        field_count += 1;
+        tracing::debug!(field_name = %name, field_count, "Processing multipart field");
 
         if name == "roomKey" && room_key.is_none() {
             room_key = Some(field.text().await.map_err(|_| {
@@ -215,7 +224,10 @@ async fn upload_file(
         }
     }
 
+    tracing::debug!(?room_key, field_count, "Processing complete");
+
     let room_key = room_key.ok_or_else(|| {
+        tracing::warn!("Room key missing from both header and multipart");
         (
             StatusCode::BAD_REQUEST,
             Json(ApiResponse {
@@ -227,6 +239,7 @@ async fn upload_file(
     })?;
 
     let (filename, content_type, data) = file_data.ok_or_else(|| {
+        tracing::warn!("File data missing from multipart");
         (
             StatusCode::BAD_REQUEST,
             Json(ApiResponse {
@@ -397,9 +410,12 @@ async fn download_file(
     let stream = ReaderStream::new(file);
     let body = Body::from_stream(stream);
 
+    // RFC 5987 encoding for non-ASCII filenames
+    let filename_encoded = utf8_percent_encode(&file_info.original_name, NON_ALPHANUMERIC).to_string();
     let content_disposition = format!(
-        "attachment; filename=\"{}\"",
-        file_info.original_name.replace('"', "\\\"")
+        "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+        file_info.original_name.replace('"', "\\\""),
+        filename_encoded
     );
 
     Ok((

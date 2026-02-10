@@ -20,12 +20,8 @@ pub type KeyedRateLimiter = Arc<RateLimiter>;
 pub struct RateLimitConfig {
     pub window_secs: u64,
     pub general_max: u32,
-    pub general_window_secs: u64,
     pub strict_max: u32,
     pub strict_window_secs: u64,
-    pub share_max: u32,
-    pub download_max: u32,
-    pub upload_max: u32,
     pub public_download_max: u32,
 }
 
@@ -33,16 +29,9 @@ impl Default for RateLimitConfig {
     fn default() -> Self {
         Self {
             window_secs: 60,
-            // General: 500 requests per 15 minutes (matching Node.js)
             general_max: 500,
-            general_window_secs: 900, // 15 minutes
-            // Strict: 50 requests per 5 minutes (matching Node.js)
             strict_max: 50,
             strict_window_secs: 300, // 5 minutes
-            share_max: 10,
-            download_max: 100,
-            // Upload: 5 requests per minute (matching Node.js)
-            upload_max: 5,
             public_download_max: 20,
         }
     }
@@ -73,15 +62,9 @@ impl RateLimitConfig {
 
         Self {
             window_secs,
-            // General: 500 requests per 15 minutes (matching Node.js HTTP_RATE_LIMITS.GENERAL)
             general_max,
-            general_window_secs: 900,
-            // Strict: 50 requests per 5 minutes (matching Node.js HTTP_RATE_LIMITS.STRICT)
             strict_max: parse_u32("STRICT_LIMIT_MAX", 50),
             strict_window_secs: 300,
-            share_max: parse_u32("SHARE_LIMIT_MAX", 10),
-            download_max: parse_u32("DOWNLOAD_LIMIT_MAX", 100),
-            upload_max: parse_u32("UPLOAD_LIMIT_MAX", 5),
             public_download_max: std::env::var("PUBLIC_DOWNLOAD_RATE_LIMIT")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -110,24 +93,9 @@ pub fn create_rate_limiter_with_window(requests: u32, window_secs: u64) -> Keyed
     Arc::new(GovRateLimiter::keyed(quota))
 }
 
-/// General rate limiter: 500 requests per 15 minutes (matching Node.js HTTP_RATE_LIMITS.GENERAL)
-pub fn general_rate_limiter(config: &RateLimitConfig) -> KeyedRateLimiter {
-    create_rate_limiter_with_window(config.general_max, config.general_window_secs)
-}
-
 /// Strict rate limiter: 50 requests per 5 minutes (matching Node.js HTTP_RATE_LIMITS.STRICT)
 pub fn strict_rate_limiter(config: &RateLimitConfig) -> KeyedRateLimiter {
     create_rate_limiter_with_window(config.strict_max, config.strict_window_secs)
-}
-
-/// Share creation rate limiter: configured from SHARE_LIMIT_MAX (default 10) per window
-pub fn share_rate_limiter(config: &RateLimitConfig) -> KeyedRateLimiter {
-    create_rate_limiter(config, config.share_max)
-}
-
-/// Download rate limiter: configured from DOWNLOAD_LIMIT_MAX (default 100) per window
-pub fn download_rate_limiter(config: &RateLimitConfig) -> KeyedRateLimiter {
-    create_rate_limiter(config, config.download_max)
 }
 
 /// Public download rate limiter: configured from PUBLIC_DOWNLOAD_RATE_LIMIT (default 20) per window

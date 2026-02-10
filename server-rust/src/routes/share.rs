@@ -12,15 +12,16 @@ use tokio_util::io::ReaderStream;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
 // Download timeout configuration (matching Node.js DOWNLOAD_TIMEOUT env var, default 30s)
-fn get_download_timeout() -> std::time::Duration {
+static DOWNLOAD_TIMEOUT: std::sync::LazyLock<std::time::Duration> = std::sync::LazyLock::new(|| {
     let timeout_ms: u64 = std::env::var("DOWNLOAD_TIMEOUT")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(30_000);
     std::time::Duration::from_millis(timeout_ms)
-}
+});
 
 use crate::AppState;
 use crate::middleware::rate_limit::extract_client_ip;
@@ -45,18 +46,34 @@ struct StreamGuard {
 
 impl StreamGuard {
     fn acquire(ip: String) -> Result<Self, ()> {
-        let global = ACTIVE_STREAMS.load(Ordering::Relaxed);
-        if global >= MAX_CONCURRENT_GLOBAL {
-            return Err(());
+        // Atomic check-and-increment for global counter
+        let result = ACTIVE_STREAMS.fetch_update(
+            Ordering::AcqRel,
+            Ordering::Acquire,
+            |current| {
+                if current >= MAX_CONCURRENT_GLOBAL {
+                    None // Abort update, limit exceeded
+                } else {
+                    Some(current + 1) // Increment
+                }
+            }
+        );
+
+        if result.is_err() {
+            return Err(()); // Global limit exceeded
         }
 
+        // Check per-IP limit
         let mut map = PER_IP_STREAMS.lock().map_err(|_| ())?;
         let count = map.entry(ip.clone()).or_insert(0);
         if *count >= MAX_CONCURRENT_PER_IP {
+            // Rollback global counter
+            ACTIVE_STREAMS.fetch_sub(1, Ordering::AcqRel);
             return Err(());
         }
         *count += 1;
-        ACTIVE_STREAMS.fetch_add(1, Ordering::AcqRel);
+        drop(map);
+
         Ok(StreamGuard { ip })
     }
 }
@@ -130,15 +147,6 @@ impl BandwidthTracker {
 
         entry.bytes += bytes;
         true
-    }
-
-    pub fn cleanup(&self) {
-        let now = Instant::now();
-        if let Ok(mut entries) = self.entries.write() {
-            entries.retain(|_, entry| {
-                now.duration_since(entry.window_start).as_secs() < 120
-            });
-        }
     }
 }
 
@@ -343,8 +351,8 @@ async fn create_share(
     // Use createdBy from request body or fallback
     let user_id = extract_user_id(&headers).unwrap_or_else(|| "temp-user-id".to_string());
 
-    // Determine password handling (matching Node.js: password="auto-generate" means enable)
-    let enable_password = payload.password.is_some();
+    // Determine password handling (matching Node.js: only enable if password is explicitly provided and non-empty)
+    let enable_password = payload.password.as_ref().map_or(false, |p| !p.is_empty());
 
     // Build metadata from original filename
     let metadata = {
@@ -367,11 +375,12 @@ async fn create_share(
         Ok((share, generated_password)) => {
             // Generate full share URL using base URL and BASE_PATH
             let base_url = super::build_base_url(&headers);
-            let base_path = std::env::var("BASE_PATH")
-                .unwrap_or_default()
-                .trim_end_matches('/')
-                .to_string();
-            let share_url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            let base_path = super::get_base_path();
+            let mut share_url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            // Append password to URL if available
+            if let Some(ref pwd) = generated_password {
+                share_url = format!("{}?password={}", share_url, utf8_percent_encode(pwd, NON_ALPHANUMERIC));
+            }
             let has_password = share.has_password();
             Ok(Json(ApiResponse {
                 success: true,
@@ -417,10 +426,7 @@ async fn list_shares(
 
     // Build base URL for share links
     let base_url = super::build_base_url(&headers);
-    let base_path = std::env::var("BASE_PATH")
-        .unwrap_or_default()
-        .trim_end_matches('/')
-        .to_string();
+    let base_path = super::get_base_path();
 
     // Get all user's shares
     let all_shares = state.share_service.get_user_shares(&user_id);
@@ -452,7 +458,14 @@ async fn list_shares(
             } else {
                 "expired"
             };
-            let url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            let mut url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            // Append password to URL if available in metadata
+            if let Some(pwd) = share.metadata.as_ref()
+                .and_then(|m| m.get("plainPassword"))
+                .and_then(|v| v.as_str())
+            {
+                url = format!("{}?password={}", url, utf8_percent_encode(pwd, NON_ALPHANUMERIC));
+            }
             // Use originalFilename from metadata if available, fallback to file_name
             let original_filename = share.metadata.as_ref()
                 .and_then(|m| m.get("originalFilename"))
@@ -807,8 +820,7 @@ pub async fn public_download(
     }
 
     // Open file with timeout protection (matching Node.js DOWNLOAD_TIMEOUT)
-    let download_timeout = get_download_timeout();
-    let file = match tokio::time::timeout(download_timeout, tokio::fs::File::open(&canonical_path)).await {
+    let file = match tokio::time::timeout(*DOWNLOAD_TIMEOUT, tokio::fs::File::open(&canonical_path)).await {
         Ok(Ok(f)) => f,
         Ok(Err(_)) => {
             return Err(download_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to open file"));
@@ -832,9 +844,18 @@ pub async fn public_download(
     let stream = ReaderStream::new(file);
     let body = Body::from_stream(stream);
 
+    // Use originalFilename from metadata if available, fallback to file_name
+    let download_filename = share.metadata.as_ref()
+        .and_then(|m| m.get("originalFilename"))
+        .and_then(|v| v.as_str())
+        .unwrap_or(&share.file_name);
+
+    // RFC 5987 encoding for non-ASCII filenames
+    let filename_encoded = utf8_percent_encode(download_filename, NON_ALPHANUMERIC).to_string();
     let content_disposition = format!(
-        "attachment; filename=\"{}\"",
-        share.file_name.replace('"', "\\\"")
+        "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+        download_filename.replace('"', "\\\""),
+        filename_encoded
     );
 
     Ok((
