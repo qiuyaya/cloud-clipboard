@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-02-10
+
+- feat: 添加 Rust 后端 Docker 镜像构建到 release workflow
+- fix: 完善 Rust 后端 Dockerfile 和房间管理逻辑
+- fix: 修复 Rust 后端与前端对接的多个兼容性问题
+- feat: 合并 main 分支并适配 Rust 后端新功能
+- fix: 对齐 Rust 后端速率限制、带宽限制和下载超时与 Node.js 实现
+- feat: 实现 Rust 后端优化计划第 3-4 阶段任务
+- feat: 完成 Rust 后端功能对齐计划全部 23 项任务
+- feat: 添加 Rust 后端实现
+- chore: release v1.4.5
+
 ## [1.4.12] - 2026-02-08
 
 - chore: 添加 release skill 支持一站式版本发布
