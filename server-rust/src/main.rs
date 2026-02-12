@@ -1,43 +1,26 @@
-mod models;
-mod routes;
-mod services;
-mod middleware;
-mod utils;
+// Use the library modules instead of redefining them
+use cloud_clipboard_server::{AppState, middleware, routes, services};
 
-use axum::{
-    Router,
-    extract::DefaultBodyLimit,
-    http::Method,
-    routing::get,
-    Json,
-    http::StatusCode,
-};
+use axum::http::{HeaderName, HeaderValue, header};
+use axum::{Json, Router, extract::DefaultBodyLimit, http::Method, http::StatusCode, routing::get};
 use socketioxide::SocketIo;
 use std::sync::Arc;
 use std::time::Duration;
 use tower_http::{
-    cors::{Any, CorsLayer},
     compression::CompressionLayer,
-    trace::TraceLayer,
-    set_header::SetResponseHeaderLayer,
-    services::{ServeDir, ServeFile},
+    cors::{Any, CorsLayer},
     limit::RequestBodyLimitLayer,
+    services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
+    trace::TraceLayer,
 };
-use axum::http::{HeaderValue, HeaderName, header};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::services::{RoomService, RoomEvent, FileManager, ShareService};
-use crate::routes::{health, api_info, rooms, files, share};
-use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, strict_rate_limiter, public_download_rate_limiter};
-
-/// Application state shared across all handlers
-#[derive(Clone)]
-pub struct AppState {
-    pub room_service: Arc<RoomService>,
-    pub file_manager: Arc<FileManager>,
-    pub share_service: Arc<ShareService>,
-    pub start_time: std::time::Instant,
-}
+use crate::middleware::rate_limit::{
+    RateLimitConfig, RateLimitMiddleware, public_download_rate_limiter, strict_rate_limiter,
+};
+use crate::routes::{api_info, files, health, rooms, share};
+use crate::services::{FileManager, RoomEvent, RoomService, ShareService};
 
 /// Cleanup task configuration
 #[derive(Clone, Debug)]
@@ -50,8 +33,8 @@ pub struct CleanupConfig {
 impl Default for CleanupConfig {
     fn default() -> Self {
         Self {
-            room_cleanup_interval_secs: 60,         // 1 minute (aligned with Node.js)
-            file_cleanup_interval_secs: 600,        // 10 minutes (aligned with Node.js)
+            room_cleanup_interval_secs: 60,  // 1 minute (aligned with Node.js)
+            file_cleanup_interval_secs: 600, // 10 minutes (aligned with Node.js)
             startup_orphaned_files_cleanup: true,
         }
     }
@@ -163,11 +146,15 @@ async fn main() -> anyhow::Result<()> {
             loop {
                 match event_rx.recv().await {
                     Ok(RoomEvent::RoomDestroyed { room_key }) => {
-                        tracing::info!("Room {} destroyed event received, cleaning up files", room_key);
+                        tracing::info!(
+                            "Room {} destroyed event received, cleaning up files",
+                            room_key
+                        );
                         let deleted_files = file_manager_for_events.delete_room_files(&room_key);
 
                         if !deleted_files.is_empty() {
-                            let filenames: Vec<String> = deleted_files.iter()
+                            let filenames: Vec<String> = deleted_files
+                                .iter()
                                 .map(|f| f.original_name.clone())
                                 .collect();
 
@@ -176,7 +163,9 @@ async fn main() -> anyhow::Result<()> {
                                 "roomKey": room_key,
                                 "deletedFiles": filenames,
                             });
-                            let _ = io_for_events.to(room_key.clone()).emit("roomDestroyed", &event);
+                            let _ = io_for_events
+                                .to(room_key.clone())
+                                .emit("roomDestroyed", &event);
 
                             // Also send systemMessage
                             let sys_msg = serde_json::json!({
@@ -188,7 +177,10 @@ async fn main() -> anyhow::Result<()> {
                             });
                             let _ = io_for_events.to(room_key).emit("systemMessage", &sys_msg);
 
-                            tracing::info!("Room destroyed - deleted {} files, notified clients", deleted_files.len());
+                            tracing::info!(
+                                "Room destroyed - deleted {} files, notified clients",
+                                deleted_files.len()
+                            );
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
@@ -249,7 +241,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Start background cleanup tasks
     tokio::spawn(async move {
-        run_cleanup_tasks(cleanup_room_service, cleanup_file_manager, cleanup_share_service, cleanup_config).await;
+        run_cleanup_tasks(
+            cleanup_room_service,
+            cleanup_file_manager,
+            cleanup_share_service,
+            cleanup_config,
+        )
+        .await;
     });
 
     // Build the API router (routes relative to base path)
@@ -263,13 +261,18 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api/rooms", rooms::router().layer(strict_rate_limit))
         // File routes - internal per-operation rate limiting
         // Override axum's default 2MB body limit for file uploads (actual limit enforced by RequestBodyLimitLayer)
-        .nest("/api/files", files::router().layer(DefaultBodyLimit::disable()))
+        .nest(
+            "/api/files",
+            files::router().layer(DefaultBodyLimit::disable()),
+        )
         // Share routes - internal per-operation rate limiting
         .nest("/api/share", share::router())
         // Public file download - dedicated public download rate limit
-        .nest("/public/file", Router::new()
-            .route("/{share_id}", get(share::public_download))
-            .layer(public_download_rate_limit)
+        .nest(
+            "/public/file",
+            Router::new()
+                .route("/{share_id}", get(share::public_download))
+                .layer(public_download_rate_limit),
         )
         .fallback(api_not_found)
         .with_state(app_state);
@@ -330,18 +333,19 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Static file serving for production (SPA fallback)
-    let static_dir = std::env::var("STATIC_DIR")
-        .unwrap_or_else(|_| "./public".to_string());
+    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "./public".to_string());
 
     let app = if std::path::Path::new(&static_dir).exists() {
         let index_path = format!("{}/index.html", static_dir);
         tracing::info!("Serving static files from: {}", static_dir);
         app.fallback_service(
-            ServeDir::new(&static_dir)
-                .not_found_service(ServeFile::new(index_path))
+            ServeDir::new(&static_dir).not_found_service(ServeFile::new(index_path)),
         )
     } else {
-        tracing::info!("Static directory '{}' not found, skipping static file serving", static_dir);
+        tracing::info!(
+            "Static directory '{}' not found, skipping static file serving",
+            static_dir
+        );
         app
     }
     .layer(socket_layer);
@@ -375,7 +379,10 @@ async fn run_cleanup_tasks(
     {
         tracing::info!("Running initial room cleanup...");
         let destroyed = room_service.cleanup_inactive_rooms();
-        tracing::info!("Initial cleanup: destroyed {} inactive rooms", destroyed.len());
+        tracing::info!(
+            "Initial cleanup: destroyed {} inactive rooms",
+            destroyed.len()
+        );
     }
 
     {
