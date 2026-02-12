@@ -1,31 +1,32 @@
 use axum::{
+    Json, Router,
     body::Body,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, HeaderName, StatusCode},
+    http::{HeaderMap, HeaderName, StatusCode, header},
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
-use base64::{engine::general_purpose, Engine};
+use base64::{Engine, engine::general_purpose};
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::{Deserialize, Serialize};
-use tokio_util::io::ReaderStream;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use tokio_util::io::ReaderStream;
 
 // Download timeout configuration (matching Node.js DOWNLOAD_TIMEOUT env var, default 30s)
-static DOWNLOAD_TIMEOUT: std::sync::LazyLock<std::time::Duration> = std::sync::LazyLock::new(|| {
-    let timeout_ms: u64 = std::env::var("DOWNLOAD_TIMEOUT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(30_000);
-    std::time::Duration::from_millis(timeout_ms)
-});
+static DOWNLOAD_TIMEOUT: std::sync::LazyLock<std::time::Duration> =
+    std::sync::LazyLock::new(|| {
+        let timeout_ms: u64 = std::env::var("DOWNLOAD_TIMEOUT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(30_000);
+        std::time::Duration::from_millis(timeout_ms)
+    });
 
+use super::ApiResponse;
 use crate::AppState;
 use crate::middleware::rate_limit::extract_client_ip;
-use super::ApiResponse;
 
 // ============= Stream & Bandwidth Tracking =============
 
@@ -47,17 +48,13 @@ struct StreamGuard {
 impl StreamGuard {
     fn acquire(ip: String) -> Result<Self, ()> {
         // Atomic check-and-increment for global counter
-        let result = ACTIVE_STREAMS.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
-            |current| {
-                if current >= MAX_CONCURRENT_GLOBAL {
-                    None // Abort update, limit exceeded
-                } else {
-                    Some(current + 1) // Increment
-                }
+        let result = ACTIVE_STREAMS.fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+            if current >= MAX_CONCURRENT_GLOBAL {
+                None // Abort update, limit exceeded
+            } else {
+                Some(current + 1) // Increment
             }
-        );
+        });
 
         if result.is_err() {
             return Err(()); // Global limit exceeded
@@ -81,12 +78,12 @@ impl StreamGuard {
 impl Drop for StreamGuard {
     fn drop(&mut self) {
         ACTIVE_STREAMS.fetch_sub(1, Ordering::AcqRel);
-        if let Ok(mut map) = PER_IP_STREAMS.lock() {
-            if let Some(count) = map.get_mut(&self.ip) {
-                *count = count.saturating_sub(1);
-                if *count == 0 {
-                    map.remove(&self.ip);
-                }
+        if let Ok(mut map) = PER_IP_STREAMS.lock()
+            && let Some(count) = map.get_mut(&self.ip)
+        {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                map.remove(&self.ip);
             }
         }
     }
@@ -101,6 +98,12 @@ pub struct BandwidthTracker {
 struct BandwidthEntry {
     bytes: u64,
     window_start: Instant,
+}
+
+impl Default for BandwidthTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BandwidthTracker {
@@ -237,12 +240,19 @@ fn extract_user_id(headers: &HeaderMap) -> Option<String> {
 }
 
 /// Build a standard error response for public_download (3-tuple with empty headers)
-fn download_error(status: StatusCode, message: &str) -> (StatusCode, HeaderMap, Json<ApiResponse<()>>) {
-    (status, HeaderMap::new(), Json(ApiResponse {
-        success: false,
-        message: Some(message.to_string()),
-        data: None,
-    }))
+fn download_error(
+    status: StatusCode,
+    message: &str,
+) -> (StatusCode, HeaderMap, Json<ApiResponse<()>>) {
+    (
+        status,
+        HeaderMap::new(),
+        Json(ApiResponse {
+            success: false,
+            message: Some(message.to_string()),
+            data: None,
+        }),
+    )
 }
 
 /// Extract password from Authorization: Basic <base64> header
@@ -256,7 +266,7 @@ fn extract_basic_auth_password(headers: &HeaderMap) -> Option<String> {
         .decode(auth_header.trim_start_matches("Basic ").trim())
         .ok()?;
     let decoded_str = String::from_utf8(decoded).ok()?;
-    let password = decoded_str.splitn(2, ':').nth(1)?;
+    let (_, password) = decoded_str.split_once(':')?;
     if password.is_empty() {
         None
     } else {
@@ -267,15 +277,17 @@ fn extract_basic_auth_password(headers: &HeaderMap) -> Option<String> {
 // ============= Router =============
 
 pub fn router() -> Router<AppState> {
-    use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, create_rate_limiter};
+    use crate::middleware::rate_limit::{
+        RateLimitConfig, RateLimitMiddleware, create_rate_limiter,
+    };
 
     let config = RateLimitConfig::from_env();
 
     // Create per-operation rate limiters (matching Node.js rateLimiter.ts)
-    let create_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 10));   // 10/min
-    let list_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 30));     // 30/min
-    let revoke_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 20));   // 20/min
-    let access_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 50));   // 50/min
+    let create_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 10)); // 10/min
+    let list_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 30)); // 30/min
+    let revoke_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 20)); // 20/min
+    let access_limiter = RateLimitMiddleware::new(create_rate_limiter(&config, 50)); // 50/min
 
     // Create route: POST /
     let create_routes = Router::new()
@@ -321,7 +333,7 @@ async fn create_share(
 ) -> Result<Json<ApiResponse<CreateShareResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
     let expires_in_days = payload.expires_in_days.unwrap_or(7);
 
-    if expires_in_days < 1 || expires_in_days > 30 {
+    if !(1..=30).contains(&expires_in_days) {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ApiResponse {
@@ -333,14 +345,19 @@ async fn create_share(
     }
 
     // Look up file info from FileManager using fileId (matching Node.js behavior)
-    let file_info = state.file_manager.get_file(&payload.file_id).ok_or_else(|| (
-        StatusCode::NOT_FOUND,
-        Json(ApiResponse {
-            success: false,
-            message: Some("File not found".to_string()),
-            data: None,
-        }),
-    ))?;
+    let file_info = state
+        .file_manager
+        .get_file(&payload.file_id)
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse {
+                    success: false,
+                    message: Some("File not found".to_string()),
+                    data: None,
+                }),
+            )
+        })?;
 
     let file_path = file_info.path.to_string_lossy().to_string();
     let file_name = file_info.filename.clone();
@@ -352,34 +369,44 @@ async fn create_share(
     let user_id = extract_user_id(&headers).unwrap_or_else(|| "temp-user-id".to_string());
 
     // Determine password handling (matching Node.js: only enable if password is explicitly provided and non-empty)
-    let enable_password = payload.password.as_ref().map_or(false, |p| !p.is_empty());
+    let enable_password = payload.password.as_ref().is_some_and(|p| !p.is_empty());
 
     // Build metadata from original filename
     let metadata = {
         let mut map = std::collections::HashMap::new();
-        map.insert("originalFilename".to_string(), serde_json::Value::String(original_filename));
+        map.insert(
+            "originalFilename".to_string(),
+            serde_json::Value::String(original_filename),
+        );
         Some(map)
     };
 
-    match state.share_service.create_share(
-        file_path,
-        file_name,
-        file_size,
-        room_key,
-        user_id,
-        expires_in_days,
-        enable_password,
-        None, // Never pass password directly; auto-generate if enabled
-        metadata,
-    ) {
+    match state
+        .share_service
+        .create_share(crate::services::CreateShareRequest {
+            file_path,
+            file_name,
+            file_size,
+            room_key,
+            created_by: user_id,
+            expires_in_days,
+            enable_password,
+            password: None, // Never pass password directly; auto-generate if enabled
+            metadata,
+        }) {
         Ok((share, generated_password)) => {
             // Generate full share URL using base URL and BASE_PATH
             let base_url = super::build_base_url(&headers);
             let base_path = super::get_base_path();
             let mut share_url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
             // Append password to URL if available
-            if let Some(ref pwd) = generated_password {
-                share_url = format!("{}?password={}", share_url, utf8_percent_encode(pwd, NON_ALPHANUMERIC));
+            let generated_password_string = generated_password.map(|s| s.to_string());
+            if let Some(ref pwd) = generated_password_string {
+                share_url = format!(
+                    "{}?password={}",
+                    share_url,
+                    utf8_percent_encode(pwd, NON_ALPHANUMERIC)
+                );
             }
             let has_password = share.has_password();
             Ok(Json(ApiResponse {
@@ -391,7 +418,7 @@ async fn create_share(
                     has_password,
                     created_by: share.created_by,
                     url: share_url,
-                    password: generated_password,
+                    password: generated_password_string,
                     created_at: share.created_at.to_rfc3339(),
                     expires_at: share.expires_at.to_rfc3339(),
                     access_count: 0,
@@ -435,13 +462,11 @@ async fn list_shares(
     let now = chrono::Utc::now();
     let filtered_shares: Vec<_> = all_shares
         .into_iter()
-        .filter(|share| {
-            match status_filter {
-                Some("active") => share.is_active && share.expires_at > now,
-                Some("expired") => !share.is_active || share.expires_at <= now,
-                Some("all") | None => true,
-                _ => true,
-            }
+        .filter(|share| match status_filter {
+            Some("active") => share.is_active && share.expires_at > now,
+            Some("expired") => !share.is_active || share.expires_at <= now,
+            Some("all") | None => true,
+            _ => true,
         })
         .collect();
 
@@ -460,14 +485,22 @@ async fn list_shares(
             };
             let mut url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
             // Append password to URL if available in metadata
-            if let Some(pwd) = share.metadata.as_ref()
+            if let Some(pwd) = share
+                .metadata
+                .as_ref()
                 .and_then(|m| m.get("plainPassword"))
                 .and_then(|v| v.as_str())
             {
-                url = format!("{}?password={}", url, utf8_percent_encode(pwd, NON_ALPHANUMERIC));
+                url = format!(
+                    "{}?password={}",
+                    url,
+                    utf8_percent_encode(pwd, NON_ALPHANUMERIC)
+                );
             }
             // Use originalFilename from metadata if available, fallback to file_name
-            let original_filename = share.metadata.as_ref()
+            let original_filename = share
+                .metadata
+                .as_ref()
                 .and_then(|m| m.get("originalFilename"))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string())
@@ -502,7 +535,10 @@ async fn list_shares(
 async fn get_share(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-) -> Result<Json<ApiResponse<crate::models::share::ShareInfoResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
+) -> Result<
+    Json<ApiResponse<crate::models::share::ShareInfoResponse>>,
+    (StatusCode, Json<ApiResponse<()>>),
+> {
     match state.share_service.get_share_info(&share_id) {
         Some(info) => Ok(Json(ApiResponse {
             success: true,
@@ -527,24 +563,28 @@ async fn delete_share(
     Path(share_id): Path<String>,
 ) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
     // Require user_id for ownership verification
-    let user_id = extract_user_id(&headers).ok_or_else(|| (
-        StatusCode::UNAUTHORIZED,
-        Json(ApiResponse {
-            success: false,
-            message: Some("User ID required (x-user-id header)".to_string()),
-            data: None,
-        }),
-    ))?;
+    let user_id = extract_user_id(&headers).ok_or_else(|| {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(ApiResponse {
+                success: false,
+                message: Some("User ID required (x-user-id header)".to_string()),
+                data: None,
+            }),
+        )
+    })?;
 
     // Check share exists and verify ownership
-    let share = state.share_service.get_share(&share_id).ok_or_else(|| (
-        StatusCode::NOT_FOUND,
-        Json(ApiResponse {
-            success: false,
-            message: Some("Share not found".to_string()),
-            data: None,
-        }),
-    ))?;
+    let share = state.share_service.get_share(&share_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse {
+                success: false,
+                message: Some("Share not found".to_string()),
+                data: None,
+            }),
+        )
+    })?;
 
     if share.created_by != user_id {
         return Err((
@@ -691,28 +731,37 @@ pub async fn public_download(
     Query(query): Query<DownloadQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, HeaderMap, Json<ApiResponse<()>>)> {
     // Validate shareId format (8-10 character base62: [a-zA-Z0-9])
-    if share_id.len() < 8 || share_id.len() > 10
+    if share_id.len() < 8
+        || share_id.len() > 10
         || !share_id.chars().all(|c| c.is_ascii_alphanumeric())
     {
-        return Err(download_error(StatusCode::BAD_REQUEST, "Invalid share ID format"));
+        return Err(download_error(
+            StatusCode::BAD_REQUEST,
+            "Invalid share ID format",
+        ));
     }
 
     // Extract client IP early for per-IP stream limiting
     let client_ip = extract_client_ip(&headers);
 
     // Extract User-Agent for access logging
-    let user_agent = headers.get(header::USER_AGENT)
+    let user_agent = headers
+        .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
     // P2.1: Check concurrent stream limit (per-IP + global)
     let _stream_guard = StreamGuard::acquire(client_ip.clone()).map_err(|_| {
-        download_error(StatusCode::SERVICE_UNAVAILABLE, "Too many concurrent downloads. Please try again later.")
+        download_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Too many concurrent downloads. Please try again later.",
+        )
     })?;
 
-    let share = state.share_service.get_share(&share_id).ok_or_else(|| {
-        download_error(StatusCode::NOT_FOUND, "Share not found")
-    })?;
+    let share = state
+        .share_service
+        .get_share(&share_id)
+        .ok_or_else(|| download_error(StatusCode::NOT_FOUND, "Share not found"))?;
 
     // Check expiration
     if share.is_expired() {
@@ -727,8 +776,7 @@ pub async fn public_download(
     // Verify password if required
     if share.has_password() {
         // Prefer Basic Auth, fallback to query parameter
-        let password = extract_basic_auth_password(&headers)
-            .or_else(|| query.password.clone());
+        let password = extract_basic_auth_password(&headers).or_else(|| query.password.clone());
 
         match password {
             Some(pwd) if share.verify_password(&pwd) => {}
@@ -744,7 +792,9 @@ pub async fn public_download(
                 let mut headers = HeaderMap::new();
                 headers.insert(
                     "WWW-Authenticate",
-                    "Basic realm=\"File Download\", charset=\"UTF-8\"".parse().unwrap(),
+                    "Basic realm=\"File Download\", charset=\"UTF-8\""
+                        .parse()
+                        .unwrap(),
                 );
                 return Err((
                     StatusCode::UNAUTHORIZED,
@@ -760,7 +810,9 @@ pub async fn public_download(
                 let mut headers = HeaderMap::new();
                 headers.insert(
                     "WWW-Authenticate",
-                    "Basic realm=\"File Download\", charset=\"UTF-8\"".parse().unwrap(),
+                    "Basic realm=\"File Download\", charset=\"UTF-8\""
+                        .parse()
+                        .unwrap(),
                 );
                 return Err((
                     StatusCode::UNAUTHORIZED,
@@ -776,19 +828,22 @@ pub async fn public_download(
     }
 
     // Get file (use file_name which is the storage filename, not the full disk path)
-    let file_info = state.file_manager.get_file(&share.file_name).ok_or_else(|| {
-        download_error(StatusCode::NOT_FOUND, "File not found")
-    })?;
+    let file_info = state
+        .file_manager
+        .get_file(&share.file_name)
+        .ok_or_else(|| download_error(StatusCode::NOT_FOUND, "File not found"))?;
 
     // P2.1: Check per-IP bandwidth limit
     if !BANDWIDTH_TRACKER.check_and_record(&client_ip, file_info.size) {
-        return Err(download_error(StatusCode::TOO_MANY_REQUESTS, "Download bandwidth limit exceeded. Please try again later."));
+        return Err(download_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Download bandwidth limit exceeded. Please try again later.",
+        ));
     }
 
     // P2.3: TOCTOU prevention - use symlink_metadata to detect symlinks
-    let metadata = std::fs::symlink_metadata(&file_info.path).map_err(|_| {
-        download_error(StatusCode::NOT_FOUND, "File not found")
-    })?;
+    let metadata = std::fs::symlink_metadata(&file_info.path)
+        .map_err(|_| download_error(StatusCode::NOT_FOUND, "File not found"))?;
 
     if metadata.file_type().is_symlink() {
         tracing::warn!("Symlink detected for file: {:?}", file_info.path);
@@ -806,13 +861,16 @@ pub async fn public_download(
     }
 
     // P2.3: Open file by path and verify it's within upload directory
-    let upload_dir = state.file_manager.upload_dir().canonicalize().map_err(|_| {
-        download_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error")
-    })?;
+    let upload_dir = state
+        .file_manager
+        .upload_dir()
+        .canonicalize()
+        .map_err(|_| download_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error"))?;
 
-    let canonical_path = file_info.path.canonicalize().map_err(|_| {
-        download_error(StatusCode::NOT_FOUND, "File not found")
-    })?;
+    let canonical_path = file_info
+        .path
+        .canonicalize()
+        .map_err(|_| download_error(StatusCode::NOT_FOUND, "File not found"))?;
 
     if !canonical_path.starts_with(&upload_dir) {
         tracing::warn!("Path traversal attempt: {:?}", file_info.path);
@@ -820,14 +878,26 @@ pub async fn public_download(
     }
 
     // Open file with timeout protection (matching Node.js DOWNLOAD_TIMEOUT)
-    let file = match tokio::time::timeout(*DOWNLOAD_TIMEOUT, tokio::fs::File::open(&canonical_path)).await {
+    let file = match tokio::time::timeout(*DOWNLOAD_TIMEOUT, tokio::fs::File::open(&canonical_path))
+        .await
+    {
         Ok(Ok(f)) => f,
         Ok(Err(_)) => {
-            return Err(download_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to open file"));
+            return Err(download_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to open file",
+            ));
         }
         Err(_) => {
-            tracing::warn!("Download timeout for shareId: {} from IP: {}", share_id, client_ip);
-            return Err(download_error(StatusCode::REQUEST_TIMEOUT, "Download timeout"));
+            tracing::warn!(
+                "Download timeout for shareId: {} from IP: {}",
+                share_id,
+                client_ip
+            );
+            return Err(download_error(
+                StatusCode::REQUEST_TIMEOUT,
+                "Download timeout",
+            ));
         }
     };
 
@@ -845,7 +915,9 @@ pub async fn public_download(
     let body = Body::from_stream(stream);
 
     // Use originalFilename from metadata if available, fallback to file_name
-    let download_filename = share.metadata.as_ref()
+    let download_filename = share
+        .metadata
+        .as_ref()
         .and_then(|m| m.get("originalFilename"))
         .and_then(|v| v.as_str())
         .unwrap_or(&share.file_name);
@@ -863,8 +935,14 @@ pub async fn public_download(
             (header::CONTENT_TYPE, file_info.mime_type),
             (header::CONTENT_DISPOSITION, content_disposition),
             (header::CONTENT_LENGTH, file_info.size.to_string()),
-            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate".to_string()),
-            (HeaderName::from_static("x-content-type-options"), "nosniff".to_string()),
+            (
+                header::CACHE_CONTROL,
+                "no-store, no-cache, must-revalidate".to_string(),
+            ),
+            (
+                HeaderName::from_static("x-content-type-options"),
+                "nosniff".to_string(),
+            ),
         ],
         body,
     ))

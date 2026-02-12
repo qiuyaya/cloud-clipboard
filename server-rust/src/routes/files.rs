@@ -1,18 +1,18 @@
 use axum::{
+    Json, Router,
     body::Body,
     extract::{Multipart, Path, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
 };
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use serde::Serialize;
-use tokio_util::io::ReaderStream;
 use std::collections::HashSet;
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use tokio_util::io::ReaderStream;
 
-use crate::AppState;
 use super::ApiResponse;
+use crate::AppState;
 
 // ============= Response Types =============
 
@@ -35,16 +35,19 @@ pub struct UploadResponse {
 
 // ============= Constants =============
 
-static DANGEROUS_EXTENSIONS: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
-    [
-        ".exe", ".bat", ".cmd", ".com", ".scr", ".pif", ".msi", ".jar",
-        ".sh", ".bash", ".ps1", ".vbs", ".php", ".asp", ".aspx", ".jsp",
-        ".py", ".rb", ".pl", ".c", ".cpp", ".cs", ".java", ".go", ".rs",
-        ".swift", ".dll", ".so", ".dylib", ".app", ".deb", ".rpm", ".dmg",
-    ].into_iter().collect()
-});
+static DANGEROUS_EXTENSIONS: std::sync::LazyLock<HashSet<&'static str>> =
+    std::sync::LazyLock::new(|| {
+        [
+            ".exe", ".bat", ".cmd", ".com", ".scr", ".pif", ".msi", ".jar", ".sh", ".bash", ".ps1",
+            ".vbs", ".php", ".asp", ".aspx", ".jsp", ".py", ".rb", ".pl", ".c", ".cpp", ".cs",
+            ".java", ".go", ".rs", ".swift", ".dll", ".so", ".dylib", ".app", ".deb", ".rpm",
+            ".dmg",
+        ]
+        .into_iter()
+        .collect()
+    });
 
-fn is_valid_filename(filename: &str) -> bool {
+pub(crate) fn is_valid_filename(filename: &str) -> bool {
     !filename.contains("..")
         && !filename.contains('/')
         && !filename.contains('\\')
@@ -57,8 +60,11 @@ fn is_valid_filename(filename: &str) -> bool {
         && !filename.contains('|')
 }
 
-fn is_dangerous_extension(filename: &str) -> bool {
-    let ext = filename.rsplit('.').next().map(|e| format!(".{}", e.to_lowercase()));
+pub(crate) fn is_dangerous_extension(filename: &str) -> bool {
+    let ext = filename
+        .rsplit('.')
+        .next()
+        .map(|e| format!(".{}", e.to_lowercase()));
     if let Some(ext) = ext {
         DANGEROUS_EXTENSIONS.contains(ext.as_str())
     } else {
@@ -119,7 +125,9 @@ fn validate_file_id(file_id: &str) -> Result<(), (StatusCode, Json<ApiResponse<(
 // ============= Router =============
 
 pub fn router() -> Router<AppState> {
-    use crate::middleware::rate_limit::{RateLimitMiddleware, RateLimitConfig, create_rate_limiter};
+    use crate::middleware::rate_limit::{
+        RateLimitConfig, RateLimitMiddleware, create_rate_limiter,
+    };
 
     let config = RateLimitConfig::from_env();
 
@@ -134,9 +142,7 @@ pub fn router() -> Router<AppState> {
         .route("/download/{file_id}", get(download_file))
         .route("/{file_id}", delete(delete_file));
 
-    Router::new()
-        .merge(upload_routes)
-        .merge(other_routes)
+    Router::new().merge(upload_routes).merge(other_routes)
 }
 
 // ============= Handlers =============
@@ -209,7 +215,10 @@ async fn upload_file(
                 ));
             }
 
-            let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
+            let content_type = field
+                .content_type()
+                .unwrap_or("application/octet-stream")
+                .to_string();
             let data = field.bytes().await.map_err(|_| {
                 (
                     StatusCode::BAD_REQUEST,
@@ -273,7 +282,7 @@ async fn upload_file(
             "application/x-dosexec",
             "application/vnd.microsoft.portable-executable",
         ];
-        if blocked_mimes.iter().any(|m| inferred_mime == *m) {
+        if blocked_mimes.contains(&inferred_mime) {
             return Err((
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse {
@@ -340,16 +349,20 @@ async fn download_file(
     })?;
 
     // Ensure file path is within upload directory (prevent path traversal)
-    let upload_dir = state.file_manager.upload_dir().canonicalize().map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Server error".to_string()),
-                data: None,
-            }),
-        )
-    })?;
+    let upload_dir = state
+        .file_manager
+        .upload_dir()
+        .canonicalize()
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiResponse {
+                    success: false,
+                    message: Some("Server error".to_string()),
+                    data: None,
+                }),
+            )
+        })?;
 
     // P2.3: Check for symlinks before canonicalizing
     let metadata = std::fs::symlink_metadata(&file_info.path).map_err(|_| {
@@ -411,7 +424,8 @@ async fn download_file(
     let body = Body::from_stream(stream);
 
     // RFC 5987 encoding for non-ASCII filenames
-    let filename_encoded = utf8_percent_encode(&file_info.original_name, NON_ALPHANUMERIC).to_string();
+    let filename_encoded =
+        utf8_percent_encode(&file_info.original_name, NON_ALPHANUMERIC).to_string();
     let content_disposition = format!(
         "attachment; filename=\"{}\"; filename*=UTF-8''{}",
         file_info.original_name.replace('"', "\\\""),

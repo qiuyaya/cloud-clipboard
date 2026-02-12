@@ -1,14 +1,14 @@
+use serde::{Deserialize, Serialize};
 use socketioxide::SocketIo;
 use socketioxide::extract::{Data, SocketRef};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 
-use crate::services::RoomService;
 use crate::models::Message;
-use crate::utils::{generate_message_id, sanitize_message_content, detect_device_type};
+use crate::services::{JoinRoomRequest, RoomService};
+use crate::utils::{detect_device_type, generate_message_id, sanitize_message_content};
 
 /// User info for client
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ impl From<&crate::models::User> for UserInfo {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct JoinRoomRequest {
+pub struct JoinRoomPayload {
     pub room_key: String,
     pub user: Option<UserData>,
     pub fingerprint: Option<FingerprintData>,
@@ -59,7 +59,7 @@ pub struct FingerprintData {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct JoinRoomWithPasswordRequest {
+pub struct JoinRoomWithPasswordPayload {
     pub room_key: String,
     pub password: String,
     pub user: Option<UserData>,
@@ -166,7 +166,13 @@ impl SocketRateLimiter {
         }
     }
 
-    fn check_rate_limit(&mut self, socket_id: &str, event: &str, max_requests: u32, window_ms: u64) -> bool {
+    fn check_rate_limit(
+        &mut self,
+        socket_id: &str,
+        event: &str,
+        max_requests: u32,
+        window_ms: u64,
+    ) -> bool {
         let now = Instant::now();
         let entries = self.limits.entry(socket_id.to_string()).or_default();
         let entry = entries.entry(event.to_string()).or_insert(RateLimitEntry {
@@ -209,13 +215,34 @@ struct SocketRateLimitConfig {
 
 fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
     match event {
-        "joinRoom" | "joinRoomWithPassword" => SocketRateLimitConfig { max_requests: 5, window_ms: 60_000 },
-        "leaveRoom" => SocketRateLimitConfig { max_requests: 10, window_ms: 60_000 },
-        "sendMessage" => SocketRateLimitConfig { max_requests: 30, window_ms: 60_000 },
-        "requestUserList" => SocketRateLimitConfig { max_requests: 20, window_ms: 60_000 },
-        "setRoomPassword" => SocketRateLimitConfig { max_requests: 10, window_ms: 60_000 },
-        "shareRoomLink" => SocketRateLimitConfig { max_requests: 20, window_ms: 60_000 },
-        _ => SocketRateLimitConfig { max_requests: 30, window_ms: 60_000 },
+        "joinRoom" | "joinRoomWithPassword" => SocketRateLimitConfig {
+            max_requests: 5,
+            window_ms: 60_000,
+        },
+        "leaveRoom" => SocketRateLimitConfig {
+            max_requests: 10,
+            window_ms: 60_000,
+        },
+        "sendMessage" => SocketRateLimitConfig {
+            max_requests: 30,
+            window_ms: 60_000,
+        },
+        "requestUserList" => SocketRateLimitConfig {
+            max_requests: 20,
+            window_ms: 60_000,
+        },
+        "setRoomPassword" => SocketRateLimitConfig {
+            max_requests: 10,
+            window_ms: 60_000,
+        },
+        "shareRoomLink" => SocketRateLimitConfig {
+            max_requests: 20,
+            window_ms: 60_000,
+        },
+        _ => SocketRateLimitConfig {
+            max_requests: 30,
+            window_ms: 60_000,
+        },
     }
 }
 
@@ -246,14 +273,19 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         socket.on("joinRoom", {
             let room_service = room_service.clone();
             let rate_limiter = rate_limiter.clone();
-            move |socket: SocketRef, Data::<JoinRoomRequest>(data)| {
+            move |socket: SocketRef, Data::<JoinRoomPayload>(data)| {
                 let room_service = room_service.clone();
                 let rate_limiter = rate_limiter.clone();
                 async move {
                     let config = get_rate_limit_config("joinRoom");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "joinRoom", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "joinRoom",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_join_room(socket, data, room_service).await;
@@ -269,14 +301,19 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
         socket.on("joinRoomWithPassword", {
             let room_service = room_service.clone();
             let rate_limiter = rate_limiter.clone();
-            move |socket: SocketRef, Data::<JoinRoomWithPasswordRequest>(data)| {
+            move |socket: SocketRef, Data::<JoinRoomWithPasswordPayload>(data)| {
                 let room_service = room_service.clone();
                 let rate_limiter = rate_limiter.clone();
                 async move {
                     let config = get_rate_limit_config("joinRoomWithPassword");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "joinRoomWithPassword", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "joinRoomWithPassword",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_join_room_with_password(socket, data, room_service).await;
@@ -298,7 +335,12 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
                     let config = get_rate_limit_config("sendMessage");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "sendMessage", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "sendMessage",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_send_message(socket, data, room_service).await;
@@ -320,7 +362,12 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
                     let config = get_rate_limit_config("leaveRoom");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "leaveRoom", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "leaveRoom",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_leave_room(socket, data, room_service).await;
@@ -342,7 +389,12 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
                     let config = get_rate_limit_config("requestUserList");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "requestUserList", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "requestUserList",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_request_user_list(socket, room_key, room_service).await;
@@ -364,7 +416,12 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
                     let config = get_rate_limit_config("setRoomPassword");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "setRoomPassword", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "setRoomPassword",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_set_room_password(socket, data, room_service).await;
@@ -386,7 +443,12 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
                     let config = get_rate_limit_config("shareRoomLink");
                     let allowed = {
                         let mut limiter = rate_limiter.write().await;
-                        limiter.check_rate_limit(&socket.id.to_string(), "shareRoomLink", config.max_requests, config.window_ms)
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "shareRoomLink",
+                            config.max_requests,
+                            config.window_ms,
+                        )
                     };
                     if allowed {
                         handle_share_room_link(socket, data, room_service).await;
@@ -452,7 +514,7 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
 
 async fn handle_join_room(
     socket: SocketRef,
-    data: JoinRoomRequest,
+    data: JoinRoomPayload,
     room_service: Arc<RoomService>,
 ) {
     tracing::info!("joinRoom event received: room_key={}", data.room_key);
@@ -460,19 +522,24 @@ async fn handle_join_room(
     // Check if room requires password
     if room_service.room_has_password(&data.room_key) {
         tracing::info!("Room {} requires password", data.room_key);
-        let _ = socket.emit("passwordRequired", &PasswordRequiredEvent {
-            room_key: data.room_key,
-        });
+        let _ = socket.emit(
+            "passwordRequired",
+            &PasswordRequiredEvent {
+                room_key: data.room_key,
+            },
+        );
         return;
     }
 
     // Generate user ID from fingerprint or random (UUID format to match shared schema)
-    let user_id = data.fingerprint
+    let user_id = data
+        .fingerprint
         .as_ref()
         .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
         .unwrap_or_else(crate::utils::generate_user_id);
 
-    let username = data.user
+    let username = data
+        .user
         .as_ref()
         .and_then(|u| u.name.clone())
         .unwrap_or_else(|| {
@@ -486,12 +553,14 @@ async fn handle_join_room(
         });
 
     // Detect device type: prefer client-provided value, fallback to User-Agent detection
-    let device_type = data.user
+    let device_type = data
+        .user
         .as_ref()
         .and_then(|u| u.device_type.clone())
         .unwrap_or_else(|| {
             let req_parts = socket.req_parts();
-            let ua = req_parts.headers
+            let ua = req_parts
+                .headers
                 .get("user-agent")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("");
@@ -502,15 +571,17 @@ async fn handle_join_room(
 
     let socket_id = socket.id.to_string();
 
-    match room_service.join_room(
-        &data.room_key,
-        &user_id,
-        &username,
-        &socket_id,
-        None,
-        &device_type,
-        fingerprint_hash,
-    ) {
+    let join_req = JoinRoomRequest {
+        room_key: &data.room_key,
+        user_id: &user_id,
+        username: &username,
+        socket_id: &socket_id,
+        password: None,
+        device_type: &device_type,
+        fingerprint: fingerprint_hash,
+    };
+
+    match room_service.join_room(join_req) {
         Ok((user, users)) => {
             // Join socket.io room
             let _ = socket.join(data.room_key.clone());
@@ -520,7 +591,11 @@ async fn handle_join_room(
             let user_list: Vec<UserInfo> = users.iter().map(UserInfo::from).collect();
 
             // Send userJoined event to the joining user
-            tracing::info!("Sending userJoined to socket {}: {:?}", socket.id, user_info);
+            tracing::info!(
+                "Sending userJoined to socket {}: {:?}",
+                socket.id,
+                user_info
+            );
             let _ = socket.emit("userJoined", &user_info);
 
             // Send user list
@@ -534,13 +609,18 @@ async fn handle_join_room(
 
             // Send room password status to joining user
             let has_password = room_service.room_has_password(&data.room_key);
-            let _ = socket.emit("roomPasswordSet", &RoomPasswordSetEvent {
-                room_key: data.room_key.clone(),
-                has_password,
-            });
+            let _ = socket.emit(
+                "roomPasswordSet",
+                &RoomPasswordSetEvent {
+                    room_key: data.room_key.clone(),
+                    has_password,
+                },
+            );
 
             // Broadcast to others in the room
-            let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
+            let _ = socket
+                .to(data.room_key.clone())
+                .emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
 
             tracing::info!("User {} joined room successfully", user.username);
@@ -554,18 +634,23 @@ async fn handle_join_room(
 
 async fn handle_join_room_with_password(
     socket: SocketRef,
-    data: JoinRoomWithPasswordRequest,
+    data: JoinRoomWithPasswordPayload,
     room_service: Arc<RoomService>,
 ) {
-    tracing::info!("joinRoomWithPassword event received: room_key={}", data.room_key);
+    tracing::info!(
+        "joinRoomWithPassword event received: room_key={}",
+        data.room_key
+    );
 
     // Generate user ID from fingerprint or random (UUID format to match shared schema)
-    let user_id = data.fingerprint
+    let user_id = data
+        .fingerprint
         .as_ref()
         .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
         .unwrap_or_else(crate::utils::generate_user_id);
 
-    let username = data.user
+    let username = data
+        .user
         .as_ref()
         .and_then(|u| u.name.clone())
         .unwrap_or_else(|| {
@@ -579,12 +664,14 @@ async fn handle_join_room_with_password(
         });
 
     // Detect device type: prefer client-provided value, fallback to User-Agent detection
-    let device_type = data.user
+    let device_type = data
+        .user
         .as_ref()
         .and_then(|u| u.device_type.clone())
         .unwrap_or_else(|| {
             let req_parts = socket.req_parts();
-            let ua = req_parts.headers
+            let ua = req_parts
+                .headers
                 .get("user-agent")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("");
@@ -595,15 +682,17 @@ async fn handle_join_room_with_password(
 
     let socket_id = socket.id.to_string();
 
-    match room_service.join_room(
-        &data.room_key,
-        &user_id,
-        &username,
-        &socket_id,
-        Some(&data.password),
-        &device_type,
-        fingerprint_hash,
-    ) {
+    let join_req = JoinRoomRequest {
+        room_key: &data.room_key,
+        user_id: &user_id,
+        username: &username,
+        socket_id: &socket_id,
+        password: Some(&data.password),
+        device_type: &device_type,
+        fingerprint: fingerprint_hash,
+    };
+
+    match room_service.join_room(join_req) {
         Ok((user, users)) => {
             // Join socket.io room
             let _ = socket.join(data.room_key.clone());
@@ -624,16 +713,24 @@ async fn handle_join_room_with_password(
 
             // Send room password status to joining user
             let has_password = room_service.room_has_password(&data.room_key);
-            let _ = socket.emit("roomPasswordSet", &RoomPasswordSetEvent {
-                room_key: data.room_key.clone(),
-                has_password,
-            });
+            let _ = socket.emit(
+                "roomPasswordSet",
+                &RoomPasswordSetEvent {
+                    room_key: data.room_key.clone(),
+                    has_password,
+                },
+            );
 
             // Broadcast to others in the room
-            let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
+            let _ = socket
+                .to(data.room_key.clone())
+                .emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
 
-            tracing::info!("User {} joined password-protected room successfully", user.username);
+            tracing::info!(
+                "User {} joined password-protected room successfully",
+                user.username
+            );
         }
         Err(error) => {
             tracing::error!("Failed to join room with password: {}", error);
@@ -679,11 +776,18 @@ async fn handle_send_message(
             msg
         };
 
-        if room_service.add_message(&data.room_key, message.clone()).is_ok() {
+        if room_service
+            .add_message(&data.room_key, message.clone())
+            .is_ok()
+        {
             // Broadcast message to room (including sender)
             let _ = socket.to(data.room_key.clone()).emit("message", &message);
             let _ = socket.emit("message", &message);
-            tracing::debug!("Message sent in room {} by {}", data.room_key, user.username);
+            tracing::debug!(
+                "Message sent in room {} by {}",
+                data.room_key,
+                user.username
+            );
         }
     }
 }
@@ -764,9 +868,16 @@ async fn handle_set_room_password(
                 room_key: data.room_key.clone(),
                 has_password,
             };
-            let _ = socket.to(data.room_key.clone()).emit("roomPasswordSet", &event);
+            let _ = socket
+                .to(data.room_key.clone())
+                .emit("roomPasswordSet", &event);
             let _ = socket.emit("roomPasswordSet", &event);
-            tracing::info!("Room {} password {} by {}", data.room_key, if has_password { "set" } else { "removed" }, user.username);
+            tracing::info!(
+                "Room {} password {} by {}",
+                data.room_key,
+                if has_password { "set" } else { "removed" },
+                user.username
+            );
         }
         Err(error) => {
             let _ = socket.emit("error", &error);
@@ -808,17 +919,22 @@ async fn handle_share_room_link(
         .ok()
         .map(|url| url.trim_end_matches('/').to_string())
         .unwrap_or_else(|| {
-        let req_parts = socket.req_parts();
-        let headers = &req_parts.headers;
+            let req_parts = socket.req_parts();
+            let headers = &req_parts.headers;
 
-        if let Some(origin) = headers.get("origin").and_then(|v| v.to_str().ok()) {
-            origin.to_string()
-        } else if let Some(referer) = headers.get("referer").and_then(|v| v.to_str().ok()) {
-            referer.split('?').next().unwrap_or(referer).trim_end_matches('/').to_string()
-        } else {
-            "http://localhost:3000".to_string()
-        }
-    });
+            if let Some(origin) = headers.get("origin").and_then(|v| v.to_str().ok()) {
+                origin.to_string()
+            } else if let Some(referer) = headers.get("referer").and_then(|v| v.to_str().ok()) {
+                referer
+                    .split('?')
+                    .next()
+                    .unwrap_or(referer)
+                    .trim_end_matches('/')
+                    .to_string()
+            } else {
+                "http://localhost:3000".to_string()
+            }
+        });
 
     let mut share_link = format!("{}/?room={}", client_origin, data.room_key);
 
@@ -833,7 +949,11 @@ async fn handle_share_room_link(
     };
 
     let _ = socket.emit("roomLinkGenerated", &event);
-    tracing::info!("Share link generated for room {} by {}", data.room_key, user.username);
+    tracing::info!(
+        "Share link generated for room {} by {}",
+        data.room_key,
+        user.username
+    );
 }
 
 async fn handle_p2p_offer(

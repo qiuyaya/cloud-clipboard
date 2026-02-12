@@ -9,7 +9,10 @@ pub fn validate_room_key(key: &str) -> Result<(), &'static str> {
         return Err("Room key must be 6-50 characters");
     }
 
-    if !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+    if !key
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
         return Err("Room key can only contain letters, numbers, underscores, and hyphens");
     }
 
@@ -36,14 +39,23 @@ mod tests {
 
     #[test]
     fn test_too_short() {
-        assert_eq!(validate_room_key("abc1").unwrap_err(), "Room key must be 6-50 characters");
-        assert_eq!(validate_room_key("a1b2c").unwrap_err(), "Room key must be 6-50 characters");
+        assert_eq!(
+            validate_room_key("abc1").unwrap_err(),
+            "Room key must be 6-50 characters"
+        );
+        assert_eq!(
+            validate_room_key("a1b2c").unwrap_err(),
+            "Room key must be 6-50 characters"
+        );
     }
 
     #[test]
     fn test_too_long() {
         let long_key = "a".repeat(49) + "1" + "x";
-        assert_eq!(validate_room_key(&long_key).unwrap_err(), "Room key must be 6-50 characters");
+        assert_eq!(
+            validate_room_key(&long_key).unwrap_err(),
+            "Room key must be 6-50 characters"
+        );
     }
 
     #[test]

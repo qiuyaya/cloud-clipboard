@@ -54,35 +54,38 @@ pub struct ShareInfoResponse {
     pub status: String,
 }
 
+/// Parameters for creating a new ShareInfo
+pub struct ShareInfoParams {
+    pub share_id: String,
+    pub file_path: String,
+    pub file_name: String,
+    pub file_size: u64,
+    pub room_key: String,
+    pub created_by: String,
+    pub expires_in_days: i64,
+    pub password_hash: Option<String>,
+    pub metadata: Option<HashMap<String, serde_json::Value>>,
+}
+
 impl ShareInfo {
-    pub fn new(
-        share_id: String,
-        file_path: String,
-        file_name: String,
-        file_size: u64,
-        room_key: String,
-        created_by: String,
-        expires_in_days: i64,
-        password_hash: Option<String>,
-        metadata: Option<HashMap<String, serde_json::Value>>,
-    ) -> Self {
+    pub fn new(params: ShareInfoParams) -> Self {
         let now = Utc::now();
-        let has_password = password_hash.is_some();
+        let has_password = params.password_hash.is_some();
         Self {
-            share_id,
-            file_path,
-            file_name,
-            file_size,
-            room_key,
-            created_by,
+            share_id: params.share_id,
+            file_path: params.file_path,
+            file_name: params.file_name,
+            file_size: params.file_size,
+            room_key: params.room_key,
+            created_by: params.created_by,
             created_at: now,
-            expires_at: now + chrono::Duration::days(expires_in_days),
-            password_hash,
+            expires_at: now + chrono::Duration::days(params.expires_in_days),
+            password_hash: params.password_hash,
             is_active: true,
             access_count: 0,
             has_password,
             access_logs: Vec::new(),
-            metadata,
+            metadata: params.metadata,
         }
     }
 
@@ -101,7 +104,14 @@ impl ShareInfo {
         }
     }
 
-    pub fn record_access(&mut self, ip_address: String, success: bool, bytes: Option<u64>, error: Option<String>, user_agent: Option<String>) {
+    pub fn record_access(
+        &mut self,
+        ip_address: String,
+        success: bool,
+        bytes: Option<u64>,
+        error: Option<String>,
+        user_agent: Option<String>,
+    ) {
         self.access_logs.push(ShareAccessLog {
             timestamp: Utc::now(),
             ip_address,
@@ -119,7 +129,9 @@ impl ShareInfo {
         let is_expired = self.is_expired();
         let is_active = self.is_active && !is_expired;
         // Use originalFilename from metadata if available, fallback to file_name
-        let display_name = self.metadata.as_ref()
+        let display_name = self
+            .metadata
+            .as_ref()
             .and_then(|m| m.get("originalFilename"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
@@ -136,7 +148,11 @@ impl ShareInfo {
             access_count: self.access_count,
             created_by: self.created_by.clone(),
             last_accessed_at: self.access_logs.last().map(|log| log.timestamp),
-            status: if is_active { "active".to_string() } else { "expired".to_string() },
+            status: if is_active {
+                "active".to_string()
+            } else {
+                "expired".to_string()
+            },
         }
     }
 }

@@ -41,7 +41,11 @@ mod tests {
     #[test]
     fn test_generate_user_id() {
         let id = generate_user_id();
-        assert!(Uuid::parse_str(&id).is_ok(), "User ID should be valid UUID: {}", id);
+        assert!(
+            Uuid::parse_str(&id).is_ok(),
+            "User ID should be valid UUID: {}",
+            id
+        );
     }
 
     #[test]
@@ -49,15 +53,26 @@ mod tests {
         let id1 = generate_user_id_from_fingerprint("abc123");
         let id2 = generate_user_id_from_fingerprint("abc123");
         let id3 = generate_user_id_from_fingerprint("def456");
-        assert!(Uuid::parse_str(&id1).is_ok(), "Fingerprint ID should be valid UUID: {}", id1);
+        assert!(
+            Uuid::parse_str(&id1).is_ok(),
+            "Fingerprint ID should be valid UUID: {}",
+            id1
+        );
         assert_eq!(id1, id2, "Same fingerprint should produce same ID");
-        assert_ne!(id1, id3, "Different fingerprints should produce different IDs");
+        assert_ne!(
+            id1, id3,
+            "Different fingerprints should produce different IDs"
+        );
     }
 
     #[test]
     fn test_generate_message_id() {
         let id = generate_message_id();
-        assert!(Uuid::parse_str(&id).is_ok(), "Message ID should be valid UUID: {}", id);
+        assert!(
+            Uuid::parse_str(&id).is_ok(),
+            "Message ID should be valid UUID: {}",
+            id
+        );
     }
 
     #[test]

@@ -1,7 +1,4 @@
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{Json, extract::State};
 use serde::Serialize;
 
 use crate::AppState;
@@ -38,7 +35,8 @@ fn get_rss_bytes() -> u64 {
     std::fs::read_to_string("/proc/self/statm")
         .ok()
         .and_then(|content| {
-            content.split_whitespace()
+            content
+                .split_whitespace()
                 .nth(1) // RSS is the second field (in pages)
                 .and_then(|rss| rss.parse::<u64>().ok())
                 .map(|pages| pages * 4096) // Convert pages to bytes

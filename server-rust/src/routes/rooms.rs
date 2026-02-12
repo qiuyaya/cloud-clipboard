@@ -1,15 +1,15 @@
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
+use super::ApiResponse;
 use crate::AppState;
 use crate::models::Message;
 use crate::utils::validate_room_key;
-use super::ApiResponse;
 
 // ============= Request/Response Types =============
 
@@ -178,7 +178,10 @@ async fn create_room(
         ));
     }
 
-    match state.room_service.create_room(&payload.room_key, payload.password.as_deref()) {
+    match state
+        .room_service
+        .create_room(&payload.room_key, payload.password.as_deref())
+    {
         Ok(info) => {
             let response = RoomInfoResponse {
                 key: info.room_key,
@@ -270,10 +273,10 @@ async fn get_room_messages(
     let mut messages = state.room_service.get_messages(&room_key);
 
     // Apply limit if specified
-    if let Some(limit) = query.limit {
-        if messages.len() > limit {
-            messages = messages.into_iter().rev().take(limit).rev().collect();
-        }
+    if let Some(limit) = query.limit
+        && messages.len() > limit
+    {
+        messages = messages.into_iter().rev().take(limit).rev().collect();
     }
 
     Ok(Json(ApiResponse {
@@ -284,9 +287,7 @@ async fn get_room_messages(
 }
 
 /// GET /api/rooms/stats
-async fn get_stats(
-    State(state): State<AppState>,
-) -> Json<ApiResponse<RoomStats>> {
+async fn get_stats(State(state): State<AppState>) -> Json<ApiResponse<RoomStats>> {
     let stats = state.room_service.get_room_stats();
 
     Json(ApiResponse {
@@ -321,10 +322,9 @@ async fn validate_user(
     }
 
     // Look up user by fingerprint
-    let found_user = state.room_service.find_user_by_fingerprint(
-        &payload.room_key,
-        &payload.user_fingerprint,
-    );
+    let found_user = state
+        .room_service
+        .find_user_by_fingerprint(&payload.room_key, &payload.user_fingerprint);
 
     match found_user {
         Some(user) => {
@@ -339,17 +339,15 @@ async fn validate_user(
                 }),
             })
         }
-        None => {
-            Json(ApiResponse {
-                success: true,
-                message: None,
-                data: Some(ValidateUserData {
-                    room_exists: true,
-                    user_exists: false,
-                    user: None,
-                }),
-            })
-        }
+        None => Json(ApiResponse {
+            success: true,
+            message: None,
+            data: Some(ValidateUserData {
+                room_exists: true,
+                user_exists: false,
+                user: None,
+            }),
+        }),
     }
 }
 
@@ -399,7 +397,10 @@ async fn room_exists(
     Json(ApiResponse {
         success: true,
         message: None,
-        data: Some(RoomExistsData { exists, has_password }),
+        data: Some(RoomExistsData {
+            exists,
+            has_password,
+        }),
     })
 }
 
@@ -409,7 +410,10 @@ async fn verify_password(
     Path(room_key): Path<String>,
     Json(payload): Json<VerifyPasswordRequest>,
 ) -> Result<Json<ApiResponse<PasswordVerifyData>>, (StatusCode, Json<ApiResponse<()>>)> {
-    match state.room_service.verify_room_password(&room_key, &payload.password) {
+    match state
+        .room_service
+        .verify_room_password(&room_key, &payload.password)
+    {
         Ok(valid) => Ok(Json(ApiResponse {
             success: true,
             message: None,

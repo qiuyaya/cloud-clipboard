@@ -1,14 +1,11 @@
 use axum::{
-    response::{Response, IntoResponse},
-    http::{Request, StatusCode, HeaderMap, header::HeaderValue},
+    http::{HeaderMap, Request, StatusCode, header::HeaderValue},
+    response::{IntoResponse, Response},
 };
-use governor::{Quota, RateLimiter as GovRateLimiter, clock::DefaultClock, state::keyed::DefaultKeyedStateStore};
-use std::{
-    num::NonZeroU32,
-    sync::Arc,
-    future::Future,
-    pin::Pin,
+use governor::{
+    Quota, RateLimiter as GovRateLimiter, clock::DefaultClock, state::keyed::DefaultKeyedStateStore,
 };
+use std::{future::Future, num::NonZeroU32, pin::Pin, sync::Arc};
 
 /// Key type for rate limiting
 pub type RateLimiter = GovRateLimiter<String, DefaultKeyedStateStore<String>, DefaultClock>;
@@ -41,7 +38,10 @@ impl RateLimitConfig {
     /// Load configuration from environment variables
     pub fn from_env() -> Self {
         let parse_u32 = |key: &str, default: u32| -> u32 {
-            std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+            std::env::var(key)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(default)
         };
 
         // Support RATE_LIMIT_WINDOW_MS (milliseconds) or RATE_LIMIT_WINDOW (seconds)
@@ -74,7 +74,10 @@ impl RateLimitConfig {
 }
 
 /// Create a rate limiter with specified requests per minute (1-minute window)
-pub fn create_rate_limiter(_config: &RateLimitConfig, requests_per_window: u32) -> KeyedRateLimiter {
+pub fn create_rate_limiter(
+    _config: &RateLimitConfig,
+    requests_per_window: u32,
+) -> KeyedRateLimiter {
     let nz = NonZeroU32::new(requests_per_window).unwrap_or_else(|| NonZeroU32::new(100).unwrap());
     let quota = Quota::per_minute(nz);
     Arc::new(GovRateLimiter::keyed(quota))
@@ -106,24 +109,23 @@ pub fn public_download_rate_limiter(config: &RateLimitConfig) -> KeyedRateLimite
 /// Extract client IP from request, supporting X-Forwarded-For header
 pub fn extract_client_ip(headers: &HeaderMap) -> String {
     // Check X-Forwarded-For header first
-    if let Some(xff) = headers.get("x-forwarded-for") {
-        if let Ok(xff_str) = xff.to_str() {
-            if let Some(ip) = xff_str.split(',').next() {
-                let ip = ip.trim();
-                if !ip.is_empty() {
-                    return ip.to_string();
-                }
-            }
+    if let Some(xff) = headers.get("x-forwarded-for")
+        && let Ok(xff_str) = xff.to_str()
+        && let Some(ip) = xff_str.split(',').next()
+    {
+        let ip = ip.trim();
+        if !ip.is_empty() {
+            return ip.to_string();
         }
     }
 
     // Check X-Real-IP header
-    if let Some(xri) = headers.get("x-real-ip") {
-        if let Ok(ip) = xri.to_str() {
-            let ip = ip.trim();
-            if !ip.is_empty() {
-                return ip.to_string();
-            }
+    if let Some(xri) = headers.get("x-real-ip")
+        && let Ok(ip) = xri.to_str()
+    {
+        let ip = ip.trim();
+        if !ip.is_empty() {
+            return ip.to_string();
         }
     }
 
@@ -131,29 +133,36 @@ pub fn extract_client_ip(headers: &HeaderMap) -> String {
 }
 
 /// Create rate limit headers
-pub fn rate_limit_headers(config: &RateLimitConfig, remaining: u32, retry_after: Option<u64>) -> HeaderMap {
+pub fn rate_limit_headers(
+    config: &RateLimitConfig,
+    remaining: u32,
+    retry_after: Option<u64>,
+) -> HeaderMap {
     let mut headers = HeaderMap::new();
     let limit = config.general_max.to_string();
 
     headers.insert(
         "X-RateLimit-Limit",
-        HeaderValue::from_str(&limit).unwrap_or_else(|_| HeaderValue::from_static("500"))
+        HeaderValue::from_str(&limit).unwrap_or_else(|_| HeaderValue::from_static("500")),
     );
     headers.insert(
         "X-RateLimit-Remaining",
-        HeaderValue::from_str(&remaining.to_string()).unwrap_or_else(|_| HeaderValue::from_static("0"))
+        HeaderValue::from_str(&remaining.to_string())
+            .unwrap_or_else(|_| HeaderValue::from_static("0")),
     );
 
     let reset_time = chrono::Utc::now().timestamp() + config.window_secs as i64;
     headers.insert(
         "X-RateLimit-Reset",
-        HeaderValue::from_str(&reset_time.to_string()).unwrap_or_else(|_| HeaderValue::from_static("0"))
+        HeaderValue::from_str(&reset_time.to_string())
+            .unwrap_or_else(|_| HeaderValue::from_static("0")),
     );
 
     if let Some(retry) = retry_after {
         headers.insert(
             "Retry-After",
-            HeaderValue::from_str(&retry.to_string()).unwrap_or_else(|_| HeaderValue::from_static("1"))
+            HeaderValue::from_str(&retry.to_string())
+                .unwrap_or_else(|_| HeaderValue::from_static("1")),
         );
     }
 

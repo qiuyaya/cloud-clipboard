@@ -9,22 +9,28 @@ pub fn detect_device_type(user_agent: &str) -> String {
     }
 
     // Check for Android tablets by model number patterns (SM-T followed by digits)
-    if ua.contains("android") {
-        // Look for SM-T followed by digits (Samsung tablet pattern)
-        if let Some(pos) = ua.find("sm-t") {
-            if ua[pos + 4..].starts_with(|c: char| c.is_ascii_digit()) {
-                return "tablet".to_string();
-            }
-        }
+    if ua.contains("android")
+        && let Some(pos) = ua.find("sm-t")
+        && ua[pos + 4..].starts_with(|c: char| c.is_ascii_digit())
+    {
+        return "tablet".to_string();
     }
 
     // Then check mobile devices
-    if ua.contains("mobile") || ua.contains("android") || ua.contains("iphone") || ua.contains("phone") {
+    if ua.contains("mobile")
+        || ua.contains("android")
+        || ua.contains("iphone")
+        || ua.contains("phone")
+    {
         return "mobile".to_string();
     }
 
     // Check desktop/laptop devices
-    if ua.contains("desktop") || ua.contains("windows") || ua.contains("mac") || ua.contains("linux") {
+    if ua.contains("desktop")
+        || ua.contains("windows")
+        || ua.contains("mac")
+        || ua.contains("linux")
+    {
         return "desktop".to_string();
     }
 

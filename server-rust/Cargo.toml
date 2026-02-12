@@ -2,6 +2,7 @@
 name = "cloud-clipboard-server"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.87"
 description = "Cloud Clipboard Server - Rust Implementation"
 authors = ["Cloud Clipboard Team"]
 
@@ -65,6 +66,8 @@ dotenvy = "0.15"
 [dev-dependencies]
 tokio-test = "0.4"
 reqwest = { version = "0.12", features = ["json"] }
+urlencoding = "2"
+tempfile = "3"
 
 [profile.release]
 lto = true

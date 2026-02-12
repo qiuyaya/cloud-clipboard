@@ -130,12 +130,16 @@ impl Room {
         let lower = username.to_lowercase();
         self.users.values().any(|u| {
             u.username.to_lowercase() == lower
-                && fingerprint.map_or(true, |fp| u.fingerprint.as_deref() != Some(fp))
+                && fingerprint.is_none_or(|fp| u.fingerprint.as_deref() != Some(fp))
         })
     }
 
     /// Generate unique username with random suffix if needed
-    pub fn generate_unique_username(&self, base_username: &str, fingerprint: Option<&str>) -> String {
+    pub fn generate_unique_username(
+        &self,
+        base_username: &str,
+        fingerprint: Option<&str>,
+    ) -> String {
         let max_length = 50;
         let max_base_length = 44; // Leave room for "_" + 5 char suffix
 
@@ -173,9 +177,9 @@ impl Room {
 
     /// Find user by fingerprint hash
     pub fn find_user_by_fingerprint(&self, hash: &str) -> Option<&User> {
-        self.users.values().find(|u| {
-            u.fingerprint.as_deref() == Some(hash)
-        })
+        self.users
+            .values()
+            .find(|u| u.fingerprint.as_deref() == Some(hash))
     }
 }
 
@@ -186,7 +190,11 @@ mod tests {
 
     fn make_room_with_user(username: &str, fingerprint: Option<&str>) -> Room {
         let mut room = Room::new("test_room1".to_string(), None, None);
-        let mut user = User::new("user1".to_string(), username.to_string(), "test_room1".to_string());
+        let mut user = User::new(
+            "user1".to_string(),
+            username.to_string(),
+            "test_room1".to_string(),
+        );
         user.fingerprint = fingerprint.map(|s| s.to_string());
         room.add_user(user);
         room

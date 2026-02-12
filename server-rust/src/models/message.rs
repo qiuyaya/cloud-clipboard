@@ -81,12 +81,7 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn new_text(
-        id: String,
-        room_key: String,
-        sender: MessageSender,
-        content: String,
-    ) -> Self {
+    pub fn new_text(id: String, room_key: String, sender: MessageSender, content: String) -> Self {
         Self {
             id,
             room_key,

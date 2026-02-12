@@ -17,7 +17,10 @@ mod tests {
     fn test_sanitize_script_tag() {
         let input = "<script>alert('xss')</script>";
         let result = sanitize_message_content(input);
-        assert_eq!(result, "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;");
+        assert_eq!(
+            result,
+            "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
+        );
         assert!(!result.contains('<'));
         assert!(!result.contains('>'));
     }
@@ -33,7 +36,10 @@ mod tests {
     fn test_sanitize_html_entities() {
         let input = r#"<img src="x" onerror="alert(1)">"#;
         let result = sanitize_message_content(input);
-        assert_eq!(result, "&lt;img src=&quot;x&quot; onerror=&quot;alert(1)&quot;&gt;");
+        assert_eq!(
+            result,
+            "&lt;img src=&quot;x&quot; onerror=&quot;alert(1)&quot;&gt;"
+        );
     }
 
     #[test]
@@ -52,6 +58,9 @@ mod tests {
     fn test_sanitize_mixed_content() {
         let input = "Hello <b>world</b> & \"friends\"";
         let result = sanitize_message_content(input);
-        assert_eq!(result, "Hello &lt;b&gt;world&lt;/b&gt; &amp; &quot;friends&quot;");
+        assert_eq!(
+            result,
+            "Hello &lt;b&gt;world&lt;/b&gt; &amp; &quot;friends&quot;"
+        );
     }
 }
