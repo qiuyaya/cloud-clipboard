@@ -47,7 +47,7 @@ static DANGEROUS_EXTENSIONS: std::sync::LazyLock<HashSet<&'static str>> =
         .collect()
     });
 
-pub(crate) fn is_valid_filename(filename: &str) -> bool {
+pub fn is_valid_filename(filename: &str) -> bool {
     !filename.contains("..")
         && !filename.contains('/')
         && !filename.contains('\\')
@@ -60,7 +60,7 @@ pub(crate) fn is_valid_filename(filename: &str) -> bool {
         && !filename.contains('|')
 }
 
-pub(crate) fn is_dangerous_extension(filename: &str) -> bool {
+pub fn is_dangerous_extension(filename: &str) -> bool {
     let ext = filename
         .rsplit('.')
         .next()
