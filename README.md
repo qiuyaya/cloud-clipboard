@@ -42,11 +42,12 @@ _中文 | [English](#english)_
 
 - **`shared/`** - 公共类型、模式和工具（TypeScript + Zod）
 - **`server/`** - 后端API和WebSocket服务器（Node.js + Express + Socket.IO）
+- **`server-rust/`** - Rust 后端实现（Rust + Axum + SocketiOxide）⭐ 新增
 - **`client/`** - 前端React应用程序（React + Vite + Tailwind CSS）
 
 ## 🛠️ 技术栈
 
-### 后端
+### 后端 (Node.js)
 
 - **运行时**: Bun
 - **框架**: Express.js
@@ -55,6 +56,18 @@ _中文 | [English](#english)_
 - **安全**: Helmet, CORS
 - **文件上传**: Multer
 - **日志**: 结构化日志系统，支持多级别输出
+
+### 后端 (Rust) ⭐ 新增
+
+- **语言**: Rust 1.93+
+- **框架**: Axum 0.8
+- **WebSocket**: SocketiOxide 0.15
+- **异步运行时**: Tokio
+- **序列化**: Serde + serde_json
+- **安全**: bcrypt 加密、SHA-256 哈希、secure random
+- **中间件**: Tower + tower-http（CORS、压缩、限流）
+- **测试**: 完善的单元测试覆盖
+- **性能**: 比 Node.js 版本更高性能和内存安全
 
 ### 前端
 
@@ -350,11 +363,12 @@ This project is built as a monorepo with four main packages:
 
 - **`shared/`** - Common types, schemas, and utilities (TypeScript + Zod)
 - **`server/`** - Backend API and WebSocket server (Node.js + Express + Socket.IO)
+- **`server-rust/`** - Rust backend implementation (Rust + Axum + SocketiOxide) ⭐ New
 - **`client/`** - Frontend React application (React + Vite + Tailwind CSS)
 
 ## 🛠️ Tech Stack
 
-### Backend
+### Backend (Node.js)
 
 - **Runtime**: Bun
 - **Framework**: Express.js
@@ -362,6 +376,18 @@ This project is built as a monorepo with four main packages:
 - **Validation**: Zod schemas
 - **Security**: Helmet, CORS
 - **File Upload**: Multer
+- **Logging**: Structured logging with multiple levels
+
+### Backend (Rust) ⭐ New
+
+- **Language**: Rust 1.93+
+- **Framework**: Axum 0.8
+- **WebSockets**: SocketiOxide 0.15
+- **Async Runtime**: Tokio
+- **Serialization**: Serde + serde_json
+- **Security**: bcrypt encryption, SHA-256 hashing, secure random
+- **Middleware**: Tower + tower-http (CORS, compression, rate limiting)
+- **Performance**: Higher performance and memory safety compared to Node.js version
 
 ### Frontend
 

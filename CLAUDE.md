@@ -30,8 +30,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `cd server-rust && docker build -t cloud-clipboard-rust .` - 使用 Docker 构建 Rust 后端
 - `cd server-rust && docker build --target builder -t cloud-clipboard-rust-builder .` - 仅编译不导出
 - 编译检查（不产生二进制）：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo check"`
-- 运行测试：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test"`
+- 运行测试：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test --all-features"`
+- 运行特定测试：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test --test 测试文件名"`
+- 代码格式化检查：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev && rustup component add rustfmt && cargo fmt -- --check"`
+- Clippy 代码质量检查：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && rustup component add clippy && cargo clippy --all-targets --all-features -- -D warnings"`
 - Dockerfile 位于 `server-rust/Dockerfile`，基于 `rust:1.93-alpine`
+- 测试覆盖：15 个测试模块，包含单元测试、集成测试、安全测试等
+- 测试模块包括：
+  - `auth_middleware_tests.rs` - 认证中间件测试
+  - `file_routes_tests.rs` - 文件路由测试
+  - `integration_tests.rs` - 集成测试
+  - `logger_tests.rs` - 日志系统测试
+  - `rate_limit_tests.rs` - 速率限制测试
+  - `room_model_tests.rs` - 房间模型测试
+  - `room_service_tests.rs` - 房间服务测试
+  - `rooms_routes_tests.rs` - 房间路由测试
+  - `share_routes_tests.rs` - 分享路由测试
+  - `share_security_tests.rs` - 分享安全测试
+  - `share_service_tests.rs` - 分享服务测试
+  - `socket_service_tests.rs` - Socket 服务测试
+  - `validation_middleware_tests.rs` - 验证中间件测试
+  - `xss_security_tests.rs` - XSS 安全测试
+  - `common/mod.rs` - 测试通用工具模块
 
 ### Code Quality
 
@@ -60,9 +80,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **GitHub Actions (CI/CD)**:
 
 - `ci.yml` - Runs on push/PR to main or develop:
-  - Lint & Type Check job uses `validate:quick`
-  - Includes security audit and version consistency checks
-  - Parallel execution for faster results
+  - **Lint & Type Check** job - 使用 `validate:quick` 进行快速验证
+  - **Test Web Application** job - 构建和测试 Web 应用
+  - **Test Rust Backend** job - 使用 Docker 运行 Rust 测试：
+    - 运行所有测试套件（`cargo test --all-features --no-fail-fast`）
+    - Rust 代码格式化检查（`cargo fmt --check`）
+    - Clippy 代码质量检查（`cargo clippy`）
+  - **Security Audit** job - 安全审计和依赖检查
+  - **Version Consistency Check** job - 版本一致性检查
+  - **Build Status** job - 汇总所有检查结果
+  - 所有作业并行执行以加快速度
 
 - `test.yml` - Comprehensive test suite:
   - Quick validation on lint-and-typecheck job
@@ -100,11 +127,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Monorepo Structure
 
-This is a Bun-based monorepo with four workspaces that must be built in dependency order:
+这是一个 Bun-based monorepo，包含以下工作空间：
 
 1. **`shared/`** - Core types and validation schemas using Zod
-2. **`server/`** - Express.js + Socket.IO backend
-3. **`client/`** - React + Vite frontend
+2. **`server/`** - Express.js + Socket.IO backend (Node.js)
+3. **`server-rust/`** - Axum + SocketiOxide backend (Rust) ⭐ 新增
+4. **`client/`** - React + Vite frontend
+
+### Rust Backend Architecture
+
+**框架选择**: 使用 Axum 0.8 作为 web 框架，SocketiOxide 0.15 用于 WebSocket 通信。
+
+**测试架构**: 采用模块化测试设计，包含 15 个测试模块：
+
+- **单元测试**: 各个服务和模型的独立测试
+- **集成测试**: API 端点和路由的完整流程测试
+- **安全测试**: XSS 防护、分享安全、认证等安全特性测试
+- **中间件测试**: 速率限制、验证、认证中间件测试
+- **通用测试工具**: `tests/common/mod.rs` 提供测试辅助函数
+
+**核心依赖**:
+
+- **Axum**: 高性能 web 框架，支持 multipart、WebSocket
+- **Tokio**: 异步运行时
+- **SocketiOxide**: Socket.IO 协议的 Rust 实现
+- **Tower/Tower-HTTP**: 中间件栈（CORS、压缩、限流、追踪）
+- **Serde**: 序列化/反序列化
+- **bcrypt**: 密码加密
+- **Governor**: 速率限制
+
+**库导出**: `src/lib.rs` 导出所有模块供测试使用，确保测试可以访问内部实现。
 
 ### Key Architectural Patterns
 
@@ -196,7 +248,12 @@ const userWithDate = {
 
 **Testing Framework**: Comprehensive test coverage with:
 
-- Unit tests for all modules
+- **Node.js Backend**: Unit tests for all modules
+- **Rust Backend**: 15 个测试模块
+  - 单元测试：服务、模型、工具函数
+  - 集成测试：完整的 API 流程
+  - 安全测试：XSS、认证、分享权限
+  - 中间件测试：速率限制、验证
 - Integration tests for API endpoints
 - End-to-end tests for user flows
 
@@ -346,9 +403,20 @@ const userWithDate = {
 
 ## Active Technologies
 
-- TypeScript 5.9.3 + Bun 1.x, Express.js, Socket.IO, Zod, React, Vite (001-external-file-sharing)
+- **TypeScript 5.9.3 + Bun 1.x**: Node.js 后端运行时和包管理器
+- **Express.js + Socket.IO**: Node.js 后端 web 框架和 WebSocket
+- **Rust 1.93 + Axum 0.8 + SocketiOxide 0.15**: Rust 后端实现 ⭐ 新增
+- **Zod**: 类型验证和 schema 定义
+- **React + Vite**: 前端框架和构建工具
 - In-memory Map-based storage (server), Multer for file uploads (001-external-file-sharing)
 
 ## Recent Changes
 
+- **Rust Backend Implementation** (2026-02):
+  - 新增完整的 Rust 后端实现（Axum + SocketiOxide）
+  - 添加 15 个测试模块
+  - 新增 `src/lib.rs` 库导出模块供测试使用
+  - 更新 CI/CD 流程，添加 Rust 测试、格式化检查、Clippy 检查
+  - 完善服务层实现：文件管理、房间服务、分享服务
+  - 增强中间件功能和安全测试
 - 001-external-file-sharing: Added TypeScript 5.9.3 + Bun 1.x, Express.js, Socket.IO, Zod, React, Vite
