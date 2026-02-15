@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-02-15
+
+- feat: 添加房间固定功能和 UI 优化
+
 ## [2.0.0] - 2026-02-10
 
 - feat: 添加 Rust 后端 Docker 镜像构建到 release workflow

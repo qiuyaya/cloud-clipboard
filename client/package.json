@@ -1,6 +1,6 @@
 {
   "name": "@cloud-clipboard/client",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Modern React frontend with PWA support, real-time synchronization, and beautiful UI for cloud clipboard sharing",
   "type": "module",
   "scripts": {
