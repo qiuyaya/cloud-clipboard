@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 use tokio::sync::broadcast;
 
 use crate::models::room::RoomInfo;
@@ -9,6 +9,19 @@ use crate::models::{Message, Room, User};
 /// Grace period before destroying a room when all users disconnect (in seconds).
 /// This allows users to reconnect after browser refresh without losing their session.
 const ROOM_DESTROY_GRACE_PERIOD_SECS: u64 = 30;
+
+/// Maximum number of pinned rooms allowed (cached from environment variable)
+static MAX_PINNED_ROOMS: OnceLock<usize> = OnceLock::new();
+
+/// Get the maximum number of pinned rooms (reads from env var once, then caches)
+fn max_pinned_rooms() -> usize {
+    *MAX_PINNED_ROOMS.get_or_init(|| {
+        std::env::var("MAX_PINNED_ROOMS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(50)
+    })
+}
 
 /// Events emitted by RoomService
 #[derive(Debug, Clone)]
@@ -83,7 +96,12 @@ impl RoomService {
     }
 
     /// Create a new room (idempotent - returns existing room if already exists)
-    pub fn create_room(&self, room_key: &str, password: Option<&str>) -> Result<RoomInfo, String> {
+    pub fn create_room(
+        &self,
+        room_key: &str,
+        password: Option<&str>,
+        creator_fingerprint: Option<&str>,
+    ) -> Result<RoomInfo, String> {
         let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
 
         if let Some(room) = rooms.get(room_key) {
@@ -99,11 +117,19 @@ impl RoomService {
             None => None,
         };
 
-        let room = Room::new(
+        let mut room = Room::new(
             room_key.to_string(),
             password.map(|p| p.to_string()),
             password_hash,
         );
+
+        // Set creator when room is first created (验证 fingerprint 有效性)
+        if let Some(fp) = creator_fingerprint {
+            if !fp.trim().is_empty() {
+                room.set_creator(fp);
+            }
+        }
+
         let info = room.to_info();
         rooms.insert(room_key.to_string(), room);
 
@@ -155,10 +181,17 @@ impl RoomService {
     pub fn join_room(&self, req: JoinRoomRequest) -> Result<(User, Vec<User>), String> {
         let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
 
-        // Create room if it doesn't exist
-        let room = rooms
-            .entry(req.room_key.to_string())
-            .or_insert_with(|| Room::new(req.room_key.to_string(), None, None));
+        // Create room if it doesn't exist, setting creator on creation
+        let room = rooms.entry(req.room_key.to_string()).or_insert_with(|| {
+            let mut new_room = Room::new(req.room_key.to_string(), None, None);
+            // Set creator when room is first created (验证 fingerprint 有效性)
+            if let Some(fp) = req.fingerprint {
+                if !fp.trim().is_empty() {
+                    new_room.set_creator(fp);
+                }
+            }
+            new_room
+        });
 
         // Verify password if room has one
         if room.has_password() {
@@ -265,7 +298,11 @@ impl RoomService {
                     Err(_) => return,
                 };
                 if let Some(room) = rooms.get(&room_key) {
-                    if room.all_users_offline() {
+                    // Skip pinned rooms - they persist even when all users are offline
+                    if room.is_pinned {
+                        tracing::info!("Room {} is pinned, skipping destruction", room_key);
+                        false
+                    } else if room.all_users_offline() {
                         rooms.remove(&room_key);
                         tracing::info!(
                             "Room {} destroyed (all users offline after grace period)",
@@ -305,8 +342,8 @@ impl RoomService {
         if let Some(room) = rooms.get_mut(&room_key) {
             room.remove_user(&user.id);
 
-            // Check if room should be destroyed
-            if room.is_empty() || room.all_users_offline() {
+            // Check if room should be destroyed (skip pinned rooms)
+            if !room.is_pinned && (room.is_empty() || room.all_users_offline()) {
                 let key = room_key.clone();
                 rooms.remove(&key);
                 tracing::info!("Room {} destroyed (empty/all offline after leave)", key);
@@ -430,6 +467,67 @@ impl RoomService {
         }
     }
 
+    /// Pin a room (any user can pin)
+    pub fn pin_room(&self, room_key: &str, fingerprint: &str) -> Result<bool, String> {
+        // 验证 fingerprint 有效性
+        if fingerprint.trim().is_empty() {
+            return Err("Invalid fingerprint".to_string());
+        }
+
+        let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
+
+        // 检查房间是否存在和是否已固定
+        let already_pinned = {
+            let room = rooms.get(room_key).ok_or("Room not found")?;
+            room.is_pinned
+        };
+
+        if already_pinned {
+            return Ok(true); // Already pinned
+        }
+
+        // 检查固定房间数量限制
+        let pinned_count = rooms.values().filter(|r| r.is_pinned).count();
+        if pinned_count >= max_pinned_rooms() {
+            return Err("Maximum pinned rooms reached".to_string());
+        }
+
+        // 固定房间
+        let room = rooms.get_mut(room_key).ok_or("Room not found")?;
+        room.pin();
+
+        tracing::info!("Room {} pinned by {}", room_key, fingerprint);
+        Ok(true)
+    }
+
+    /// Unpin a room (any user can unpin)
+    pub fn unpin_room(&self, room_key: &str, fingerprint: &str) -> Result<bool, String> {
+        // 验证 fingerprint 有效性
+        if fingerprint.trim().is_empty() {
+            return Err("Invalid fingerprint".to_string());
+        }
+
+        let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
+        let room = rooms.get_mut(room_key).ok_or("Room not found")?;
+
+        if !room.is_pinned {
+            return Ok(false); // Already unpinned
+        }
+
+        room.unpin();
+        tracing::info!("Room {} unpinned by {}", room_key, fingerprint);
+        Ok(false)
+    }
+
+    /// Check if a room is pinned
+    pub fn is_room_pinned(&self, room_key: &str) -> bool {
+        self.rooms
+            .read()
+            .ok()
+            .and_then(|rooms| rooms.get(room_key).map(|r| r.is_pinned))
+            .unwrap_or(false)
+    }
+
     /// Get room statistics
     pub fn get_room_stats(&self) -> RoomStats {
         let rooms = self.rooms.read().unwrap_or_else(|e| e.into_inner());
@@ -450,6 +548,10 @@ impl RoomService {
 
         if let Ok(mut rooms) = self.rooms.write() {
             rooms.retain(|key, room| {
+                // Pinned rooms are never cleaned up by inactivity
+                if room.is_pinned {
+                    return true;
+                }
                 // Destroy if inactive for 24h OR all users are offline
                 let inactive = room.last_activity < cutoff;
                 let all_offline = !room.is_empty() && room.all_users_offline();
@@ -527,7 +629,7 @@ mod tests {
     #[test]
     fn test_create_room_new() {
         let service = RoomService::new();
-        let result = service.create_room("newroom", None);
+        let result = service.create_room("newroom", None, None);
         assert!(result.is_ok());
         assert!(service.room_exists("newroom"));
     }
@@ -535,8 +637,8 @@ mod tests {
     #[test]
     fn test_create_room_existing() {
         let service = RoomService::new();
-        let room1 = service.create_room("testroom", None).unwrap();
-        let room2 = service.create_room("testroom", None).unwrap();
+        let room1 = service.create_room("testroom", None, None).unwrap();
+        let room2 = service.create_room("testroom", None, None).unwrap();
         // Both should return info about the same room
         assert_eq!(room1.room_key, room2.room_key);
     }
@@ -544,7 +646,7 @@ mod tests {
     #[test]
     fn test_create_room_with_password() {
         let service = RoomService::new();
-        let result = service.create_room("secretroom", Some("password123"));
+        let result = service.create_room("secretroom", Some("password123"), None);
         assert!(result.is_ok());
         assert!(service.room_has_password("secretroom"));
     }
@@ -553,7 +655,7 @@ mod tests {
     #[test]
     fn test_get_room_info_exists() {
         let service = RoomService::new();
-        service.create_room("testroom", None).unwrap();
+        service.create_room("testroom", None, None).unwrap();
         let info = service.get_room_info("testroom");
         assert!(info.is_some());
     }
@@ -584,7 +686,7 @@ mod tests {
     fn test_join_room_with_correct_password() {
         let service = RoomService::new();
         service
-            .create_room("testroom", Some("password123"))
+            .create_room("testroom", Some("password123"), None)
             .unwrap();
         let result = service.join_room(
             JoinRoomRequest::new("testroom", "user1", "TestUser", "socket1")
@@ -598,7 +700,7 @@ mod tests {
     fn test_join_room_with_wrong_password() {
         let service = RoomService::new();
         service
-            .create_room("testroom", Some("password123"))
+            .create_room("testroom", Some("password123"), None)
             .unwrap();
         let result = service.join_room(
             JoinRoomRequest::new("testroom", "user1", "TestUser", "socket1")
@@ -613,7 +715,7 @@ mod tests {
     fn test_join_room_password_required() {
         let service = RoomService::new();
         service
-            .create_room("testroom", Some("password123"))
+            .create_room("testroom", Some("password123"), None)
             .unwrap();
         let result = service.join_room(
             JoinRoomRequest::new("testroom", "user1", "TestUser", "socket1")
@@ -627,7 +729,7 @@ mod tests {
     #[test]
     fn test_set_room_password() {
         let service = RoomService::new();
-        service.create_room("testroom", None).unwrap();
+        service.create_room("testroom", None, None).unwrap();
         let result = service.set_room_password("testroom", Some("newpassword"));
         assert!(result.is_ok());
         assert!(result.unwrap());
@@ -646,7 +748,7 @@ mod tests {
     fn test_room_has_password_true() {
         let service = RoomService::new();
         service
-            .create_room("testroom", Some("password123"))
+            .create_room("testroom", Some("password123"), None)
             .unwrap();
         assert!(service.room_has_password("testroom"));
     }
@@ -654,7 +756,7 @@ mod tests {
     #[test]
     fn test_room_has_password_false() {
         let service = RoomService::new();
-        service.create_room("testroom", None).unwrap();
+        service.create_room("testroom", None, None).unwrap();
         assert!(!service.room_has_password("testroom"));
     }
 
@@ -692,7 +794,7 @@ mod tests {
     #[test]
     fn test_add_message_to_room() {
         let service = RoomService::new();
-        service.create_room("testroom", None).unwrap();
+        service.create_room("testroom", None, None).unwrap();
 
         let user = User::new(
             "user1".to_string(),
@@ -758,7 +860,7 @@ mod tests {
     #[test]
     fn test_get_messages_existing_room() {
         let service = RoomService::new();
-        service.create_room("testroom", None).unwrap();
+        service.create_room("testroom", None, None).unwrap();
 
         let user = User::new(
             "user1".to_string(),

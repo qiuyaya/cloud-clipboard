@@ -11,6 +11,8 @@ import { EventEmitter } from "events";
 export class RoomService extends EventEmitter {
   private rooms: Map<RoomKey, RoomModel> = new Map();
   private cleanupInterval: NodeJS.Timeout;
+  private pinnedRoomCount = 0; // 性能优化：维护固定房间计数器
+  static readonly MAX_PINNED_ROOMS = parseInt(process.env.MAX_PINNED_ROOMS || "50", 10);
 
   constructor() {
     super();
@@ -23,12 +25,16 @@ export class RoomService extends EventEmitter {
     );
   }
 
-  createRoom(key: RoomKey): RoomModel {
+  createRoom(key: RoomKey, creatorFingerprint?: string): RoomModel {
     if (this.rooms.has(key)) {
       return this.rooms.get(key)!;
     }
 
     const room = new RoomModel(key);
+    // Set creator when room is first created (验证 fingerprint 有效性)
+    if (creatorFingerprint && creatorFingerprint.trim() !== "") {
+      room.setCreator(creatorFingerprint);
+    }
     this.rooms.set(key, room);
     return room;
   }
@@ -37,12 +43,17 @@ export class RoomService extends EventEmitter {
     return this.rooms.get(key);
   }
 
-  getRoomOrCreate(key: RoomKey): RoomModel {
-    return this.getRoom(key) ?? this.createRoom(key);
+  getRoomOrCreate(key: RoomKey, creatorFingerprint?: string): RoomModel {
+    const existingRoom = this.getRoom(key);
+    if (existingRoom) {
+      return existingRoom;
+    }
+    return this.createRoom(key, creatorFingerprint);
   }
 
   joinRoom(key: RoomKey, user: User): RoomModel {
-    const room = this.getRoomOrCreate(key);
+    // Pass user's fingerprint when creating room so first user becomes creator
+    const room = this.getRoomOrCreate(key, user.fingerprint);
     room.addUser(user);
     return room;
   }
@@ -139,6 +150,11 @@ export class RoomService extends EventEmitter {
   }
 
   private checkRoomDestruction(key: RoomKey, room: RoomModel): void {
+    // Pinned rooms are never destroyed automatically
+    if (room.isPinned) {
+      return;
+    }
+
     // Check if all users are offline or room is empty
     const onlineUsers = room.getOnlineUsers();
 
@@ -161,6 +177,12 @@ export class RoomService extends EventEmitter {
 
     for (const [key, room] of this.rooms.entries()) {
       checkedRooms++;
+
+      // Pinned rooms skip 24h inactivity cleanup
+      if (room.isPinned) {
+        continue;
+      }
+
       const timeSinceLastActivity = now.getTime() - room.lastActivity.getTime();
 
       if (timeSinceLastActivity > inactiveThreshold) {
@@ -191,6 +213,51 @@ export class RoomService extends EventEmitter {
       cleaned: beforeCount - this.rooms.size,
       total: this.rooms.size,
     };
+  }
+
+  getPinnedRoomCount(): number {
+    // 性能优化：直接返回计数器，避免遍历所有房间
+    return this.pinnedRoomCount;
+  }
+
+  pinRoom(key: RoomKey, fingerprint: string): { success: boolean; error?: string } {
+    const room = this.getRoom(key);
+    if (!room) return { success: false, error: "Room not found" };
+
+    // 验证 fingerprint 有效性
+    if (!fingerprint || fingerprint.trim() === "") {
+      return { success: false, error: "Invalid fingerprint" };
+    }
+
+    if (room.isPinned) {
+      return { success: true }; // Already pinned
+    }
+
+    if (this.pinnedRoomCount >= RoomService.MAX_PINNED_ROOMS) {
+      return { success: false, error: "Maximum pinned rooms reached" };
+    }
+
+    room.pin();
+    this.pinnedRoomCount++; // 更新计数器
+    return { success: true };
+  }
+
+  unpinRoom(key: RoomKey, fingerprint: string): { success: boolean; error?: string } {
+    const room = this.getRoom(key);
+    if (!room) return { success: false, error: "Room not found" };
+
+    // 验证 fingerprint 有效性
+    if (!fingerprint || fingerprint.trim() === "") {
+      return { success: false, error: "Invalid fingerprint" };
+    }
+
+    if (!room.isPinned) {
+      return { success: true }; // Already unpinned
+    }
+
+    room.unpin();
+    this.pinnedRoomCount--; // 更新计数器
+    return { success: true };
   }
 
   destroy(): void {

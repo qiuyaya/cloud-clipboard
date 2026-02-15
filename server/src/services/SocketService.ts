@@ -11,6 +11,7 @@ import {
   FileMessageSchema,
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
+  PinRoomRequestSchema,
   sanitizeMessageContent,
   generateUserId,
   generateUserIdFromFingerprint,
@@ -30,6 +31,7 @@ import type {
   FileMessage,
   SetRoomPasswordRequest,
   ShareRoomLinkRequest,
+  PinRoomRequest,
 } from "@cloud-clipboard/shared";
 
 export class SocketService {
@@ -218,6 +220,20 @@ export class SocketService {
         }
       });
 
+      socket.on("pinRoom", (data: PinRoomRequest) => {
+        if (
+          this.checkRateLimit(
+            socket.id,
+            SOCKET_RATE_LIMITS.PASSWORD_CHANGE.MAX_REQUESTS,
+            SOCKET_RATE_LIMITS.PASSWORD_CHANGE.WINDOW_MS,
+          )
+        ) {
+          this.handlePinRoom(socket, data);
+        } else {
+          socket.emit("error", "Too many requests. Please wait.");
+        }
+      });
+
       socket.on("p2pOffer", (data: { to: string; offer: string }) => {
         this.handleP2POffer(socket, data);
       });
@@ -262,10 +278,15 @@ export class SocketService {
       }
       const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
 
-      console.log(`🏠 [Server] Join attempt for room ${validatedData.roomKey}`, {
-        existingUsersCount: existingUsers.length,
-        userName: validatedData.user.name,
-      });
+      log.info(
+        "Join attempt for room",
+        {
+          roomKey: validatedData.roomKey,
+          existingUsersCount: existingUsers.length,
+          userName: validatedData.user.name,
+        },
+        "SocketService",
+      );
 
       // Generate user ID based on fingerprint for consistent identity
       let userId: string;
@@ -292,17 +313,32 @@ export class SocketService {
           this.roomService.updateUserStatus(validatedData.roomKey, existingUser.id, true);
 
           // Send the user their own info
-          console.log(`📤 [Server] Sending userJoined event to ${socket.id}:`, existingUser);
+          log.debug(
+            "Sending userJoined event to reconnecting user",
+            { socketId: socket.id, userId: existingUser.id, userName: existingUser.name },
+            "SocketService",
+          );
           socket.emit("userJoined", existingUser);
           socket.emit("userList", this.roomService.getUsersInRoom(validatedData.roomKey));
+
+          // Send room pin status to reconnecting user
+          const reconnectRoom = this.roomService.getRoom(validatedData.roomKey);
+          if (reconnectRoom) {
+            socket.emit("roomPinned", {
+              roomKey: validatedData.roomKey,
+              isPinned: !!reconnectRoom.isPinned,
+            });
+          }
 
           // Notify others about the reconnection
           socket
             .to(validatedData.roomKey)
             .emit("userList", this.roomService.getUsersInRoom(validatedData.roomKey));
 
-          console.log(
-            `🔄 [Server] User ${existingUser.name} reconnected to room ${validatedData.roomKey}`,
+          log.info(
+            "User reconnected to room",
+            { userName: existingUser.name, roomKey: validatedData.roomKey },
+            "SocketService",
           );
           return;
         }
@@ -347,18 +383,32 @@ export class SocketService {
         fingerprint,
       };
 
-      console.log(`🏠 [Server] Adding user to room service:`, user);
+      log.debug("Adding user to room service", { user }, "SocketService");
       const room = this.roomService.joinRoom(validatedData.roomKey, user);
 
-      console.log(`🔗 [Server] Adding socket ${socket.id} to room ${validatedData.roomKey}`);
+      log.debug(
+        "Adding socket to room",
+        { socketId: socket.id, roomKey: validatedData.roomKey },
+        "SocketService",
+      );
       socket.join(validatedData.roomKey);
       this.userSockets.set(user.id, socket.id);
       this.socketUsers.set(socket.id, user);
 
       // Send the user their own info first
-      console.log(`📤 [Server] Sending userJoined event to new user ${socket.id}:`, user);
+      log.debug(
+        "Sending userJoined event to new user",
+        { socketId: socket.id, userId: user.id, userName: user.name },
+        "SocketService",
+      );
       socket.emit("userJoined", user);
       socket.emit("userList", room.getUserList());
+
+      // Send room pin status to joining user
+      socket.emit("roomPinned", {
+        roomKey: validatedData.roomKey,
+        isPinned: !!room.isPinned,
+      });
 
       // Send message history to the new user
       const messages = this.roomService.getMessagesInRoom(validatedData.roomKey);
@@ -367,15 +417,21 @@ export class SocketService {
       }
 
       // Notify others in the room
-      console.log(`📢 [Server] Notifying other users in room about new user:`, user.name);
+      log.debug(
+        "Notifying other users in room about new user",
+        { userName: user.name, roomKey: validatedData.roomKey },
+        "SocketService",
+      );
       socket.to(validatedData.roomKey).emit("userJoined", user);
       socket.to(validatedData.roomKey).emit("userList", room.getUserList());
 
-      console.log(
-        `✅ [Server] User ${user.name} successfully joined room ${validatedData.roomKey}`,
+      log.info(
+        "User successfully joined room",
+        { userName: user.name, roomKey: validatedData.roomKey },
+        "SocketService",
       );
     } catch (error) {
-      console.error("Join room error:", error);
+      log.error("Join room error", { error }, "SocketService");
 
       // Send more specific error information
       let errorMessage = "Failed to join room";
@@ -493,6 +549,12 @@ export class SocketService {
       socket.emit("userJoined", user);
       socket.emit("userList", room.getUserList());
 
+      // Send room pin status to joining user
+      socket.emit("roomPinned", {
+        roomKey: validatedData.roomKey,
+        isPinned: !!room.isPinned,
+      });
+
       // Send message history to the new user
       const pwMessages = this.roomService.getMessagesInRoom(validatedData.roomKey);
       if (pwMessages.length > 0) {
@@ -502,11 +564,13 @@ export class SocketService {
       socket.to(validatedData.roomKey).emit("userJoined", user);
       socket.to(validatedData.roomKey).emit("userList", room.getUserList());
 
-      console.log(
-        `✅ [Server] User ${user.name} successfully joined password-protected room ${validatedData.roomKey}`,
+      log.info(
+        "User successfully joined password-protected room",
+        { userName: user.name, roomKey: validatedData.roomKey },
+        "SocketService",
       );
     } catch (error) {
-      console.error("Join room with password error:", error);
+      log.error("Join room with password error", { error }, "SocketService");
       socket.emit("error", "Failed to join room with password");
     }
   }
@@ -523,9 +587,13 @@ export class SocketService {
 
       socket.to(validatedData.roomKey).emit("userLeft", validatedData.userId);
 
-      console.log(`User ${user.name} left room ${validatedData.roomKey}`);
+      log.info(
+        "User left room",
+        { userName: user.name, roomKey: validatedData.roomKey },
+        "SocketService",
+      );
     } catch (error) {
-      console.error("Leave room error:", error);
+      log.error("Leave room error", { error }, "SocketService");
       socket.emit("error", "Failed to leave room");
     }
   }
@@ -564,9 +632,13 @@ export class SocketService {
       socket.to(message.roomKey).emit("message", validatedMessage);
       socket.emit("message", validatedMessage);
 
-      console.log(`Message sent in room ${message.roomKey} by ${user.name}`);
+      log.debug(
+        "Message sent in room",
+        { roomKey: message.roomKey, userName: user.name, messageType: message.type },
+        "SocketService",
+      );
     } catch (error) {
-      console.error("Send message error:", error);
+      log.error("Send message error", { error }, "SocketService");
       socket.emit("error", "Failed to send message");
     }
   }
@@ -576,7 +648,7 @@ export class SocketService {
       const users = this.roomService.getUsersInRoom(roomKey);
       socket.emit("userList", users);
     } catch (error) {
-      console.error("Request user list error:", error);
+      log.error("Request user list error", { error }, "SocketService");
       socket.emit("error", "Failed to get user list");
     }
   }
@@ -619,14 +691,20 @@ export class SocketService {
           hasPassword,
         });
 
-        console.log(
-          `🔒 [Server] Room ${validatedData.roomKey} password ${hasPassword ? "set" : "removed"} by ${user.name}`,
+        log.info(
+          "Room password updated",
+          {
+            roomKey: validatedData.roomKey,
+            hasPassword,
+            userName: user.name,
+          },
+          "SocketService",
         );
       } else {
         socket.emit("error", "Failed to set room password");
       }
     } catch (error) {
-      console.error("Set room password error:", error);
+      log.error("Set room password error", { error }, "SocketService");
       socket.emit("error", "Failed to set room password");
     }
   }
@@ -676,12 +754,59 @@ export class SocketService {
         shareLink,
       });
 
-      console.log(
-        `🔗 [Server] Share link generated for room ${validatedData.roomKey} by ${user.name}`,
+      log.info(
+        "Share link generated for room",
+        { roomKey: validatedData.roomKey, userName: user.name },
+        "SocketService",
       );
     } catch (error) {
-      console.error("Share room link error:", error);
+      log.error("Share room link error", { error }, "SocketService");
       socket.emit("error", "Failed to generate share link");
+    }
+  }
+
+  private handlePinRoom(socket: any, data: PinRoomRequest): void {
+    try {
+      const validatedData = PinRoomRequestSchema.parse(data);
+
+      const user = this.socketUsers.get(socket.id);
+      if (!user) {
+        socket.emit("error", "User not authenticated");
+        return;
+      }
+
+      if (!user.fingerprint) {
+        socket.emit("error", "Fingerprint required for pin/unpin");
+        return;
+      }
+
+      const result = validatedData.pinned
+        ? this.roomService.pinRoom(validatedData.roomKey, user.fingerprint)
+        : this.roomService.unpinRoom(validatedData.roomKey, user.fingerprint);
+
+      if (!result.success) {
+        socket.emit("error", result.error || "Failed to pin/unpin room");
+        return;
+      }
+
+      // Broadcast to all users in the room
+      this.io.to(validatedData.roomKey).emit("roomPinned", {
+        roomKey: validatedData.roomKey,
+        isPinned: validatedData.pinned,
+      });
+
+      log.info(
+        "Room pin status updated",
+        {
+          roomKey: validatedData.roomKey,
+          isPinned: validatedData.pinned,
+          userName: user.name,
+        },
+        "SocketService",
+      );
+    } catch (error) {
+      log.error("Pin room error", { error }, "SocketService");
+      socket.emit("error", "Failed to pin/unpin room");
     }
   }
 
@@ -698,7 +823,7 @@ export class SocketService {
         });
       }
     } catch (error) {
-      console.error("P2P offer error:", error);
+      log.error("P2P offer error", { error }, "SocketService");
     }
   }
 
@@ -715,7 +840,7 @@ export class SocketService {
         });
       }
     } catch (error) {
-      console.error("P2P answer error:", error);
+      log.error("P2P answer error", { error }, "SocketService");
     }
   }
 
@@ -732,7 +857,7 @@ export class SocketService {
         });
       }
     } catch (error) {
-      console.error("P2P ICE candidate error:", error);
+      log.error("P2P ICE candidate error", { error }, "SocketService");
     }
   }
 
@@ -749,7 +874,11 @@ export class SocketService {
         socket.to(roomKey).emit("userLeft", user.id);
       });
 
-      console.log(`Client disconnected: ${socket.id}`);
+      log.info(
+        "Client disconnected",
+        { socketId: socket.id, userName: user.name },
+        "SocketService",
+      );
     }
   }
 

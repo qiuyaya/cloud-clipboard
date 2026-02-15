@@ -67,7 +67,13 @@
     "copied": "Copied!",
     "linkCopied": "Link copied!",
     "passwordSet": "Password set!",
-    "passwordRemoved": "Password removed!"
+    "passwordRemoved": "Password removed!",
+    "pin": "Pin Room",
+    "unpin": "Unpin Room",
+    "pinned": "Room pinned!",
+    "unpinned": "Room unpinned!",
+    "pinLimitReached": "Maximum pinned rooms reached",
+    "onlyCreatorCanPin": "Only the room creator can pin/unpin"
   },
   "message": {
     "you": "(You)",

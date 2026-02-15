@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { socketService } from "@/services/socket";
@@ -25,7 +25,8 @@ interface UseSocketConnectionProps {
   onSetIsConnecting: (connecting: boolean) => void;
   onSetShowPasswordInput: (show: boolean) => void;
   onSetHasRoomPassword: (hasPassword: boolean) => void;
-  onLeaveRoom: () => void;
+  onSetIsPinned: (isPinned: boolean) => void;
+  onLeaveRoom: (options?: { silent?: boolean; localOnly?: boolean }) => void;
   fetchRoomMessages: (roomKey: string) => Promise<void>;
   roomKey: RoomKey | null;
   currentUser: User | null;
@@ -38,6 +39,7 @@ export const useSocketConnection = ({
   onSetIsConnecting,
   onSetShowPasswordInput,
   onSetHasRoomPassword,
+  onSetIsPinned,
   onLeaveRoom,
   fetchRoomMessages,
   roomKey,
@@ -57,6 +59,7 @@ export const useSocketConnection = ({
     onSetIsConnecting,
     onSetShowPasswordInput,
     onSetHasRoomPassword,
+    onSetIsPinned,
     onLeaveRoom,
     fetchRoomMessages,
   });
@@ -72,6 +75,7 @@ export const useSocketConnection = ({
       onSetIsConnecting,
       onSetShowPasswordInput,
       onSetHasRoomPassword,
+      onSetIsPinned,
       onLeaveRoom,
       fetchRoomMessages,
     };
@@ -91,7 +95,12 @@ export const useSocketConnection = ({
       const savedRoomKey = loadFromLocalStorage("cloudClipboard_roomKey");
 
       if (savedUser && savedRoomKey) {
-        debug.info("Checking if room and user still exist before auto-rejoining", { savedRoomKey });
+        debug.info("Found saved user and room, attempting to rejoin", {
+          savedRoomKey,
+          savedUserName: savedUser.name,
+          currentUserExists: !!currentUserRef.current,
+          roomKeyMatches: roomKeyRef.current === savedRoomKey,
+        });
 
         let fingerprint;
         try {
@@ -128,10 +137,6 @@ export const useSocketConnection = ({
 
           if (result.success && result.data.roomExists && result.data.userExists) {
             debug.info("Auto-rejoining room - user exists", { savedRoomKey });
-            callbacksRef.current.onSetIsConnecting(true);
-            callbacksRef.current.onSetCurrentUser(null);
-            callbacksRef.current.onSetUsers([]);
-            callbacksRef.current.onSetMessages([]);
 
             const rejoinData: JoinRoomRequest = {
               type: "join_room",
@@ -165,10 +170,6 @@ export const useSocketConnection = ({
           debug.error("Failed to validate user, proceeding with normal join", {
             error,
           });
-          callbacksRef.current.onSetIsConnecting(true);
-          callbacksRef.current.onSetCurrentUser(null);
-          callbacksRef.current.onSetUsers([]);
-          callbacksRef.current.onSetMessages([]);
 
           const rejoinData: JoinRoomRequest = {
             type: "join_room",
@@ -186,9 +187,9 @@ export const useSocketConnection = ({
 
     const handleDisconnect = () => {
       setIsConnected(false);
-      callbacksRef.current.onSetCurrentUser(null);
-      callbacksRef.current.onSetUsers([]);
-      debug.warn("Disconnected from server");
+      debug.warn("Disconnected from server - socket will attempt to reconnect");
+      // Don't clear currentUser and users here - let auto-reconnect handle it
+      // If the socket can't reconnect, the user can manually leave the room
     };
 
     const handleMessage = (message: TextMessage | FileMessage) => {
@@ -272,16 +273,30 @@ export const useSocketConnection = ({
             callbacksRef.current.fetchRoomMessages(currentRoomKey);
           }
 
-          // setTimeout(() => {
-          //   toast({
-          //     title: t("toast.joinedRoom"),
-          //     description: t("toast.joinedRoomDesc", {
-          //       roomKey: currentRoomKey,
-          //     }),
-          //   });
-          // }, 100);
           return userWithDate;
-        } else if (prev.id !== userWithDate.id) {
+        } else if (prev.id === userWithDate.id) {
+          // Same user rejoining (refresh scenario) - update user and request user list
+          debug.info("Same user rejoining - updating user and requesting user list", {
+            user: userWithDate,
+            currentRoomKey: roomKeyRef.current,
+          });
+          callbacksRef.current.onSetIsConnecting(false);
+          saveToLocalStorage("cloudClipboard_user", userWithDate);
+
+          // Use roomKeyRef.current first, fallback to localStorage
+          const currentRoomKey =
+            roomKeyRef.current || loadFromLocalStorage("cloudClipboard_roomKey");
+          if (currentRoomKey) {
+            debug.info("Requesting user list and messages for room", { roomKey: currentRoomKey });
+            socketService.requestUserList(currentRoomKey);
+            callbacksRef.current.fetchRoomMessages(currentRoomKey);
+          } else {
+            debug.warn("No room key available to request user list");
+          }
+
+          return userWithDate;
+        } else {
+          // Different user joining - show notification
           setTimeout(() => {
             toast({
               title: t("toast.userJoined"),
@@ -403,7 +418,9 @@ export const useSocketConnection = ({
             t("toast.roomDestroyedDesc") + ` (${data.deletedFiles.length} files deleted)`,
         });
       }
-      callbacksRef.current.onLeaveRoom();
+      // Room already destroyed on server, just clean up local state
+      // Use localOnly to avoid sending another leaveRoom event
+      callbacksRef.current.onLeaveRoom({ localOnly: true });
     };
 
     const handlePasswordRequired = () => {
@@ -441,6 +458,11 @@ export const useSocketConnection = ({
     socketService.onPasswordRequired(handlePasswordRequired);
     socketService.onRoomPasswordSet(handleRoomPasswordSet);
     socketService.onRoomLinkGenerated(handleRoomLinkGenerated);
+
+    const handleRoomPinned = (data: { roomKey: string; isPinned: boolean }) => {
+      callbacksRef.current.onSetIsPinned(data.isPinned);
+    };
+    socketService.onRoomPinned(handleRoomPinned);
 
     return () => {
       socketService.disconnect();

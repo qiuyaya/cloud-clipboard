@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { socketService } from "@/services/socket";
@@ -14,6 +14,8 @@ import type {
   JoinRoomWithPasswordRequest,
   LeaveRoomRequest,
   RoomKey,
+  BrowserFingerprint,
+  SetRoomPasswordRequest,
 } from "@cloud-clipboard/shared";
 
 export const useRoomManager = () => {
@@ -42,14 +44,16 @@ export const useRoomManager = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [hasRoomPassword, setHasRoomPassword] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [pendingRoomJoin, setPendingRoomJoin] = useState<{
     roomKey: string;
     username: string | undefined;
-    fingerprint: any;
+    fingerprint: BrowserFingerprint;
   } | null>(null);
 
   const { toast } = useToast();
   const { t } = useTranslation();
+  const joinTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     try {
@@ -65,6 +69,16 @@ export const useRoomManager = () => {
       localStorage.removeItem("cloudClipboard_fingerprint");
       debug.info("Cleared corrupted fingerprint cache");
     }
+  }, []);
+
+  // Cleanup join timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (joinTimeoutRef.current) {
+        clearTimeout(joinTimeoutRef.current);
+        joinTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   const fetchRoomMessages = useCallback(async (roomKey: string) => {
@@ -111,6 +125,12 @@ export const useRoomManager = () => {
         return;
       }
 
+      // Clear any existing timeout
+      if (joinTimeoutRef.current) {
+        clearTimeout(joinTimeoutRef.current);
+        joinTimeoutRef.current = null;
+      }
+
       debug.info("Starting room join process");
       setIsConnecting(true);
       setRoomKey(data.roomKey);
@@ -130,7 +150,7 @@ export const useRoomManager = () => {
       debug.debug("Calling socketService.joinRoom", { data });
       socketService.joinRoom(data);
 
-      const joinTimeout = setTimeout(() => {
+      joinTimeoutRef.current = setTimeout(() => {
         if (isConnecting && !currentUser) {
           debug.warn("Join room timeout");
           setIsConnecting(false);
@@ -140,9 +160,8 @@ export const useRoomManager = () => {
             description: "Room join timeout. Please try again.",
           });
         }
+        joinTimeoutRef.current = null;
       }, 10000);
-
-      return () => clearTimeout(joinTimeout);
     },
     [isConnecting, currentUser, toast, t],
   );
@@ -187,8 +206,10 @@ export const useRoomManager = () => {
   }, []);
 
   const handleLeaveRoom = useCallback(
-    (options?: { silent?: boolean }) => {
-      if (currentUser && roomKey) {
+    (options?: { silent?: boolean; localOnly?: boolean }) => {
+      // Only send leaveRoom event to server if not local-only mode
+      // localOnly is used when server has already destroyed the room
+      if (!options?.localOnly && currentUser && roomKey) {
         const leaveData: LeaveRoomRequest = {
           type: "leave_room",
           roomKey,
@@ -221,14 +242,16 @@ export const useRoomManager = () => {
     (shouldHavePassword: boolean) => {
       if (!roomKey) return;
 
-      const request: any = {
-        type: "set_room_password" as const,
-        roomKey,
-      };
-
-      if (shouldHavePassword) {
-        request.password = "";
-      }
+      const request: SetRoomPasswordRequest = shouldHavePassword
+        ? {
+            type: "set_room_password" as const,
+            roomKey,
+            password: "",
+          }
+        : {
+            type: "set_room_password" as const,
+            roomKey,
+          };
 
       socketService.setRoomPassword(request);
     },
@@ -243,6 +266,19 @@ export const useRoomManager = () => {
       roomKey,
     });
   }, [roomKey]);
+
+  const handlePinRoom = useCallback(
+    (pinned: boolean) => {
+      if (!roomKey) return;
+
+      socketService.pinRoom({
+        type: "pin_room",
+        roomKey,
+        pinned,
+      });
+    },
+    [roomKey],
+  );
 
   return {
     currentUser,
@@ -259,6 +295,8 @@ export const useRoomManager = () => {
     setShowPasswordInput,
     hasRoomPassword,
     setHasRoomPassword,
+    isPinned,
+    setIsPinned,
     pendingRoomJoin,
     setPendingRoomJoin,
     fetchRoomMessages,
@@ -268,5 +306,6 @@ export const useRoomManager = () => {
     handleLeaveRoom,
     handleSetRoomPassword,
     handleShareRoomLink,
+    handlePinRoom,
   };
 };

@@ -87,6 +87,20 @@ pub struct ShareRoomLinkRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PinRoomPayload {
+    pub room_key: String,
+    pub pinned: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomPinnedEvent {
+    pub room_key: String,
+    pub is_pinned: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct P2POfferRequest {
     #[serde(rename = "to")]
     pub target_user_id: String,
@@ -216,11 +230,11 @@ struct SocketRateLimitConfig {
 fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
     match event {
         "joinRoom" | "joinRoomWithPassword" => SocketRateLimitConfig {
-            max_requests: 5,
+            max_requests: 15,
             window_ms: 60_000,
         },
         "leaveRoom" => SocketRateLimitConfig {
-            max_requests: 10,
+            max_requests: 20,
             window_ms: 60_000,
         },
         "sendMessage" => SocketRateLimitConfig {
@@ -231,7 +245,7 @@ fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
             max_requests: 20,
             window_ms: 60_000,
         },
-        "setRoomPassword" => SocketRateLimitConfig {
+        "setRoomPassword" | "pinRoom" => SocketRateLimitConfig {
             max_requests: 10,
             window_ms: 60_000,
         },
@@ -459,6 +473,33 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
             }
         });
 
+        // Handle pin room
+        socket.on("pinRoom", {
+            let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
+            move |socket: SocketRef, Data::<PinRoomPayload>(data)| {
+                let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
+                async move {
+                    let config = get_rate_limit_config("pinRoom");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "pinRoom",
+                            config.max_requests,
+                            config.window_ms,
+                        )
+                    };
+                    if allowed {
+                        handle_pin_room(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many requests. Please wait.");
+                    }
+                }
+            }
+        });
+
         // Handle P2P offer (no rate limit, same as Node)
         socket.on("p2pOffer", {
             let room_service = room_service.clone();
@@ -617,6 +658,16 @@ async fn handle_join_room(
                 },
             );
 
+            // Send room pinned status to joining user
+            let is_pinned = room_service.is_room_pinned(&data.room_key);
+            let _ = socket.emit(
+                "roomPinned",
+                &RoomPinnedEvent {
+                    room_key: data.room_key.clone(),
+                    is_pinned,
+                },
+            );
+
             // Broadcast to others in the room
             let _ = socket
                 .to(data.room_key.clone())
@@ -718,6 +769,16 @@ async fn handle_join_room_with_password(
                 &RoomPasswordSetEvent {
                     room_key: data.room_key.clone(),
                     has_password,
+                },
+            );
+
+            // Send room pinned status to joining user
+            let is_pinned = room_service.is_room_pinned(&data.room_key);
+            let _ = socket.emit(
+                "roomPinned",
+                &RoomPinnedEvent {
+                    room_key: data.room_key.clone(),
+                    is_pinned,
                 },
             );
 
@@ -1009,6 +1070,62 @@ async fn handle_p2p_ice_candidate(
                 "candidate": data.candidate
             });
             let _ = socket.to(target_socket_id).emit("p2pIceCandidate", &event);
+        }
+    }
+}
+
+async fn handle_pin_room(socket: SocketRef, data: PinRoomPayload, room_service: Arc<RoomService>) {
+    let socket_id = socket.id.to_string();
+
+    // Verify user is authenticated
+    let user = match room_service.get_user_by_socket(&socket_id) {
+        Some(u) => u,
+        None => {
+            let _ = socket.emit("error", &"User not authenticated");
+            return;
+        }
+    };
+
+    // Verify user is in the target room
+    if user.room_key != data.room_key {
+        let _ = socket.emit("error", &"User not in room");
+        return;
+    }
+
+    // Get user fingerprint
+    let fingerprint = match &user.fingerprint {
+        Some(fp) => fp.clone(),
+        None => {
+            let _ = socket.emit("error", &"User fingerprint required");
+            return;
+        }
+    };
+
+    let result = if data.pinned {
+        room_service.pin_room(&data.room_key, &fingerprint)
+    } else {
+        room_service.unpin_room(&data.room_key, &fingerprint)
+    };
+
+    match result {
+        Ok(is_pinned) => {
+            let event = RoomPinnedEvent {
+                room_key: data.room_key.clone(),
+                is_pinned,
+            };
+            // Broadcast to all users in the room (including sender)
+            let _ = socket.to(data.room_key.clone()).emit("roomPinned", &event);
+            let _ = socket.emit("roomPinned", &event);
+            tracing::info!(
+                "Room {} {} by {}",
+                data.room_key,
+                if is_pinned { "pinned" } else { "unpinned" },
+                user.username
+            );
+        }
+        Err(error) => {
+            tracing::error!("Failed to pin/unpin room: {}", error);
+            let _ = socket.emit("error", &error.as_str());
         }
     }
 }

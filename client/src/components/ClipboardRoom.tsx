@@ -33,6 +33,8 @@ interface ClipboardRoomProps {
   onShareRoomLink: () => void;
   onNavigateToShare?: () => void;
   hasRoomPassword?: boolean;
+  isPinned?: boolean;
+  onPinRoom?: (pinned: boolean) => void;
 }
 
 export function ClipboardRoom({
@@ -47,6 +49,8 @@ export function ClipboardRoom({
   onShareRoomLink,
   onNavigateToShare,
   hasRoomPassword = false,
+  isPinned = false,
+  onPinRoom,
 }: ClipboardRoomProps): JSX.Element {
   const [textInput, setTextInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -148,6 +152,8 @@ export function ClipboardRoom({
             onShareRoomLink={onShareRoomLink}
             onNavigateToShare={onNavigateToShare}
             hasRoomPassword={hasRoomPassword}
+            isPinned={isPinned}
+            onPinRoom={onPinRoom}
             isMobile={isMobile}
           />
         </div>
@@ -170,6 +176,8 @@ export function ClipboardRoom({
               onShareRoomLink={onShareRoomLink}
               onNavigateToShare={onNavigateToShare}
               hasRoomPassword={hasRoomPassword}
+              isPinned={isPinned}
+              onPinRoom={onPinRoom}
               isMobile={isMobile}
             />
           </SheetContent>
@@ -183,7 +191,7 @@ export function ClipboardRoom({
           <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
             <MobileNav onOpenSidebar={() => setIsSidebarOpen(true)} />
             <div className="flex items-center gap-2">
-              {/* Room Actions - Left */}
+              {/* Room Management - Left */}
               <Button
                 variant="outline"
                 size="mobile-sm"
@@ -193,12 +201,24 @@ export function ClipboardRoom({
               >
                 {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
               </Button>
-              <ThemeToggle />
+              <Button
+                variant="outline"
+                size="mobile-sm"
+                onClick={shareRoom}
+                className="mobile-touch"
+                title={t("room.share")}
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
 
               {/* Spacer */}
               <div className="w-px h-6 bg-border mx-1" />
 
-              {/* Management - Middle */}
+              {/* User Actions - Right */}
+              <div className="flex items-center gap-1">
+                <ThemeToggle />
+                <LanguageToggle />
+              </div>
               <Button
                 variant="outline"
                 size="mobile-sm"
@@ -208,25 +228,6 @@ export function ClipboardRoom({
               >
                 <LogOut className="h-4 w-4" />
               </Button>
-
-              {/* Spacer */}
-              <div className="w-px h-6 bg-border mx-1" />
-
-              {/* User Settings - Right */}
-              <div className="flex items-center gap-1">
-                <LanguageToggle />
-              </div>
-              <div className="relative">
-                <Button
-                  variant="outline"
-                  size="mobile-sm"
-                  onClick={shareRoom}
-                  className="mobile-touch"
-                  title={t("room.share")}
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </div>
             </div>
           </div>
         )}
@@ -292,7 +293,7 @@ export function ClipboardRoom({
                       </div>
                     )}
                     {copiedMessageId === message.id && (
-                      <div className="absolute -top-8 right-0 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                      <div className="absolute top-full mt-2 right-0 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
                         <span className="text-popover-foreground">{t("room.copied")}</span>
                       </div>
                     )}

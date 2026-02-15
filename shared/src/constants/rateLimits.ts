@@ -41,15 +41,19 @@ export const HTTP_RATE_LIMITS = {
 
 // WebSocket Rate Limits (per socket)
 export const SOCKET_RATE_LIMITS = {
-  // Join room events - 5 joins per minute
+  // Join room events - 15 joins per minute
+  // Increased from 5 to 15 to support pinned room feature where users may
+  // frequently switch between multiple pinned rooms without triggering rate limits
   JOIN_ROOM: {
     WINDOW_MS: TIME_CONSTANTS.ONE_MINUTE,
-    MAX_REQUESTS: 5,
+    MAX_REQUESTS: 15,
   },
-  // Leave room events - 10 leaves per minute
+  // Leave room events - 20 leaves per minute
+  // Increased from 10 to 20 to match the increased join limit and support
+  // rapid room switching behavior
   LEAVE_ROOM: {
     WINDOW_MS: TIME_CONSTANTS.ONE_MINUTE,
-    MAX_REQUESTS: 10,
+    MAX_REQUESTS: 20,
   },
   // Send message events - 30 messages per minute
   SEND_MESSAGE: {

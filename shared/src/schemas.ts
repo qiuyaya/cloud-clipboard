@@ -144,6 +144,12 @@ export const ShareRoomLinkRequestSchema = z.object({
   roomKey: RoomKeySchema,
 });
 
+export const PinRoomRequestSchema = z.object({
+  type: z.literal("pin_room"),
+  roomKey: RoomKeySchema,
+  pinned: z.boolean(),
+});
+
 export const WebSocketMessageSchema = z.discriminatedUnion("type", [
   TextMessageSchema,
   FileMessageSchema,
@@ -178,6 +184,8 @@ export const RoomInfoSchema = z.object({
   createdAt: z.date(),
   lastActivity: z.date(),
   hasPassword: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  createdBy: z.string().optional(),
 });
 
 // Share-related schemas

@@ -230,7 +230,7 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
                   >
                     <Copy className="h-4 w-4" />
                     {copiedShareId === share.shareId && (
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
                         <span className="text-popover-foreground">{t("room.copied")}</span>
                       </div>
                     )}

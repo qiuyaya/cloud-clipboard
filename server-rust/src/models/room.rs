@@ -14,6 +14,8 @@ pub struct Room {
     pub messages: VecDeque<Message>,
     pub created_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
+    pub is_pinned: bool,
+    pub created_by: Option<String>, // fingerprint hash of room creator
     max_messages: usize,
     message_count: u64,
     message_dropped_count: u64,
@@ -28,6 +30,7 @@ pub struct RoomInfo {
     pub has_password: bool,
     pub created_at: DateTime<Utc>,
     pub last_activity: DateTime<Utc>,
+    pub is_pinned: bool,
 }
 
 impl Room {
@@ -41,6 +44,8 @@ impl Room {
             messages: VecDeque::new(),
             created_at: now,
             last_activity: now,
+            is_pinned: false,
+            created_by: None,
             max_messages: 1000,
             message_count: 0,
             message_dropped_count: 0,
@@ -118,6 +123,23 @@ impl Room {
             has_password: self.has_password(),
             created_at: self.created_at,
             last_activity: self.last_activity,
+            is_pinned: self.is_pinned,
+        }
+    }
+
+    pub fn pin(&mut self) {
+        self.is_pinned = true;
+        self.update_activity();
+    }
+
+    pub fn unpin(&mut self) {
+        self.is_pinned = false;
+        self.update_activity();
+    }
+
+    pub fn set_creator(&mut self, fingerprint: &str) {
+        if self.created_by.is_none() {
+            self.created_by = Some(fingerprint.to_string());
         }
     }
 

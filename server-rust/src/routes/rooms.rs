@@ -47,6 +47,7 @@ pub struct RoomInfoResponse {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub last_activity: chrono::DateTime<chrono::Utc>,
     pub has_password: bool,
+    pub is_pinned: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -180,7 +181,7 @@ async fn create_room(
 
     match state
         .room_service
-        .create_room(&payload.room_key, payload.password.as_deref())
+        .create_room(&payload.room_key, payload.password.as_deref(), None)
     {
         Ok(info) => {
             let response = RoomInfoResponse {
@@ -190,6 +191,7 @@ async fn create_room(
                 created_at: info.created_at,
                 last_activity: info.last_activity,
                 has_password: info.has_password,
+                is_pinned: info.is_pinned,
             };
             Ok(Json(ApiResponse {
                 success: true,
@@ -236,6 +238,7 @@ async fn get_room_info(
         created_at: info.created_at,
         last_activity: info.last_activity,
         has_password: info.has_password,
+        is_pinned: info.is_pinned,
     };
 
     Ok(Json(ApiResponse {
@@ -377,6 +380,7 @@ async fn get_room_by_path(
         created_at: info.created_at,
         last_activity: info.last_activity,
         has_password: info.has_password,
+        is_pinned: info.is_pinned,
     };
 
     Ok(Json(ApiResponse {

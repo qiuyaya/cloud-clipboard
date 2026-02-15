@@ -18,6 +18,7 @@ import {
   RoomPasswordSchema,
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
+  PinRoomRequestSchema,
   SharedFileSchema,
   ShareLinkSchema,
   ShareAccessLogSchema,
@@ -38,6 +39,7 @@ export type BrowserFingerprint = z.infer<typeof BrowserFingerprintSchema>;
 export type RoomPassword = z.infer<typeof RoomPasswordSchema>;
 export type SetRoomPasswordRequest = z.infer<typeof SetRoomPasswordRequestSchema>;
 export type ShareRoomLinkRequest = z.infer<typeof ShareRoomLinkRequestSchema>;
+export type PinRoomRequest = z.infer<typeof PinRoomRequestSchema>;
 export type APIResponse<T = unknown> = Omit<z.infer<typeof APIResponseSchema>, "data"> & {
   data?: T;
 };
@@ -69,6 +71,7 @@ export interface ServerToClientEvents {
   roomPasswordSet: (data: { roomKey: string; hasPassword: boolean }) => void;
   roomLinkGenerated: (data: { roomKey: string; shareLink: string }) => void;
   passwordRequired: (data: { roomKey: string }) => void;
+  roomPinned: (data: { roomKey: string; isPinned: boolean }) => void;
   p2pOffer: (data: { from: string; offer: string }) => void;
   p2pAnswer: (data: { from: string; answer: string }) => void;
   p2pIceCandidate: (data: { from: string; candidate: string }) => void;
@@ -82,6 +85,7 @@ export interface ClientToServerEvents {
   requestUserList: (roomKey: RoomKey) => void;
   setRoomPassword: (data: SetRoomPasswordRequest) => void;
   shareRoomLink: (data: ShareRoomLinkRequest) => void;
+  pinRoom: (data: PinRoomRequest) => void;
   p2pOffer: (data: { to: string; offer: string }) => void;
   p2pAnswer: (data: { to: string; answer: string }) => void;
   p2pIceCandidate: (data: { to: string; candidate: string }) => void;
@@ -94,6 +98,8 @@ export interface Room {
   createdAt: Date;
   lastActivity: Date;
   password?: RoomPassword;
+  isPinned?: boolean;
+  createdBy?: string; // fingerprint hash of room creator
 }
 
 export interface ClipboardItem {

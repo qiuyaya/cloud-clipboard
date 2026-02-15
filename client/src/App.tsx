@@ -36,6 +36,8 @@ export function App(): JSX.Element {
     setShowPasswordInput,
     hasRoomPassword,
     setHasRoomPassword,
+    isPinned,
+    setIsPinned,
     fetchRoomMessages,
     handleJoinRoom,
     handleJoinRoomWithPassword,
@@ -43,6 +45,7 @@ export function App(): JSX.Element {
     handleLeaveRoom,
     handleSetRoomPassword,
     handleShareRoomLink,
+    handlePinRoom,
   } = useRoomManager();
 
   const { isConnected } = useSocketConnection({
@@ -52,6 +55,7 @@ export function App(): JSX.Element {
     onSetIsConnecting: setIsConnecting,
     onSetShowPasswordInput: setShowPasswordInput,
     onSetHasRoomPassword: setHasRoomPassword,
+    onSetIsPinned: setIsPinned,
     onLeaveRoom: handleLeaveRoom,
     fetchRoomMessages,
     roomKey,
@@ -82,14 +86,16 @@ export function App(): JSX.Element {
       const urlParams = new URLSearchParams(window.location.search);
       const roomKeyFromUrl = urlParams.get("room");
 
-      if (roomKeyFromUrl && currentUser && roomKey && roomKeyFromUrl !== roomKey) {
-        const passwordFromUrl = urlParams.get("password");
-        setSwitchRoomTarget({
-          roomKey: roomKeyFromUrl,
-          password: passwordFromUrl || undefined,
-        });
+      if (roomKeyFromUrl && currentUser && roomKey) {
+        if (roomKeyFromUrl !== roomKey) {
+          const passwordFromUrl = urlParams.get("password");
+          setSwitchRoomTarget({
+            roomKey: roomKeyFromUrl,
+            password: passwordFromUrl || undefined,
+          });
+        }
 
-        // Clear URL parameters
+        // Clear URL parameters regardless of whether it's the same room
         window.history.replaceState({}, "", window.location.pathname);
       }
     };
@@ -179,6 +185,8 @@ export function App(): JSX.Element {
         onShareRoomLink={handleShareRoomLink}
         onNavigateToShare={handleNavigateToShare}
         hasRoomPassword={hasRoomPassword}
+        isPinned={isPinned}
+        onPinRoom={handlePinRoom}
       />
       <AlertDialog
         open={!!switchRoomTarget}

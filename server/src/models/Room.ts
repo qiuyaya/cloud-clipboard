@@ -14,6 +14,8 @@ export class RoomModel implements Room {
   createdAt: Date;
   lastActivity: Date;
   password?: RoomPassword;
+  isPinned?: boolean;
+  createdBy?: string; // fingerprint hash of room creator
   // 优化：增加消息限制到1000条，并支持配置
   private maxMessages = 1000;
   // 添加统计信息
@@ -26,6 +28,7 @@ export class RoomModel implements Room {
     this.messages = [];
     this.createdAt = new Date();
     this.lastActivity = new Date();
+    this.isPinned = false;
   }
 
   addUser(user: User): void {
@@ -120,6 +123,22 @@ export class RoomModel implements Room {
 
   validatePassword(password: RoomPassword): boolean {
     return this.password === password;
+  }
+
+  pin(): void {
+    this.isPinned = true;
+    this.updateActivity();
+  }
+
+  unpin(): void {
+    this.isPinned = false;
+    this.updateActivity();
+  }
+
+  setCreator(fingerprint: string): void {
+    if (!this.createdBy) {
+      this.createdBy = fingerprint;
+    }
   }
 
   private updateActivity(): void {

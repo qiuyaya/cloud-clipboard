@@ -11,6 +11,7 @@ import type {
   LeaveRoomRequest,
   SetRoomPasswordRequest,
   ShareRoomLinkRequest,
+  PinRoomRequest,
 } from "@cloud-clipboard/shared";
 import { debug } from "../utils/debug";
 
@@ -146,6 +147,12 @@ class SocketService {
     }
   }
 
+  pinRoom(data: PinRoomRequest): void {
+    if (this.socket) {
+      this.socket.emit("pinRoom", data);
+    }
+  }
+
   leaveRoom(data: LeaveRoomRequest): void {
     this.socket?.emit("leaveRoom", data);
   }
@@ -265,6 +272,12 @@ class SocketService {
   onRoomLinkGenerated(callback: (data: { roomKey: string; shareLink: string }) => void): void {
     if (this.socket) {
       this.socket.on("roomLinkGenerated", callback);
+    }
+  }
+
+  onRoomPinned(callback: (data: { roomKey: string; isPinned: boolean }) => void): void {
+    if (this.socket) {
+      this.socket.on("roomPinned", callback);
     }
   }
 

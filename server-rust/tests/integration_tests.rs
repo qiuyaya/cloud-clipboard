@@ -101,7 +101,9 @@ mod tests {
         let service = create_room_service();
 
         // Create room with password
-        service.create_room("secretroom1", Some("pass123")).unwrap();
+        service
+            .create_room("secretroom1", Some("pass123"), None)
+            .unwrap();
 
         // Try joining without password
         let result = service.join_room(
