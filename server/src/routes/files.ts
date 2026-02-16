@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { FileManager } from "../services/FileManager";
 import { getPublicUrl } from "../utils/url";
+import { log } from "../utils/logger";
 
 const router = Router();
 
@@ -26,7 +27,7 @@ const storage = multer.diskStorage({
       }
       cb(null, uploadDir);
     } catch (error) {
-      console.error("Failed to create upload directory:", error);
+      log.error("Failed to create upload directory", { error }, "FileRoutes");
       cb(error as Error, "");
     }
   },
@@ -36,7 +37,7 @@ const storage = multer.diskStorage({
       const timestamp = Date.now();
       cb(null, `${timestamp}-${sanitized}`);
     } catch (error) {
-      console.error("Failed to generate filename:", error);
+      log.error("Failed to generate filename", { error }, "FileRoutes");
       cb(error as Error, "");
     }
   },
@@ -116,7 +117,7 @@ const upload = multer({
       // Allow any file type except dangerous extensions
       cb(null, true);
     } catch (error) {
-      console.error("File filter error:", error);
+      log.error("File filter error", { error }, "FileRoutes");
       cb(new Error("File validation failed"));
     }
   },
@@ -161,16 +162,18 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
           const existingFile = fileManager.getFile(existingFileId);
 
           if (existingFile) {
-            console.log(
-              `File deduplicated: ${req.file.originalname} (hash: ${fileHash.substring(0, 16)}...)`,
+            log.info(
+              "File deduplicated",
+              { filename: req.file.originalname, hash: fileHash.substring(0, 16) },
+              "FileRoutes",
             );
 
             // Clean up the duplicate file that was just uploaded
             try {
               fs.unlinkSync(req.file.path);
-              console.log(`Cleaned up duplicate file: ${req.file.path}`);
+              log.debug("Cleaned up duplicate file", { path: req.file.path }, "FileRoutes");
             } catch (cleanupError) {
-              console.error("Failed to clean up duplicate file:", cleanupError);
+              log.error("Failed to clean up duplicate file", { error: cleanupError }, "FileRoutes");
             }
 
             const fileInfo: FileInfo = {
@@ -223,16 +226,22 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
             hash: fileHash,
           });
 
-          console.log(
-            `New file uploaded: ${req.file.originalname} (hash: ${fileHash.substring(0, 16)}...)`,
+          log.info(
+            "New file uploaded",
+            { filename: req.file.originalname, hash: fileHash.substring(0, 16) },
+            "FileRoutes",
           );
         } catch (fileError) {
-          console.error("Failed to track file in FileManager:", fileError);
+          log.error("Failed to track file in FileManager", { error: fileError }, "FileRoutes");
           // Clean up the uploaded file if tracking fails
           try {
             fs.unlinkSync(req.file.path);
           } catch (cleanupError) {
-            console.error("Failed to clean up file after tracking failure:", cleanupError);
+            log.error(
+              "Failed to clean up file after tracking failure",
+              { error: cleanupError },
+              "FileRoutes",
+            );
           }
           res.status(500).json({
             success: false,
@@ -252,17 +261,21 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
           },
         });
       } catch (error) {
-        console.error("File upload error:", error);
+        log.error("File upload error", { error }, "FileRoutes");
 
         // 如果文件已上传但处理失败，尝试清理
         if (req.file && req.file.path) {
           try {
             if (fs.existsSync(req.file.path)) {
               fs.unlinkSync(req.file.path);
-              console.log(`Cleaned up failed upload: ${req.file.path}`);
+              log.debug("Cleaned up failed upload", { path: req.file.path }, "FileRoutes");
             }
           } catch (cleanupError) {
-            console.error("Failed to clean up file after upload error:", cleanupError);
+            log.error(
+              "Failed to clean up file after upload error",
+              { error: cleanupError },
+              "FileRoutes",
+            );
           }
         }
 
@@ -324,7 +337,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
 
         res.download(filePath, (err: any) => {
           if (err) {
-            console.error("File download error:", err);
+            log.error("File download error", { error: err }, "FileRoutes");
             if (!res.headersSent) {
               res.status(500).json({
                 success: false,
@@ -334,7 +347,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
           }
         });
       } catch (error) {
-        console.error("File download error:", error);
+        log.error("File download error", { error }, "FileRoutes");
         if (!res.headersSent) {
           res.status(500).json({
             success: false,
@@ -388,7 +401,7 @@ export const createFileRoutes = (fileManager: FileManager): Router => {
           message: "File deleted successfully",
         });
       } catch (error) {
-        console.error("File delete error:", error);
+        log.error("File delete error", { error }, "FileRoutes");
         res.status(500).json({
           success: false,
           message: "Failed to delete file",

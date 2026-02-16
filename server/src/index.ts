@@ -23,14 +23,8 @@ const port = process.env.PORT || 3001;
 const isProduction = process.env.NODE_ENV === "production";
 const staticPath = process.env.STATIC_PATH || path.join(__dirname, "../public");
 
-console.log("DEBUG: NODE_ENV =", process.env.NODE_ENV);
-console.log("DEBUG: isProduction =", isProduction);
-console.log("DEBUG: staticPath =", staticPath);
-
 // Security headers - conditionally based on HTTP/HTTPS mode
 const allowHttp = process.env.ALLOW_HTTP === "true";
-console.log("DEBUG: ALLOW_HTTP =", process.env.ALLOW_HTTP);
-console.log("DEBUG: allowHttp =", allowHttp);
 
 app.use(
   helmet({
@@ -124,7 +118,11 @@ roomService.on("roomDestroyed", (roomKey: string) => {
       deletedFiles: deletedFiles.map((f) => f.filename),
     });
 
-    console.log(`Room ${roomKey} destroyed - deleted ${deletedFiles.length} files`);
+    log.info(
+      "Room destroyed - files deleted",
+      { roomKey, deletedFileCount: deletedFiles.length },
+      "Server",
+    );
   }
 });
 
@@ -208,7 +206,7 @@ app.use(
     res: express.Response<APIResponse>,
     _next: express.NextFunction,
   ) => {
-    console.error("Unhandled error:", error);
+    log.error("Unhandled error", { error }, "Server");
     res.status(500).json({
       success: false,
       message: "Internal server error",

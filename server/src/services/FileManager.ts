@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import type { RoomKey } from "@cloud-clipboard/shared";
+import { FILE_RETENTION_HOURS, FILE_CLEANUP_INTERVAL_MS } from "@cloud-clipboard/shared";
+import { log } from "../utils/logger";
 
 interface FileRecord {
   id: string;
@@ -16,9 +18,9 @@ interface FileRecord {
 export class FileManager {
   private files: Map<string, FileRecord> = new Map();
   private roomFiles: Map<RoomKey, Set<string>> = new Map();
-  private hashToFileId: Map<string, string> = new Map(); // 哈希到文件ID的映射，用于去重
+  private hashToFileId: Map<string, Set<string>> = new Map(); // 哈希到文件ID集合的映射，用于去重
   private uploadDir = path.join(process.cwd(), "uploads");
-  private maxRetentionHours = 12;
+  private maxRetentionHours = FILE_RETENTION_HOURS;
   private cleanupInterval: NodeJS.Timeout;
   // 添加文件统计信息
   private deletedFileCount = 0;
@@ -31,12 +33,9 @@ export class FileManager {
     }
 
     // 优化：清理间隔从1小时改为10分钟，更及时释放磁盘空间
-    this.cleanupInterval = setInterval(
-      () => {
-        this.cleanupExpiredFiles();
-      },
-      10 * 60 * 1000, // 10分钟
-    );
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredFiles();
+    }, FILE_CLEANUP_INTERVAL_MS);
 
     // Initial cleanup on startup - scan for orphaned files
     this.scanAndCleanupOrphanedFiles();
@@ -62,19 +61,23 @@ export class FileManager {
           // 如果文件超过 maxRetentionHours（12小时）未修改，视为过期文件
           const maxAge = this.maxRetentionHours * 60 * 60 * 1000;
           if (age > maxAge) {
-            console.log(`[Orphan Cleanup] Removing stale file: ${entry.name}`);
+            log.info("Removing stale orphan file", { filename: entry.name }, "FileManager");
             try {
               fs.unlinkSync(filePath);
             } catch (unlinkError) {
-              console.error(`[Orphan Cleanup] Failed to remove ${entry.name}:`, unlinkError);
+              log.error(
+                "Failed to remove orphan file",
+                { filename: entry.name, error: unlinkError },
+                "FileManager",
+              );
             }
           }
         }
       }
 
-      console.log("[Orphan Cleanup] Scan completed");
+      log.info("Orphan file scan completed", {}, "FileManager");
     } catch (error) {
-      console.error("[Orphan Cleanup] Scan failed:", error);
+      log.error("Orphan file scan failed", { error }, "FileManager");
     }
   }
 
@@ -89,7 +92,10 @@ export class FileManager {
 
     // Track file by hash for deduplication
     if (fileRecord.hash) {
-      this.hashToFileId.set(fileRecord.hash, fileRecord.id);
+      if (!this.hashToFileId.has(fileRecord.hash)) {
+        this.hashToFileId.set(fileRecord.hash, new Set());
+      }
+      this.hashToFileId.get(fileRecord.hash)!.add(fileRecord.id);
     }
   }
 
@@ -103,7 +109,17 @@ export class FileManager {
    * @returns 文件ID，如果不存在则返回undefined
    */
   getFileIdByHash(hash: string): string | undefined {
-    return this.hashToFileId.get(hash);
+    const fileIds = this.hashToFileId.get(hash);
+    if (!fileIds) return undefined;
+    // 返回第一个仍然存在的文件ID
+    for (const fileId of fileIds) {
+      if (this.files.has(fileId)) {
+        return fileId;
+      }
+    }
+    // 所有关联文件都已删除，清理哈希映射
+    this.hashToFileId.delete(hash);
+    return undefined;
   }
 
   /**
@@ -143,7 +159,11 @@ export class FileManager {
         try {
           fs.unlinkSync(file.path);
         } catch (unlinkError) {
-          console.error(`Failed to unlink file ${file.path}:`, unlinkError);
+          log.error(
+            "Failed to unlink file",
+            { path: file.path, error: unlinkError },
+            "FileManager",
+          );
           // 即使文件删除失败，也继续清理跟踪信息，避免内存泄漏
         }
       }
@@ -158,14 +178,25 @@ export class FileManager {
         }
       }
 
+      // Remove from hash tracking
+      if (file.hash) {
+        const hashFileIds = this.hashToFileId.get(file.hash);
+        if (hashFileIds) {
+          hashFileIds.delete(fileId);
+          if (hashFileIds.size === 0) {
+            this.hashToFileId.delete(file.hash);
+          }
+        }
+      }
+
       // 统计信息
       this.deletedFileCount++;
       this.totalDeletedSize += file.size;
 
-      console.log(`File ${file.filename} deleted (reason: ${reason})`);
+      log.info("File deleted", { filename: file.filename, reason }, "FileManager");
       return { filename: file.filename, roomKey: file.roomKey };
     } catch (error) {
-      console.error("Failed to delete file %s:", fileId, error);
+      log.error("Failed to delete file", { fileId, error }, "FileManager");
       return null;
     }
   }
@@ -182,7 +213,7 @@ export class FileManager {
     }
 
     this.roomFiles.delete(roomKey);
-    console.log(`Deleted ${deletedFiles.length} files for destroyed room ${roomKey}`);
+    log.info("Room files deleted", { roomKey, count: deletedFiles.length }, "FileManager");
     return deletedFiles;
   }
 
@@ -203,8 +234,10 @@ export class FileManager {
     }
 
     if (expiredFiles.length > 0) {
-      console.log(
-        `[File Cleanup] Cleaned up ${expiredFiles.length} expired files, total deleted: ${this.deletedFileCount}`,
+      log.info(
+        "File cleanup completed",
+        { expired: expiredFiles.length, totalDeleted: this.deletedFileCount },
+        "FileManager",
       );
     }
   }

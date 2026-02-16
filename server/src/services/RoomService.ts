@@ -6,7 +6,9 @@ import type {
   FileMessage,
   RoomPassword,
 } from "@cloud-clipboard/shared";
+import { ROOM_CLEANUP_INTERVAL_MS, ROOM_INACTIVE_THRESHOLD_MS } from "@cloud-clipboard/shared";
 import { EventEmitter } from "events";
+import { log } from "../utils/logger";
 
 export class RoomService extends EventEmitter {
   private rooms: Map<RoomKey, RoomModel> = new Map();
@@ -17,12 +19,9 @@ export class RoomService extends EventEmitter {
   constructor() {
     super();
     // 优化：清理间隔从5分钟改为1分钟，更及时释放内存
-    this.cleanupInterval = setInterval(
-      () => {
-        this.cleanupInactiveRooms();
-      },
-      1 * 60 * 1000, // 1分钟
-    );
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupInactiveRooms();
+    }, ROOM_CLEANUP_INTERVAL_MS);
   }
 
   createRoom(key: RoomKey, creatorFingerprint?: string): RoomModel {
@@ -51,34 +50,11 @@ export class RoomService extends EventEmitter {
     return this.createRoom(key, creatorFingerprint);
   }
 
-  joinRoom(key: RoomKey, user: User): RoomModel {
-    // Pass user's fingerprint when creating room so first user becomes creator
-    const room = this.getRoomOrCreate(key, user.fingerprint);
-    room.addUser(user);
-    return room;
-  }
-
-  joinRoomWithPassword(
-    key: RoomKey,
-    user: User,
-    password: RoomPassword,
-  ): { success: boolean; room?: RoomModel; error?: string } {
+  addUserToRoom(key: RoomKey, user: User): void {
     const room = this.getRoom(key);
-
-    if (!room) {
-      return { success: false, error: "Room not found" };
+    if (room) {
+      room.addUser(user);
     }
-
-    if (!room.hasPassword()) {
-      return { success: false, error: "Room does not require a password" };
-    }
-
-    if (!room.validatePassword(password)) {
-      return { success: false, error: "Invalid password" };
-    }
-
-    room.addUser(user);
-    return { success: true, room };
   }
 
   setRoomPassword(key: RoomKey, password?: RoomPassword): boolean {
@@ -159,7 +135,7 @@ export class RoomService extends EventEmitter {
     const onlineUsers = room.getOnlineUsers();
 
     if (onlineUsers.length === 0) {
-      console.log(`Room ${key} has no online users - destroying room`);
+      log.info("Room has no online users - destroying", { roomKey: key }, "RoomService");
       this.rooms.delete(key);
 
       // Emit event for file cleanup
@@ -169,7 +145,7 @@ export class RoomService extends EventEmitter {
 
   private cleanupInactiveRooms(): void {
     const now = new Date();
-    const inactiveThreshold = 24 * 60 * 60 * 1000; // 24小时
+    const inactiveThreshold = ROOM_INACTIVE_THRESHOLD_MS;
 
     // 跟踪清理统计
     let cleanedRooms = 0;
@@ -186,7 +162,7 @@ export class RoomService extends EventEmitter {
       const timeSinceLastActivity = now.getTime() - room.lastActivity.getTime();
 
       if (timeSinceLastActivity > inactiveThreshold) {
-        console.log(`Cleaned up inactive room after 24h: ${key}`);
+        log.info("Cleaned up inactive room after 24h", { roomKey: key }, "RoomService");
         this.rooms.delete(key);
         this.emit("roomDestroyed", key);
         cleanedRooms++;
@@ -196,10 +172,11 @@ export class RoomService extends EventEmitter {
       }
     }
 
-    // 每10次清理输出一次统计信息
     if (checkedRooms > 0) {
-      console.log(
-        `[Room Cleanup] Checked: ${checkedRooms}, Cleaned: ${cleanedRooms}, Active: ${this.rooms.size}`,
+      log.debug(
+        "Room cleanup stats",
+        { checked: checkedRooms, cleaned: cleanedRooms, active: this.rooms.size },
+        "RoomService",
       );
     }
   }

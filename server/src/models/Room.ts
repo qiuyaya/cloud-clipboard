@@ -72,13 +72,11 @@ export class RoomModel implements Room {
     this.updateActivity();
   }
 
-  getMessages(limit = 50, offset = 0): (TextMessage | FileMessage)[] {
-    // 支持分页查询，优化大消息量场景
-    if (offset >= this.messages.length) {
-      return [];
+  getMessages(limit?: number): (TextMessage | FileMessage)[] {
+    if (!limit || limit >= this.messages.length) {
+      return this.messages;
     }
-    const end = Math.min(offset + limit, this.messages.length);
-    return this.messages.slice(-end - offset).slice(0, limit);
+    return this.messages.slice(-limit);
   }
 
   // 获取消息统计信息

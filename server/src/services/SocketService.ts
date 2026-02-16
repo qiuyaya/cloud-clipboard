@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from "socket.io";
 import type { Server } from "http";
 import { RoomService } from "./RoomService";
+import type { RoomModel } from "../models/Room";
 import { log } from "../utils/logger";
 import { randomUUID } from "crypto";
 import {
@@ -19,6 +20,8 @@ import {
   detectDeviceType,
   SOCKET_RATE_LIMITS,
   CLEANUP_INTERVALS,
+  INITIAL_MESSAGE_LIMIT,
+  MAX_USERNAME_LENGTH,
 } from "@cloud-clipboard/shared";
 import type {
   ServerToClientEvents,
@@ -254,186 +257,28 @@ export class SocketService {
 
   private handleJoinRoom(socket: any, data: JoinRoomRequest): void {
     try {
-      log.debug(
-        "handleJoinRoom called",
-        {
-          socketId: socket.id,
-          roomKey: data.roomKey,
-          userName: data.user?.name,
-          userDevice: data.user?.deviceType,
-          hasFingerprint: !!data.fingerprint,
-          fingerprintHash: data.fingerprint?.hash?.substring(0, 16) + "...",
-        },
-        "SocketService",
-      );
-
-      log.debug("Validating join room data with schema", {}, "SocketService");
       const validatedData = JoinRoomRequestSchema.parse(data);
-      log.debug("Join room data validation passed", {}, "SocketService");
 
       // Check if room requires password
       if (this.roomService.isRoomPasswordProtected(validatedData.roomKey)) {
         socket.emit("passwordRequired", { roomKey: validatedData.roomKey });
         return;
       }
-      const existingUsers = this.roomService.getUsersInRoom(validatedData.roomKey);
 
-      log.info(
-        "Join attempt for room",
-        {
-          roomKey: validatedData.roomKey,
-          existingUsersCount: existingUsers.length,
-          userName: validatedData.user.name,
-        },
-        "SocketService",
+      const room = this.roomService.getRoomOrCreate(
+        validatedData.roomKey,
+        validatedData.fingerprint?.hash,
       );
-
-      // Generate user ID based on fingerprint for consistent identity
-      let userId: string;
-      let fingerprint: string | undefined;
-
-      if (validatedData.fingerprint) {
-        fingerprint = validatedData.fingerprint.hash;
-        userId = generateUserIdFromFingerprint(fingerprint);
-
-        // Check if this user (fingerprint) already exists in the room
-        const existingUser = existingUsers.find((u) => u.fingerprint === fingerprint);
-        if (existingUser) {
-          // User is reconnecting - reuse existing user but update online status
-          existingUser.isOnline = true;
-          existingUser.lastSeen = new Date();
-
-          // Update socket mappings
-          this.userSockets.set(existingUser.id, socket.id);
-          this.socketUsers.set(socket.id, existingUser);
-
-          socket.join(validatedData.roomKey);
-
-          // Update user in room service
-          this.roomService.updateUserStatus(validatedData.roomKey, existingUser.id, true);
-
-          // Send the user their own info
-          log.debug(
-            "Sending userJoined event to reconnecting user",
-            { socketId: socket.id, userId: existingUser.id, userName: existingUser.name },
-            "SocketService",
-          );
-          socket.emit("userJoined", existingUser);
-          socket.emit("userList", this.roomService.getUsersInRoom(validatedData.roomKey));
-
-          // Send room pin status to reconnecting user
-          const reconnectRoom = this.roomService.getRoom(validatedData.roomKey);
-          if (reconnectRoom) {
-            socket.emit("roomPinned", {
-              roomKey: validatedData.roomKey,
-              isPinned: !!reconnectRoom.isPinned,
-            });
-          }
-
-          // Notify others about the reconnection
-          socket
-            .to(validatedData.roomKey)
-            .emit("userList", this.roomService.getUsersInRoom(validatedData.roomKey));
-
-          log.info(
-            "User reconnected to room",
-            { userName: existingUser.name, roomKey: validatedData.roomKey },
-            "SocketService",
-          );
-          return;
-        }
-      } else {
-        // Fallback to random ID if no fingerprint
-        userId = generateUserId();
-      }
-
-      // Check for duplicate names and generate unique name if needed
-      let uniqueName = validatedData.user.name || generateDefaultUsername();
-      const existingNames = existingUsers
-        .filter((u) => u.fingerprint !== fingerprint)
-        .map((u) => u.name?.toLowerCase() || "")
-        .filter((name) => name !== "");
-
-      // Only add suffix if name conflicts with OTHER users (different fingerprint)
-      if (existingNames.includes(uniqueName.toLowerCase())) {
-        // Generate random suffix until we find a unique name, keeping within 50 char limit
-        let attempts = 0;
-        const maxBaseLength = 44; // Leave room for "_" + 5 char suffix
-        const baseName = uniqueName.slice(0, maxBaseLength);
-
-        do {
-          const randomSuffix = Math.random().toString(36).substring(2, 7); // 5 chars
-          uniqueName = `${baseName}_${randomSuffix}`;
-          attempts++;
-        } while (existingNames.includes(uniqueName.toLowerCase()) && attempts < 10);
-      } else {
-        // Ensure name doesn't exceed 50 characters
-        uniqueName = uniqueName.slice(0, 50);
-      }
-
-      // Create new user
-      const user: User = {
-        id: userId,
-        name: uniqueName,
-        deviceType:
-          validatedData.user.deviceType ||
-          detectDeviceType(socket.handshake.headers["user-agent"] || ""),
-        isOnline: true,
-        lastSeen: new Date(),
-        fingerprint,
-      };
-
-      log.debug("Adding user to room service", { user }, "SocketService");
-      const room = this.roomService.joinRoom(validatedData.roomKey, user);
-
-      log.debug(
-        "Adding socket to room",
-        { socketId: socket.id, roomKey: validatedData.roomKey },
-        "SocketService",
-      );
-      socket.join(validatedData.roomKey);
-      this.userSockets.set(user.id, socket.id);
-      this.socketUsers.set(socket.id, user);
-
-      // Send the user their own info first
-      log.debug(
-        "Sending userJoined event to new user",
-        { socketId: socket.id, userId: user.id, userName: user.name },
-        "SocketService",
-      );
-      socket.emit("userJoined", user);
-      socket.emit("userList", room.getUserList());
-
-      // Send room pin status to joining user
-      socket.emit("roomPinned", {
-        roomKey: validatedData.roomKey,
-        isPinned: !!room.isPinned,
-      });
-
-      // Send message history to the new user
-      const messages = this.roomService.getMessagesInRoom(validatedData.roomKey);
-      if (messages.length > 0) {
-        socket.emit("messageHistory", messages);
-      }
-
-      // Notify others in the room
-      log.debug(
-        "Notifying other users in room about new user",
-        { userName: user.name, roomKey: validatedData.roomKey },
-        "SocketService",
-      );
-      socket.to(validatedData.roomKey).emit("userJoined", user);
-      socket.to(validatedData.roomKey).emit("userList", room.getUserList());
-
-      log.info(
-        "User successfully joined room",
-        { userName: user.name, roomKey: validatedData.roomKey },
-        "SocketService",
+      this.processUserJoin(
+        socket,
+        validatedData.roomKey,
+        validatedData.user,
+        validatedData.fingerprint,
+        room,
       );
     } catch (error) {
       log.error("Join room error", { error }, "SocketService");
 
-      // Send more specific error information
       let errorMessage = "Failed to join room";
       if (error && typeof error === "object" && "issues" in error) {
         const zodError = error as any;
@@ -452,127 +297,145 @@ export class SocketService {
     try {
       const validatedData = JoinRoomWithPasswordRequestSchema.parse(data);
 
-      const result = this.roomService.joinRoomWithPassword(
-        validatedData.roomKey,
-        {
-          id: "", // Will be generated
-          name: validatedData.user.name || generateDefaultUsername(),
-          deviceType: validatedData.user.deviceType,
-          isOnline: true,
-          lastSeen: new Date(),
-          fingerprint: validatedData.fingerprint?.hash,
-        },
-        validatedData.password,
-      );
-
-      if (!result.success) {
-        socket.emit("error", result.error || "Failed to join room");
+      const room = this.roomService.getRoom(validatedData.roomKey);
+      if (!room) {
+        socket.emit("error", "Room not found");
         return;
       }
 
-      const room = result.room!;
-
-      // Handle user joining logic similar to handleJoinRoom
-      const existingUsers = room.getUserList();
-      let userId: string;
-      let fingerprint: string | undefined;
-
-      if (validatedData.fingerprint) {
-        fingerprint = validatedData.fingerprint.hash;
-        userId = generateUserIdFromFingerprint(fingerprint);
-
-        const existingUser = existingUsers.find((u) => u.fingerprint === fingerprint);
-        if (existingUser) {
-          existingUser.isOnline = true;
-          existingUser.lastSeen = new Date();
-
-          this.userSockets.set(existingUser.id, socket.id);
-          this.socketUsers.set(socket.id, existingUser);
-
-          socket.join(validatedData.roomKey);
-
-          this.roomService.updateUserStatus(validatedData.roomKey, existingUser.id, true);
-
-          socket.emit("userJoined", existingUser);
-          socket.emit("userList", room.getUserList());
-
-          // Send message history to rejoining user
-          const messages = this.roomService.getMessagesInRoom(validatedData.roomKey);
-          if (messages.length > 0) {
-            socket.emit("messageHistory", messages);
-          }
-
-          socket.to(validatedData.roomKey).emit("userList", room.getUserList());
-
-          return;
-        }
-      } else {
-        userId = generateUserId();
+      if (!room.hasPassword()) {
+        socket.emit("error", "Room does not require a password");
+        return;
       }
 
-      // Check for duplicate names
-      let uniqueName = validatedData.user.name || generateDefaultUsername();
-      const existingNames = existingUsers
-        .filter((u) => u.fingerprint !== fingerprint)
-        .map((u) => u.name?.toLowerCase() || "")
-        .filter((name) => name !== "");
-
-      if (existingNames.includes(uniqueName.toLowerCase())) {
-        let attempts = 0;
-        const maxBaseLength = 44;
-        const baseName = uniqueName.slice(0, maxBaseLength);
-
-        do {
-          const randomSuffix = Math.random().toString(36).substring(2, 7);
-          uniqueName = `${baseName}_${randomSuffix}`;
-          attempts++;
-        } while (existingNames.includes(uniqueName.toLowerCase()) && attempts < 10);
-      } else {
-        uniqueName = uniqueName.slice(0, 50);
+      if (!room.validatePassword(validatedData.password)) {
+        socket.emit("error", "Invalid password");
+        return;
       }
 
-      const user: User = {
-        id: userId,
-        name: uniqueName,
-        deviceType:
-          validatedData.user.deviceType ||
-          detectDeviceType(socket.handshake.headers["user-agent"] || ""),
-        isOnline: true,
-        lastSeen: new Date(),
-        fingerprint,
-      };
-
-      socket.join(validatedData.roomKey);
-      this.userSockets.set(user.id, socket.id);
-      this.socketUsers.set(socket.id, user);
-
-      socket.emit("userJoined", user);
-      socket.emit("userList", room.getUserList());
-
-      // Send room pin status to joining user
-      socket.emit("roomPinned", {
-        roomKey: validatedData.roomKey,
-        isPinned: !!room.isPinned,
-      });
-
-      // Send message history to the new user
-      const pwMessages = this.roomService.getMessagesInRoom(validatedData.roomKey);
-      if (pwMessages.length > 0) {
-        socket.emit("messageHistory", pwMessages);
-      }
-
-      socket.to(validatedData.roomKey).emit("userJoined", user);
-      socket.to(validatedData.roomKey).emit("userList", room.getUserList());
-
-      log.info(
-        "User successfully joined password-protected room",
-        { userName: user.name, roomKey: validatedData.roomKey },
-        "SocketService",
+      this.processUserJoin(
+        socket,
+        validatedData.roomKey,
+        validatedData.user,
+        validatedData.fingerprint,
+        room,
       );
     } catch (error) {
       log.error("Join room with password error", { error }, "SocketService");
       socket.emit("error", "Failed to join room with password");
     }
+  }
+
+  /**
+   * 处理用户加入房间的公共逻辑：指纹检测/重连、用户名去重、User 创建、事件发送
+   */
+  private processUserJoin(
+    socket: any,
+    roomKey: string,
+    userData: JoinRoomRequest["user"],
+    fingerprint: { hash: string } | undefined,
+    room: RoomModel,
+  ): void {
+    const existingUsers = room.getUserList();
+
+    // 1. 指纹检测和重连逻辑
+    let userId: string;
+    let fp: string | undefined;
+
+    if (fingerprint) {
+      fp = fingerprint.hash;
+      userId = generateUserIdFromFingerprint(fp);
+
+      const existingUser = existingUsers.find((u) => u.fingerprint === fp);
+      if (existingUser) {
+        existingUser.isOnline = true;
+        existingUser.lastSeen = new Date();
+
+        this.userSockets.set(existingUser.id, socket.id);
+        this.socketUsers.set(socket.id, existingUser);
+
+        socket.join(roomKey);
+        this.roomService.updateUserStatus(roomKey, existingUser.id, true);
+
+        socket.emit("userJoined", existingUser);
+        socket.emit("userList", room.getUserList());
+
+        socket.emit("roomPinned", {
+          roomKey,
+          isPinned: !!room.isPinned,
+        });
+
+        const messages = this.roomService.getMessagesInRoom(roomKey, INITIAL_MESSAGE_LIMIT);
+        if (messages.length > 0) {
+          socket.emit("messageHistory", messages);
+        }
+
+        socket.to(roomKey).emit("userList", room.getUserList());
+
+        log.info(
+          "User reconnected to room",
+          { userName: existingUser.name, roomKey },
+          "SocketService",
+        );
+        return;
+      }
+    } else {
+      userId = generateUserId();
+    }
+
+    // 2. 用户名去重
+    let uniqueName = userData.name || generateDefaultUsername();
+    const existingNames = existingUsers
+      .filter((u) => u.fingerprint !== fp)
+      .map((u) => u.name?.toLowerCase() || "")
+      .filter((name) => name !== "");
+
+    if (existingNames.includes(uniqueName.toLowerCase())) {
+      let attempts = 0;
+      const maxBaseLength = MAX_USERNAME_LENGTH - 6; // Leave room for "_" + 5 char suffix
+      const baseName = uniqueName.slice(0, maxBaseLength);
+
+      do {
+        const randomSuffix = Math.random().toString(36).substring(2, 7);
+        uniqueName = `${baseName}_${randomSuffix}`;
+        attempts++;
+      } while (existingNames.includes(uniqueName.toLowerCase()) && attempts < 10);
+    } else {
+      uniqueName = uniqueName.slice(0, MAX_USERNAME_LENGTH);
+    }
+
+    // 3. 创建 User 对象
+    const user: User = {
+      id: userId,
+      name: uniqueName,
+      deviceType:
+        userData.deviceType || detectDeviceType(socket.handshake.headers["user-agent"] || ""),
+      isOnline: true,
+      lastSeen: new Date(),
+      fingerprint: fp,
+    };
+
+    // 4. 加入房间
+    room.addUser(user);
+    socket.join(roomKey);
+    this.userSockets.set(user.id, socket.id);
+    this.socketUsers.set(socket.id, user);
+
+    // 5. 发送事件给新用户
+    socket.emit("userJoined", user);
+    socket.emit("userList", room.getUserList());
+    socket.emit("roomPinned", { roomKey, isPinned: !!room.isPinned });
+
+    const messages = this.roomService.getMessagesInRoom(roomKey, INITIAL_MESSAGE_LIMIT);
+    if (messages.length > 0) {
+      socket.emit("messageHistory", messages);
+    }
+
+    // 6. 通知房间内其他用户
+    socket.to(roomKey).emit("userJoined", user);
+    socket.to(roomKey).emit("userList", room.getUserList());
+
+    log.info("User successfully joined room", { userName: user.name, roomKey }, "SocketService");
   }
 
   private handleLeaveRoom(socket: any, data: LeaveRoomRequest): void {
@@ -862,6 +725,9 @@ export class SocketService {
   }
 
   private handleDisconnect(socket: any): void {
+    // 立即清理该 socket 的速率限制数据，避免内存泄漏
+    this.messageRateLimits.delete(socket.id);
+
     const user = this.socketUsers.get(socket.id);
     if (user) {
       this.userSockets.delete(user.id);

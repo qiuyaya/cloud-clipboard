@@ -5,36 +5,26 @@ import { Version } from "@/components/Version";
 import { useTranslation } from "react-i18next";
 import { useState, useRef, useEffect } from "react";
 import { formatTimestamp } from "@cloud-clipboard/shared";
-import type { User, RoomKey } from "@cloud-clipboard/shared";
 import { Users, LogOut, Share2, Lock, Unlock, Settings, Pin, PinOff } from "lucide-react";
+import { useRoom } from "@/contexts/RoomContext";
 
 interface SidebarContentProps {
-  roomKey: RoomKey;
-  currentUser: User;
-  users: User[];
-  onLeaveRoom: () => void;
-  onSetRoomPassword: (hasPassword: boolean) => void;
-  onShareRoomLink: () => void;
-  onNavigateToShare?: () => void;
-  hasRoomPassword?: boolean;
-  isPinned?: boolean;
-  onPinRoom?: (pinned: boolean) => void;
   isMobile: boolean;
 }
 
-export function SidebarContent({
-  roomKey,
-  currentUser,
-  users,
-  onLeaveRoom,
-  onSetRoomPassword,
-  onShareRoomLink,
-  onNavigateToShare,
-  hasRoomPassword = false,
-  isPinned = false,
-  onPinRoom,
-  isMobile,
-}: SidebarContentProps): JSX.Element {
+export function SidebarContent({ isMobile }: SidebarContentProps): JSX.Element {
+  const {
+    roomKey,
+    currentUser,
+    users,
+    onLeaveRoom,
+    onSetRoomPassword,
+    onShareRoomLink,
+    onNavigateToShare,
+    hasRoomPassword,
+    isPinned,
+    onPinRoom,
+  } = useRoom();
   const { t, i18n } = useTranslation();
   const [copiedRoomKey, setCopiedRoomKey] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
@@ -205,46 +195,42 @@ export function SidebarContent({
                 </div>
 
                 {/* Pin Room */}
-                {onPinRoom && (
-                  <div className="min-w-0 flex-shrink-0">
-                    <div className="relative">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleTogglePin}
-                        className="flex items-center gap-2 min-w-fit mobile-touch"
-                        title={isPinned ? t("room.unpin") : t("room.pin")}
-                      >
-                        {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                      </Button>
-                      {pinChanged !== null && (
-                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                          <span className="text-popover-foreground">
-                            {pinChanged ? t("room.pinned") : t("room.unpinned")}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                <div className="min-w-0 flex-shrink-0">
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTogglePin}
+                      className="flex items-center gap-2 min-w-fit mobile-touch"
+                      title={isPinned ? t("room.unpin") : t("room.pin")}
+                    >
+                      {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                    </Button>
+                    {pinChanged !== null && (
+                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                        <span className="text-popover-foreground">
+                          {pinChanged ? t("room.pinned") : t("room.unpinned")}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Bottom Row - User Actions */}
               <div className="flex items-center justify-center gap-0.5">
                 {/* Settings */}
-                {onNavigateToShare && (
-                  <div className="min-w-0 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={onNavigateToShare}
-                      className="flex items-center gap-2 min-w-fit mobile-touch"
-                      title={t("share.list.title")}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                <div className="min-w-0 flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onNavigateToShare}
+                    className="flex items-center gap-2 min-w-fit mobile-touch"
+                    title={t("share.list.title")}
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </div>
 
                 {/* Leave Room */}
                 <div className="min-w-0 flex-shrink-0">

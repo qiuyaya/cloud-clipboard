@@ -75,7 +75,20 @@ export default defineConfig({
               },
             },
           },
-          // API 请求使用 NetworkOnly，确保每次都获取最新数据
+          // 只读 API 请求使用 NetworkFirst，离线时有 fallback
+          {
+            urlPattern: /\/api\/(health|rooms\/info)/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-readonly-cache",
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60, // 1 minute
+              },
+            },
+          },
+          // 其他 API 请求使用 NetworkOnly，确保每次都获取最新数据
           {
             urlPattern: /\/api\//i,
             handler: "NetworkOnly",

@@ -13,6 +13,11 @@ import type {
   ShareRoomLinkRequest,
   PinRoomRequest,
 } from "@cloud-clipboard/shared";
+import {
+  SOCKET_RECONNECTION_ATTEMPTS,
+  SOCKET_RECONNECTION_DELAY_MS,
+  SOCKET_TIMEOUT_MS,
+} from "@cloud-clipboard/shared";
 import { debug } from "../utils/debug";
 
 class SocketService {
@@ -51,9 +56,9 @@ class SocketService {
       path: socketPath,
       autoConnect: true,
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-      timeout: 20000,
+      reconnectionDelay: SOCKET_RECONNECTION_DELAY_MS,
+      reconnectionAttempts: SOCKET_RECONNECTION_ATTEMPTS,
+      timeout: SOCKET_TIMEOUT_MS,
     });
 
     this.socket.on("connect", () => {
@@ -75,17 +80,18 @@ class SocketService {
       this.isConnected = false;
     });
 
-    // Add debugging for all outgoing events
-    const originalEmit = this.socket.emit.bind(this.socket);
-    this.socket.emit = function (event: any, ...args: any[]) {
-      debug.debug("Socket sending event", { event, args });
-      return originalEmit(event, ...args);
-    } as typeof this.socket.emit;
+    // Add debugging for all outgoing and incoming events (dev only)
+    if (import.meta.env.DEV) {
+      const originalEmit = this.socket.emit.bind(this.socket);
+      this.socket.emit = function (event: any, ...args: any[]) {
+        debug.debug("Socket sending event", { event, args });
+        return originalEmit(event, ...args);
+      } as typeof this.socket.emit;
 
-    // Add debugging for all incoming events
-    this.socket.onAny((event: string, ...args: any[]) => {
-      debug.debug("Socket received event", { event, args });
-    });
+      this.socket.onAny((event: string, ...args: any[]) => {
+        debug.debug("Socket received event", { event, args });
+      });
+    }
 
     return this.socket;
   }

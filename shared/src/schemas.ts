@@ -1,10 +1,16 @@
 import { z } from "zod";
 import { SafeTextContentSchema, sanitizeUsername } from "./utils/sanitize";
+import {
+  MAX_FILE_SIZE_BYTES,
+  MAX_USERNAME_LENGTH,
+  ROOM_KEY_MIN_LENGTH,
+  ROOM_KEY_MAX_LENGTH,
+} from "./constants/app";
 
 export const RoomKeySchema = z
   .string()
-  .min(6, "Room key must be at least 6 characters")
-  .max(50, "Room key must not exceed 50 characters")
+  .min(ROOM_KEY_MIN_LENGTH, `Room key must be at least ${ROOM_KEY_MIN_LENGTH} characters`)
+  .max(ROOM_KEY_MAX_LENGTH, `Room key must not exceed ${ROOM_KEY_MAX_LENGTH} characters`)
   .regex(/^[a-zA-Z0-9_-]+$/, "Room key can only contain letters, numbers, underscores, and hyphens")
   .refine((key) => {
     // Ensure some complexity: must contain both letters and numbers
@@ -38,7 +44,7 @@ export const UserSchema = z.object({
   id: z.string().uuid(),
   name: z
     .string()
-    .max(50, "Name must not exceed 50 characters")
+    .max(MAX_USERNAME_LENGTH, `Name must not exceed ${MAX_USERNAME_LENGTH} characters`)
     .regex(/^[a-zA-Z0-9\s._\u4e00-\u9fff-]+$/, "Name contains invalid characters")
     .refine((name) => {
       const trimmed = name.trim();
@@ -76,7 +82,7 @@ export const FileInfoSchema = z.object({
   size: z
     .number()
     .min(0, "File size cannot be negative")
-    .max(100 * 1024 * 1024, "File size cannot exceed 100MB"),
+    .max(MAX_FILE_SIZE_BYTES, `File size cannot exceed ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB`),
   type: z.string().min(1, "File type is required").max(100, "File type too long"),
   lastModified: z
     .number()
@@ -192,10 +198,7 @@ export const RoomInfoSchema = z.object({
 export const SharedFileSchema = z.object({
   id: z.string().uuid(),
   originalFilename: z.string().min(1).max(255),
-  fileSize: z
-    .number()
-    .min(1)
-    .max(100 * 1024 * 1024), // 100MB
+  fileSize: z.number().min(1).max(MAX_FILE_SIZE_BYTES),
   mimeType: z.string(),
   uploadTimestamp: z.date(),
   uploadedBy: z.string(),

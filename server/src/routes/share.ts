@@ -13,6 +13,7 @@ import {
   concurrentDownloadTracker,
 } from "../middleware/rateLimiter";
 import { getPublicUrl } from "../utils/url";
+import { log } from "../utils/logger";
 
 // Bandwidth tracking for rate limiting
 class BandwidthTracker {
@@ -165,7 +166,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
     try {
       // Set timeout to prevent slowloris attacks
       res.setTimeout(DOWNLOAD_TIMEOUT, () => {
-        console.warn(`Download timeout for shareId: ${shareId} from IP: ${clientIP}`);
+        log.warn("Download timeout", { shareId, clientIP }, "ShareRoutes");
         cleanup();
         if (!res.headersSent) {
           sendErrorResponse(res, 408);
@@ -174,7 +175,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 
       // Check concurrent download limit
       if (!concurrentDownloadTracker.increment(clientIP)) {
-        console.warn(`Too many concurrent downloads from IP: ${clientIP}`);
+        log.warn("Too many concurrent downloads", { clientIP }, "ShareRoutes");
         sendErrorResponse(res, 429);
         return;
       }
@@ -255,7 +256,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
             return;
           }
         } catch (authError) {
-          console.error("Authentication error:", authError);
+          log.error("Authentication error", { error: authError }, "ShareRoutes");
           cleanup();
           sendErrorResponse(res, 401);
           return;
@@ -289,7 +290,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 
         // Ensure the file path is within the allowed directory (prevent path traversal)
         if (!normalizedPath.startsWith(normalizedAllowedDir)) {
-          console.error(`Blocked path traversal attempt: ${fileRecord.path}`);
+          log.error("Blocked path traversal attempt", { path: fileRecord.path }, "ShareRoutes");
           cleanup();
 
           shareService.logAccess({
@@ -306,7 +307,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 
         // Check if file still exists on disk
         if (!fs.existsSync(fileRecord.path)) {
-          console.error(`File not found on disk: ${fileRecord.path}`);
+          log.error("File not found on disk", { path: fileRecord.path }, "ShareRoutes");
           cleanup();
 
           shareService.logAccess({
@@ -324,7 +325,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
         // Security check: Detect and block symbolic links
         const fileStats = fs.lstatSync(fileRecord.path);
         if (fileStats.isSymbolicLink()) {
-          console.error(`Blocked symlink attack: ${fileRecord.path}`);
+          log.error("Blocked symlink attack", { path: fileRecord.path }, "ShareRoutes");
           cleanup();
 
           shareService.logAccess({
@@ -342,8 +343,10 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
         // Security check: Detect potential hardlink attacks
         // Hardlinks with nlink > 1 might indicate attempts to access other files
         if (fileStats.nlink > 1) {
-          console.error(
-            `Potential hardlink attack detected: ${fileRecord.path}, nlink=${fileStats.nlink}`,
+          log.error(
+            "Potential hardlink attack detected",
+            { path: fileRecord.path, nlink: fileStats.nlink },
+            "ShareRoutes",
           );
           cleanup();
 
@@ -359,7 +362,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
           return;
         }
       } catch (pathError) {
-        console.error("Path validation error:", pathError);
+        log.error("Path validation error", { error: pathError }, "ShareRoutes");
         cleanup();
         sendErrorResponse(res, 404);
         return;
@@ -367,8 +370,10 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 
       // Check file size against configured limit
       if (fileRecord.size > MAX_FILE_SIZE) {
-        console.warn(
-          `File size exceeds limit: ${fileRecord.size} > ${MAX_FILE_SIZE} for shareId: ${shareId}`,
+        log.warn(
+          "File size exceeds limit",
+          { fileSize: fileRecord.size, maxSize: MAX_FILE_SIZE, shareId },
+          "ShareRoutes",
         );
         cleanup();
 
@@ -396,8 +401,10 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
           MAX_BANDWIDTH_BYTES,
         )
       ) {
-        console.warn(
-          `Bandwidth limit exceeded for IP: ${clientIP}. Attempted to download ${fileRecord.size} bytes`,
+        log.warn(
+          "Bandwidth limit exceeded",
+          { clientIP, fileSize: fileRecord.size },
+          "ShareRoutes",
         );
         cleanup();
 
@@ -423,16 +430,20 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
         if (fileTypeResult) {
           detectedMimeType = fileTypeResult.mime;
           detectedExt = fileTypeResult.ext;
-          console.log(
-            `Detected file type for ${fileRecord.filename}: ${detectedMimeType} (${detectedExt})`,
+          log.debug(
+            "Detected file type",
+            { filename: fileRecord.filename, mimeType: detectedMimeType, ext: detectedExt },
+            "ShareRoutes",
           );
         } else {
-          console.warn(
-            `Could not detect file type for ${fileRecord.filename}, falling back to extension-based detection`,
+          log.warn(
+            "Could not detect file type, using extension-based detection",
+            { filename: fileRecord.filename },
+            "ShareRoutes",
           );
         }
       } catch (typeError) {
-        console.error("Error detecting file type:", typeError);
+        log.error("Error detecting file type", { error: typeError }, "ShareRoutes");
         // Continue with extension-based detection as fallback
       }
 
@@ -485,8 +496,10 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 
       // Check stream limit before creating read stream
       if (!streamTracker.canCreateStream()) {
-        console.warn(
-          `Stream limit exceeded (${streamTracker.getActiveCount()}/${streamTracker.getMaxStreams()}) for IP: ${clientIP}`,
+        log.warn(
+          "Stream limit exceeded",
+          { active: streamTracker.getActiveCount(), max: streamTracker.getMaxStreams(), clientIP },
+          "ShareRoutes",
         );
         cleanup();
 
@@ -525,11 +538,15 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
           try {
             fs.closeSync(fileDescriptor);
           } catch (closeError) {
-            console.error("Error closing file descriptor:", closeError);
+            log.error("Error closing file descriptor", { error: closeError }, "ShareRoutes");
           }
         }
 
-        console.error("Race condition or security violation detected:", raceConditionError);
+        log.error(
+          "Race condition or security violation detected",
+          { error: raceConditionError },
+          "ShareRoutes",
+        );
         cleanup();
 
         shareService.logAccess({
@@ -564,14 +581,16 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
 
       // Ensure file descriptor is closed when stream ends
       readStream.on("end", () => {
-        console.log(
-          `File streamed successfully: ${fileRecord.filename} (${fileRecord.size} bytes)`,
+        log.debug(
+          "File streamed successfully",
+          { filename: fileRecord.filename, size: fileRecord.size },
+          "ShareRoutes",
         );
         cleanup();
       });
 
       readStream.on("error", (err) => {
-        console.error("Error reading file stream:", err);
+        log.error("Error reading file stream", { error: err }, "ShareRoutes");
         cleanup();
         if (!res.headersSent) {
           sendErrorResponse(res, 500);
@@ -591,7 +610,7 @@ export const createShareDownloadHandler = (fileManager: FileManager) => {
       // Pipe the stream to response
       readStream.pipe(res);
     } catch (error) {
-      console.error("Error downloading file:", error);
+      log.error("Error downloading file", { error }, "ShareRoutes");
       cleanup();
       if (!res.headersSent) {
         sendErrorResponse(res, 500);
@@ -658,7 +677,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
       }
 
       // Log error
-      console.error("Error creating share:", error);
+      log.error("Error creating share", { error }, "ShareRoutes");
 
       // Return generic error
       res.status(500).json({
@@ -741,7 +760,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
         },
       });
     } catch (error) {
-      console.error("Error listing shares:", error);
+      log.error("Error listing shares", { error }, "ShareRoutes");
       res.status(500).json({
         success: false,
         error: "INTERNAL_ERROR",
@@ -807,7 +826,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
 
       res.status(200).json(response);
     } catch (error) {
-      console.error("Error getting share details:", error);
+      log.error("Error getting share details", { error }, "ShareRoutes");
       res.status(500).json({
         success: false,
         error: "INTERNAL_ERROR",
@@ -865,7 +884,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
         message: "Share link revoked successfully",
       });
     } catch (error) {
-      console.error("Error revoking share:", error);
+      log.error("Error revoking share", { error }, "ShareRoutes");
       res.status(500).json({
         success: false,
         error: "INTERNAL_ERROR",
@@ -927,7 +946,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
           message: "Share link permanently deleted",
         });
       } catch (error) {
-        console.error("Error deleting share:", error);
+        log.error("Error deleting share", { error }, "ShareRoutes");
         res.status(500).json({
           success: false,
           error: "INTERNAL_ERROR",
@@ -973,13 +992,13 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
       const logs = shareService.getAccessLogs(shareId, limit);
 
       // Format response
-      const formattedLogs = logs.map((log) => ({
-        timestamp: log.timestamp.toISOString(),
-        ipAddress: log.ipAddress,
-        userAgent: log.userAgent || null,
-        success: log.success,
-        errorCode: log.errorCode || null,
-        bytesTransferred: log.bytesTransferred || 0,
+      const formattedLogs = logs.map((logEntry) => ({
+        timestamp: logEntry.timestamp.toISOString(),
+        ipAddress: logEntry.ipAddress,
+        userAgent: logEntry.userAgent || null,
+        success: logEntry.success,
+        errorCode: logEntry.errorCode || null,
+        bytesTransferred: logEntry.bytesTransferred || 0,
       }));
 
       res.status(200).json({
@@ -990,7 +1009,7 @@ export const createShareRoutes = (fileManager: FileManager): Router => {
         },
       });
     } catch (error) {
-      console.error("Error getting access logs:", error);
+      log.error("Error getting access logs", { error }, "ShareRoutes");
       res.status(500).json({
         success: false,
         error: "INTERNAL_ERROR",

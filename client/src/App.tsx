@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { RoomJoin } from "@/components/RoomJoin";
 import { ClipboardRoom } from "@/components/ClipboardRoom";
-import { SharePage } from "@/pages/SharePage";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,6 +19,9 @@ import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { useActivityMonitor } from "@/hooks/useActivityMonitor";
 import { useMessageHandler } from "@/hooks/useMessageHandler";
 import { useTranslation } from "react-i18next";
+import { RoomProvider } from "@/contexts/RoomContext";
+
+const SharePage = lazy(() => import("@/pages/SharePage"));
 
 export function App(): JSX.Element {
   const {
@@ -134,18 +136,59 @@ export function App(): JSX.Element {
     setSwitchRoomTarget(null);
   }, []);
 
-  const handleNavigateToShare = () => {
+  const handleNavigateToShare = useCallback(() => {
     setShowSharePage(true);
-  };
+  }, []);
 
-  const handleBackFromShare = () => {
+  const handleBackFromShare = useCallback(() => {
     setShowSharePage(false);
-  };
+  }, []);
+
+  const roomContextValue = useMemo(
+    () => ({
+      roomKey,
+      currentUser,
+      users,
+      messages,
+      hasRoomPassword,
+      isPinned,
+      onSendMessage: handleSendMessage,
+      onSendFile: handleSendFile,
+      onLeaveRoom: handleLeaveRoom,
+      onSetRoomPassword: handleSetRoomPassword,
+      onShareRoomLink: handleShareRoomLink,
+      onNavigateToShare: handleNavigateToShare,
+      onPinRoom: handlePinRoom,
+    }),
+    [
+      roomKey,
+      currentUser,
+      users,
+      messages,
+      hasRoomPassword,
+      isPinned,
+      handleSendMessage,
+      handleSendFile,
+      handleLeaveRoom,
+      handleSetRoomPassword,
+      handleShareRoomLink,
+      handleNavigateToShare,
+      handlePinRoom,
+    ],
+  );
 
   if (showSharePage && currentUser) {
     return (
       <>
-        <SharePage userId={currentUser.id} onBack={handleBackFromShare} />
+        <Suspense
+          fallback={
+            <div className="flex min-h-screen items-center justify-center">
+              <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          }
+        >
+          <SharePage userId={currentUser.id} onBack={handleBackFromShare} />
+        </Suspense>
         <PWAInstallPrompt />
         <PWAUpdatePrompt />
         <Toaster />
@@ -173,21 +216,9 @@ export function App(): JSX.Element {
 
   return (
     <>
-      <ClipboardRoom
-        roomKey={roomKey}
-        currentUser={currentUser}
-        users={users}
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        onSendFile={handleSendFile}
-        onLeaveRoom={handleLeaveRoom}
-        onSetRoomPassword={handleSetRoomPassword}
-        onShareRoomLink={handleShareRoomLink}
-        onNavigateToShare={handleNavigateToShare}
-        hasRoomPassword={hasRoomPassword}
-        isPinned={isPinned}
-        onPinRoom={handlePinRoom}
-      />
+      <RoomProvider value={roomContextValue}>
+        <ClipboardRoom />
+      </RoomProvider>
       <AlertDialog
         open={!!switchRoomTarget}
         onOpenChange={(open) => !open && handleCancelSwitchRoom()}

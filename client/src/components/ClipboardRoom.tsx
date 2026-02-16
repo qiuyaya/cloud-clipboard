@@ -18,40 +18,26 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { ShareModal } from "./Share/ShareModal";
 import { useTranslation } from "react-i18next";
 import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
-import type { User, TextMessage, FileMessage, RoomKey } from "@cloud-clipboard/shared";
+import type { FileMessage } from "@cloud-clipboard/shared";
 import { Copy, Send, Upload, File, Download, Share2, Lock, Unlock, LogOut } from "lucide-react";
+import { useRoom } from "@/contexts/RoomContext";
 
-interface ClipboardRoomProps {
-  roomKey: RoomKey;
-  currentUser: User;
-  users: User[];
-  messages: (TextMessage | FileMessage)[];
-  onSendMessage: (content: string) => void;
-  onSendFile: (file: File) => void;
-  onLeaveRoom: () => void;
-  onSetRoomPassword: (hasPassword: boolean) => void;
-  onShareRoomLink: () => void;
-  onNavigateToShare?: () => void;
-  hasRoomPassword?: boolean;
-  isPinned?: boolean;
-  onPinRoom?: (pinned: boolean) => void;
-}
-
-export function ClipboardRoom({
-  roomKey,
-  currentUser,
-  users,
-  messages,
-  onSendMessage,
-  onSendFile,
-  onLeaveRoom,
-  onSetRoomPassword,
-  onShareRoomLink,
-  onNavigateToShare,
-  hasRoomPassword = false,
-  isPinned = false,
-  onPinRoom,
-}: ClipboardRoomProps): JSX.Element {
+export function ClipboardRoom(): JSX.Element {
+  const {
+    roomKey,
+    currentUser,
+    users,
+    messages,
+    onSendMessage,
+    onSendFile,
+    onLeaveRoom,
+    onSetRoomPassword,
+    onShareRoomLink,
+    onNavigateToShare,
+    hasRoomPassword,
+    isPinned,
+    onPinRoom,
+  } = useRoom();
   const [textInput, setTextInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -143,19 +129,7 @@ export function ClipboardRoom({
       {/* 桌面端侧边栏 */}
       {!isMobile && (
         <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-          <SidebarContent
-            roomKey={roomKey}
-            currentUser={currentUser}
-            users={users}
-            onLeaveRoom={onLeaveRoom}
-            onSetRoomPassword={onSetRoomPassword}
-            onShareRoomLink={onShareRoomLink}
-            onNavigateToShare={onNavigateToShare}
-            hasRoomPassword={hasRoomPassword}
-            isPinned={isPinned}
-            onPinRoom={onPinRoom}
-            isMobile={isMobile}
-          />
+          <SidebarContent isMobile={isMobile} />
         </div>
       )}
 
@@ -167,19 +141,7 @@ export function ClipboardRoom({
               <SheetTitle>{t("room.sidebarTitle")}</SheetTitle>
               <SheetDescription>{t("room.sidebarDescription")}</SheetDescription>
             </SheetHeader>
-            <SidebarContent
-              roomKey={roomKey}
-              currentUser={currentUser}
-              users={users}
-              onLeaveRoom={onLeaveRoom}
-              onSetRoomPassword={onSetRoomPassword}
-              onShareRoomLink={onShareRoomLink}
-              onNavigateToShare={onNavigateToShare}
-              hasRoomPassword={hasRoomPassword}
-              isPinned={isPinned}
-              onPinRoom={onPinRoom}
-              isMobile={isMobile}
-            />
+            <SidebarContent isMobile={isMobile} />
           </SheetContent>
         </Sheet>
       )}

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import type { User } from "@cloud-clipboard/shared";
+import { USER_INACTIVITY_TIMEOUT_MS } from "@cloud-clipboard/shared";
 
 interface UseActivityMonitorProps {
   currentUser: User | null;
@@ -30,8 +31,7 @@ export const useActivityMonitor = ({ currentUser, onLeaveRoom }: UseActivityMoni
 
   useEffect(() => {
     const checkInactivity = () => {
-      const twoHours = 2 * 60 * 60 * 1000;
-      if (currentUser && Date.now() - lastActivity > twoHours) {
+      if (currentUser && Date.now() - lastActivity > USER_INACTIVITY_TIMEOUT_MS) {
         onLeaveRoom();
         toast({
           title: t("toast.autoLogout"),

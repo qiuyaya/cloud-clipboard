@@ -115,7 +115,8 @@ describe("Integration Tests", () => {
         fingerprint: "test-fingerprint",
       };
 
-      roomService.joinRoom(roomKey, mockUser);
+      roomService.getRoomOrCreate(roomKey, mockUser.fingerprint);
+      roomService.addUserToRoom(roomKey, mockUser);
 
       // Get room info
       const response = await request(app).get(`/api/rooms/${roomKey}`).expect(200);

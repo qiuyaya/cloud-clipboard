@@ -287,5 +287,11 @@
       "incorrectPassword": "Incorrect password",
       "authFailed": "Authentication failed"
     }
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "defaultMessage": "An unexpected error occurred",
+    "tryAgain": "Try Again",
+    "reloadPage": "Reload Page"
   }
 }

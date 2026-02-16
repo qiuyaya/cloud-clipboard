@@ -119,8 +119,8 @@ describe("RoomService", () => {
     });
   });
 
-  describe("joinRoom", () => {
-    it("should add user to room", () => {
+  describe("addUserToRoom", () => {
+    it("should add user to existing room", () => {
       const user: User = {
         id: randomUUID(),
         name: "TestUser",
@@ -130,17 +130,13 @@ describe("RoomService", () => {
         isOnline: true,
       };
 
-      // Get the room that was created
       const createdRoom = roomService.createRoom("testroom");
-      const room = roomService.joinRoom("testroom", user);
+      roomService.addUserToRoom("testroom", user);
 
-      expect(room).toBeDefined();
-      expect(createdRoom.addUser).toHaveBeenCalled();
+      expect(createdRoom.addUser).toHaveBeenCalledWith(user);
     });
-  });
 
-  describe("joinRoomWithPassword", () => {
-    it("should join room when password is correct", () => {
+    it("should do nothing for non-existent room", () => {
       const user: User = {
         id: randomUUID(),
         name: "TestUser",
@@ -150,72 +146,8 @@ describe("RoomService", () => {
         isOnline: true,
       };
 
-      const testRoom = roomService.createRoom("testroom");
-      (testRoom.hasPassword as any).mockReturnValue(true);
-      (testRoom.validatePassword as any).mockReturnValue(true);
-
-      const result = roomService.joinRoomWithPassword("testroom", user, "password123");
-
-      expect(result.success).toBe(true);
-      expect(result.room).toBeDefined();
-    });
-
-    it("should fail when room doesn't exist", () => {
-      const user: User = {
-        id: randomUUID(),
-        name: "TestUser",
-        deviceType: "desktop",
-        fingerprint: "fp1",
-        lastSeen: new Date(),
-        isOnline: false,
-      };
-
-      const result = roomService.joinRoomWithPassword("nonexistent", user, "password123");
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Room not found");
-    });
-
-    it("should fail when room doesn't have password", () => {
-      const user: User = {
-        id: randomUUID(),
-        name: "TestUser",
-        deviceType: "desktop",
-        fingerprint: "fp1",
-        lastSeen: new Date(),
-        isOnline: false,
-      };
-
-      roomService.createRoom("testroom");
-
-      const result = roomService.joinRoomWithPassword("testroom", user, "password123");
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Room does not require a password");
-    });
-
-    it("should fail when password is invalid", () => {
-      const user: User = {
-        id: randomUUID(),
-        name: "TestUser",
-        deviceType: "desktop",
-        fingerprint: "fp1",
-        lastSeen: new Date(),
-        isOnline: true,
-      };
-
-      roomService.createRoom("testroom");
-      roomService.setRoomPassword("testroom", "correctpass");
-
-      // Mock hasPassword and validatePassword
-      const testRoom = roomService.getRoom("testroom")!;
-      (testRoom.hasPassword as any).mockReturnValue(true);
-      (testRoom.validatePassword as any).mockReturnValue(false);
-
-      const result = roomService.joinRoomWithPassword("testroom", user, "wrongpass");
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Invalid password");
+      // Should not throw
+      roomService.addUserToRoom("nonexistent", user);
     });
   });
 
