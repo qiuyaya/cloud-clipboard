@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2026-02-20
+
+- feat: 添加消息撤回功能
+- refactor: 代码质量优化和架构改进
+
 ## [2.2.0] - 2026-02-15
 
 - feat: 添加房间固定功能和 UI 优化
