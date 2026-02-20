@@ -79,6 +79,9 @@
     "you": "(You)",
     "copy": "Copy",
     "download": "Download",
+    "recall": "Recall",
+    "recallConfirm": "Confirm Recall?",
+    "recallCancel": "Cancel",
     "file": "File"
   },
   "input": {
@@ -113,7 +116,10 @@
       "failedToSendMessage": "Failed to send message",
       "tooManyMessages": "Too many messages. Please wait.",
       "failedToSetPassword": "Failed to set room password",
-      "failedToGenerateShareLink": "Failed to generate share link"
+      "failedToGenerateShareLink": "Failed to generate share link",
+      "messageNotFound": "Message not found",
+      "cannotRecallOthersMessage": "Cannot recall other user's message",
+      "failedToRecallMessage": "Failed to recall message"
     },
     "notConnected": "Not connected to server. Please try again.",
     "error": "Error",

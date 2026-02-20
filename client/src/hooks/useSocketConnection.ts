@@ -365,6 +365,11 @@ export const useSocketConnection = ({
         "Failed to generate share link": t(
           "toast.connectionErrorMessages.failedToGenerateShareLink",
         ),
+        "Message not found": t("toast.connectionErrorMessages.messageNotFound"),
+        "Cannot recall other user's message": t(
+          "toast.connectionErrorMessages.cannotRecallOthersMessage",
+        ),
+        "Failed to recall message": t("toast.connectionErrorMessages.failedToRecallMessage"),
       };
       return errorMap[error] || error;
     };
@@ -464,7 +469,13 @@ export const useSocketConnection = ({
     };
     socketService.onRoomPinned(handleRoomPinned);
 
+    const handleMessageRecalled = (data: { messageId: string }) => {
+      callbacksRef.current.onSetMessages((prev) => prev.filter((m) => m.id !== data.messageId));
+    };
+    socketService.onMessageRecalled(handleMessageRecalled);
+
     return () => {
+      socketService.off("messageRecalled", handleMessageRecalled);
       socketService.disconnect();
     };
   }, []);

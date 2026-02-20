@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from "socket.io";
 import type { Server } from "http";
 import { RoomService } from "./RoomService";
+import { FileManager } from "./FileManager";
 import type { RoomModel } from "../models/Room";
 import { log } from "../utils/logger";
 import { randomUUID } from "crypto";
@@ -13,6 +14,7 @@ import {
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
   PinRoomRequestSchema,
+  RecallMessageRequestSchema,
   sanitizeMessageContent,
   generateUserId,
   generateUserIdFromFingerprint,
@@ -35,6 +37,7 @@ import type {
   SetRoomPasswordRequest,
   ShareRoomLinkRequest,
   PinRoomRequest,
+  RecallMessageRequest,
 } from "@cloud-clipboard/shared";
 
 export class SocketService {
@@ -46,6 +49,7 @@ export class SocketService {
   constructor(
     server: Server,
     private roomService: RoomService,
+    private fileManager: FileManager,
   ) {
     // Use same CORS configuration as main server
     const allowedOrigins = process.env.CLIENT_URL
@@ -232,6 +236,20 @@ export class SocketService {
           )
         ) {
           this.handlePinRoom(socket, data);
+        } else {
+          socket.emit("error", "Too many requests. Please wait.");
+        }
+      });
+
+      socket.on("recallMessage", (data: RecallMessageRequest) => {
+        if (
+          this.checkRateLimit(
+            socket.id,
+            SOCKET_RATE_LIMITS.RECALL_MESSAGE.MAX_REQUESTS,
+            SOCKET_RATE_LIMITS.RECALL_MESSAGE.WINDOW_MS,
+          )
+        ) {
+          this.handleRecallMessage(socket, data);
         } else {
           socket.emit("error", "Too many requests. Please wait.");
         }
@@ -670,6 +688,61 @@ export class SocketService {
     } catch (error) {
       log.error("Pin room error", { error }, "SocketService");
       socket.emit("error", "Failed to pin/unpin room");
+    }
+  }
+
+  private handleRecallMessage(socket: any, data: RecallMessageRequest): void {
+    try {
+      const validatedData = RecallMessageRequestSchema.parse(data);
+
+      const user = this.socketUsers.get(socket.id);
+      if (!user) {
+        socket.emit("error", "User not authenticated");
+        return;
+      }
+
+      // Verify the message exists and belongs to this user
+      const messages = this.roomService.getMessagesInRoom(validatedData.roomKey);
+      const message = messages.find((m) => m.id === validatedData.messageId);
+      if (!message) {
+        socket.emit("error", "Message not found");
+        return;
+      }
+
+      if (message.sender.id !== user.id) {
+        socket.emit("error", "Cannot recall other user's message");
+        return;
+      }
+
+      // Clean up file from disk if it's a file message
+      if (message.type === "file" && "fileId" in message && message.fileId) {
+        this.fileManager.deleteFile(message.fileId, "manual");
+      }
+
+      const removed = this.roomService.removeMessage(
+        validatedData.roomKey,
+        validatedData.messageId,
+      );
+      if (removed) {
+        this.io.to(validatedData.roomKey).emit("messageRecalled", {
+          messageId: validatedData.messageId,
+        });
+
+        log.info(
+          "Message recalled",
+          {
+            roomKey: validatedData.roomKey,
+            messageId: validatedData.messageId,
+            userName: user.name,
+          },
+          "SocketService",
+        );
+      } else {
+        socket.emit("error", "Failed to recall message");
+      }
+    } catch (error) {
+      log.error("Recall message error", { error }, "SocketService");
+      socket.emit("error", "Failed to recall message");
     }
   }
 

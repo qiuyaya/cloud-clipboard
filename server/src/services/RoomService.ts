@@ -90,6 +90,13 @@ export class RoomService extends EventEmitter {
     return true;
   }
 
+  removeMessage(key: RoomKey, messageId: string): boolean {
+    const room = this.getRoom(key);
+    if (!room) return false;
+
+    return room.removeMessage(messageId);
+  }
+
   getUsersInRoom(key: RoomKey): User[] {
     const room = this.getRoom(key);
     return room ? room.getUserList() : [];

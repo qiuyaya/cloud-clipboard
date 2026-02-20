@@ -12,6 +12,7 @@ import type {
   SetRoomPasswordRequest,
   ShareRoomLinkRequest,
   PinRoomRequest,
+  RecallMessageRequest,
 } from "@cloud-clipboard/shared";
 import {
   SOCKET_RECONNECTION_ATTEMPTS,
@@ -159,6 +160,12 @@ class SocketService {
     }
   }
 
+  recallMessage(data: RecallMessageRequest): void {
+    if (this.socket) {
+      this.socket.emit("recallMessage", data);
+    }
+  }
+
   leaveRoom(data: LeaveRoomRequest): void {
     this.socket?.emit("leaveRoom", data);
   }
@@ -278,6 +285,12 @@ class SocketService {
   onRoomLinkGenerated(callback: (data: { roomKey: string; shareLink: string }) => void): void {
     if (this.socket) {
       this.socket.on("roomLinkGenerated", callback);
+    }
+  }
+
+  onMessageRecalled(callback: (data: { messageId: string }) => void): void {
+    if (this.socket) {
+      this.socket.on("messageRecalled", callback);
     }
   }
 

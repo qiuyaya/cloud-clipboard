@@ -19,7 +19,20 @@ import { ShareModal } from "./Share/ShareModal";
 import { useTranslation } from "react-i18next";
 import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
 import type { FileMessage } from "@cloud-clipboard/shared";
-import { Copy, Send, Upload, File, Download, Share2, Lock, Unlock, LogOut } from "lucide-react";
+import {
+  Copy,
+  Send,
+  Upload,
+  File,
+  Download,
+  Share2,
+  Lock,
+  Unlock,
+  LogOut,
+  Undo2,
+  Check,
+  X,
+} from "lucide-react";
 import { useRoom } from "@/contexts/RoomContext";
 
 export function ClipboardRoom(): JSX.Element {
@@ -30,6 +43,7 @@ export function ClipboardRoom(): JSX.Element {
     messages,
     onSendMessage,
     onSendFile,
+    onRecallMessage,
     onLeaveRoom,
     onSetRoomPassword,
     onShareRoomLink,
@@ -46,6 +60,7 @@ export function ClipboardRoom(): JSX.Element {
     name: string;
   } | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [recallConfirmId, setRecallConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -227,31 +242,67 @@ export function ClipboardRoom(): JSX.Element {
                         {formatTimestamp(message.timestamp, i18n.language)}
                       </span>
                     </div>
-                    {message.type === "text" && (
-                      <button
-                        onClick={() => copyToClipboard(message.content, message.id)}
-                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors opacity-0 group-hover:opacity-100 opacity-100 md:opacity-0"
-                        title={t("message.copy")}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    {message.type === "file" && message.downloadUrl && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 opacity-100 md:opacity-0">
+                    {recallConfirmId === message.id ? (
+                      <div className="flex items-center gap-1 animate-in fade-in-0 duration-150">
+                        <span className="text-xs text-destructive mr-1">
+                          {t("message.recallConfirm")}
+                        </span>
                         <button
-                          onClick={() => downloadFile(message)}
-                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                          title={t("message.download")}
+                          onClick={() => {
+                            onRecallMessage(message.id);
+                            setRecallConfirmId(null);
+                          }}
+                          className="p-1.5 text-destructive hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                          title={t("message.recallConfirm")}
                         >
-                          <Download className="h-3.5 w-3.5" />
+                          <Check className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => handleShareClick(message)}
+                          onClick={() => setRecallConfirmId(null)}
                           className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                          title={t("share.button")}
+                          title={t("message.recallCancel")}
                         >
-                          <Share2 className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1 opacity-100 md:opacity-0 group-hover:md:opacity-100">
+                        {message.type === "text" && (
+                          <button
+                            onClick={() => copyToClipboard(message.content, message.id)}
+                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                            title={t("message.copy")}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {message.type === "file" && message.downloadUrl && (
+                          <>
+                            <button
+                              onClick={() => downloadFile(message)}
+                              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                              title={t("message.download")}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleShareClick(message)}
+                              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                              title={t("share.button")}
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {message.sender.id === currentUser.id && (
+                          <button
+                            onClick={() => setRecallConfirmId(message.id)}
+                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                            title={t("message.recall")}
+                          >
+                            <Undo2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     )}
                     {copiedMessageId === message.id && (

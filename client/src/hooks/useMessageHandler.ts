@@ -150,8 +150,21 @@ export const useMessageHandler = ({ currentUser, roomKey }: UseMessageHandlerPro
     [currentUser, roomKey, toast, t],
   );
 
+  const handleRecallMessage = useCallback(
+    (messageId: string) => {
+      if (!roomKey) return;
+      socketService.recallMessage({
+        type: "recall_message",
+        roomKey,
+        messageId,
+      });
+    },
+    [roomKey],
+  );
+
   return {
     handleSendMessage,
     handleSendFile,
+    handleRecallMessage,
   };
 };

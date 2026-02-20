@@ -69,7 +69,7 @@ export function App(): JSX.Element {
     onLeaveRoom: handleLeaveRoom,
   });
 
-  const { handleSendMessage, handleSendFile } = useMessageHandler({
+  const { handleSendMessage, handleSendFile, handleRecallMessage } = useMessageHandler({
     currentUser,
     roomKey,
   });
@@ -146,14 +146,15 @@ export function App(): JSX.Element {
 
   const roomContextValue = useMemo(
     () => ({
-      roomKey,
-      currentUser,
+      roomKey: roomKey!,
+      currentUser: currentUser!,
       users,
       messages,
       hasRoomPassword,
       isPinned,
       onSendMessage: handleSendMessage,
       onSendFile: handleSendFile,
+      onRecallMessage: handleRecallMessage,
       onLeaveRoom: handleLeaveRoom,
       onSetRoomPassword: handleSetRoomPassword,
       onShareRoomLink: handleShareRoomLink,
@@ -169,6 +170,7 @@ export function App(): JSX.Element {
       isPinned,
       handleSendMessage,
       handleSendFile,
+      handleRecallMessage,
       handleLeaveRoom,
       handleSetRoomPassword,
       handleShareRoomLink,

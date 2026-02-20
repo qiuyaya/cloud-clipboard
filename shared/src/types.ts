@@ -19,6 +19,7 @@ import {
   SetRoomPasswordRequestSchema,
   ShareRoomLinkRequestSchema,
   PinRoomRequestSchema,
+  RecallMessageRequestSchema,
   SharedFileSchema,
   ShareLinkSchema,
   ShareAccessLogSchema,
@@ -40,6 +41,7 @@ export type RoomPassword = z.infer<typeof RoomPasswordSchema>;
 export type SetRoomPasswordRequest = z.infer<typeof SetRoomPasswordRequestSchema>;
 export type ShareRoomLinkRequest = z.infer<typeof ShareRoomLinkRequestSchema>;
 export type PinRoomRequest = z.infer<typeof PinRoomRequestSchema>;
+export type RecallMessageRequest = z.infer<typeof RecallMessageRequestSchema>;
 export type APIResponse<T = unknown> = Omit<z.infer<typeof APIResponseSchema>, "data"> & {
   data?: T;
 };
@@ -72,6 +74,7 @@ export interface ServerToClientEvents {
   roomLinkGenerated: (data: { roomKey: string; shareLink: string }) => void;
   passwordRequired: (data: { roomKey: string }) => void;
   roomPinned: (data: { roomKey: string; isPinned: boolean }) => void;
+  messageRecalled: (data: { messageId: string }) => void;
   p2pOffer: (data: { from: string; offer: string }) => void;
   p2pAnswer: (data: { from: string; answer: string }) => void;
   p2pIceCandidate: (data: { from: string; candidate: string }) => void;
@@ -86,6 +89,7 @@ export interface ClientToServerEvents {
   setRoomPassword: (data: SetRoomPasswordRequest) => void;
   shareRoomLink: (data: ShareRoomLinkRequest) => void;
   pinRoom: (data: PinRoomRequest) => void;
+  recallMessage: (data: RecallMessageRequest) => void;
   p2pOffer: (data: { to: string; offer: string }) => void;
   p2pAnswer: (data: { to: string; answer: string }) => void;
   p2pIceCandidate: (data: { to: string; candidate: string }) => void;

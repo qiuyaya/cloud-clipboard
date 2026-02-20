@@ -78,6 +78,9 @@
     "you": "（您）",
     "copy": "复制",
     "download": "下载",
+    "recall": "撤回",
+    "recallConfirm": "确认撤回？",
+    "recallCancel": "取消",
     "file": "文件"
   },
   "input": {
@@ -112,7 +115,10 @@
       "failedToSendMessage": "发送消息失败",
       "tooManyMessages": "发送消息过于频繁，请稍后再试",
       "failedToSetPassword": "设置密码失败",
-      "failedToGenerateShareLink": "生成分享链接失败"
+      "failedToGenerateShareLink": "生成分享链接失败",
+      "messageNotFound": "消息不存在",
+      "cannotRecallOthersMessage": "无法撤回他人的消息",
+      "failedToRecallMessage": "撤回消息失败"
     },
     "notConnected": "未连接到服务器。请重试。",
     "error": "错误",

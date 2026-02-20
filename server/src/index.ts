@@ -104,7 +104,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const fileManager = new FileManager();
 const roomService = new RoomService();
-const socketService = new SocketService(server, roomService);
+const socketService = new SocketService(server, roomService, fileManager);
 
 // Handle room destruction events - cleanup files and notify users
 roomService.on("roomDestroyed", (roomKey: string) => {

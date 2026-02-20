@@ -156,6 +156,12 @@ export const PinRoomRequestSchema = z.object({
   pinned: z.boolean(),
 });
 
+export const RecallMessageRequestSchema = z.object({
+  type: z.literal("recall_message"),
+  roomKey: RoomKeySchema,
+  messageId: z.string().uuid(),
+});
+
 export const WebSocketMessageSchema = z.discriminatedUnion("type", [
   TextMessageSchema,
   FileMessageSchema,

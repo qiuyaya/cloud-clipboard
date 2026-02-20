@@ -72,6 +72,14 @@ export class RoomModel implements Room {
     this.updateActivity();
   }
 
+  removeMessage(messageId: string): boolean {
+    const index = this.messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return false;
+    this.messages.splice(index, 1);
+    this.updateActivity();
+    return true;
+  }
+
   getMessages(limit?: number): (TextMessage | FileMessage)[] {
     if (!limit || limit >= this.messages.length) {
       return this.messages;

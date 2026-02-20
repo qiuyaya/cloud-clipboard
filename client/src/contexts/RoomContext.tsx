@@ -14,6 +14,7 @@ export interface RoomContextValue {
   onSetRoomPassword: (hasPassword: boolean) => void;
   onShareRoomLink: () => void;
   onNavigateToShare: () => void;
+  onRecallMessage: (messageId: string) => void;
   onPinRoom: (pinned: boolean) => void;
 }
 

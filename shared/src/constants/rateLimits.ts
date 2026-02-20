@@ -76,6 +76,11 @@ export const SOCKET_RATE_LIMITS = {
     WINDOW_MS: TIME_CONSTANTS.ONE_MINUTE,
     MAX_REQUESTS: 20,
   },
+  // Recall message events - 10 recalls per minute
+  RECALL_MESSAGE: {
+    WINDOW_MS: TIME_CONSTANTS.ONE_MINUTE,
+    MAX_REQUESTS: 10,
+  },
 } as const;
 
 // Cleanup intervals

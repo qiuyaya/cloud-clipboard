@@ -1,6 +1,9 @@
 /// <reference types="vitest" />
 import { describe, it, expect, vi } from "vitest";
 import type { User } from "@cloud-clipboard/shared";
+import { RecallMessageRequestSchema } from "@cloud-clipboard/shared";
+import { RoomModel } from "../../models/Room";
+import { RoomService } from "../RoomService";
 
 // Mock setInterval before any imports
 vi.stubGlobal(
@@ -350,5 +353,158 @@ describe("SocketService Share Room Link", () => {
     const shareLink = `${clientOrigin}/?room=${roomKey}&password=${password}`;
 
     expect(shareLink).toBe("http://localhost:3000/?room=test-room&password=secret123");
+  });
+});
+
+describe("SocketService Recall Message", () => {
+  it("should validate RecallMessageRequest schema - valid input", () => {
+    const validRequest = {
+      type: "recall_message",
+      roomKey: "room1a",
+      messageId: "550e8400-e29b-41d4-a716-446655440000",
+    };
+    const result = RecallMessageRequestSchema.safeParse(validRequest);
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject RecallMessageRequest with non-uuid messageId", () => {
+    const invalidRequest = {
+      type: "recall_message",
+      roomKey: "room1a",
+      messageId: "not-a-uuid",
+    };
+    const result = RecallMessageRequestSchema.safeParse(invalidRequest);
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject RecallMessageRequest with invalid roomKey", () => {
+    const invalidRequest = {
+      type: "recall_message",
+      roomKey: "!!!!",
+      messageId: "550e8400-e29b-41d4-a716-446655440000",
+    };
+    const result = RecallMessageRequestSchema.safeParse(invalidRequest);
+    expect(result.success).toBe(false);
+  });
+
+  it("should remove message from RoomModel and return true when found", () => {
+    const room = new RoomModel("room1a");
+    const fakeMessage = {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      type: "text" as const,
+      content: "hello",
+      sender: {
+        id: "user-1",
+        name: "Alice",
+        isOnline: true,
+        lastSeen: new Date(),
+        deviceType: "desktop" as const,
+      },
+      timestamp: new Date(),
+      roomKey: "room1a" as any,
+    };
+    room.addMessage(fakeMessage);
+    expect(room.getMessages().length).toBe(1);
+
+    const removed = room.removeMessage(fakeMessage.id);
+    expect(removed).toBe(true);
+    expect(room.getMessages().length).toBe(0);
+  });
+
+  it("should return false when removing non-existent message from RoomModel", () => {
+    const room = new RoomModel("room1a");
+    const removed = room.removeMessage("550e8400-e29b-41d4-a716-446655440000");
+    expect(removed).toBe(false);
+  });
+
+  it("should only allow sender to recall their own message", () => {
+    const room = new RoomModel("room1a");
+    const senderId = "user-1";
+    const otherUserId = "user-2";
+    const messageId = "550e8400-e29b-41d4-a716-446655440000";
+
+    room.addMessage({
+      id: messageId,
+      type: "text" as const,
+      content: "hello",
+      sender: {
+        id: senderId,
+        name: "Alice",
+        isOnline: true,
+        lastSeen: new Date(),
+        deviceType: "desktop" as const,
+      },
+      timestamp: new Date(),
+      roomKey: "room1a" as any,
+    });
+
+    const message = room.getMessages().find((m) => m.id === messageId);
+    expect(message).toBeDefined();
+    expect(message!.sender.id).toBe(senderId);
+    expect(message!.sender.id).not.toBe(otherUserId);
+  });
+
+  it("should remove file message and allow file cleanup", () => {
+    const room = new RoomModel("room1a");
+    const fileMessage = {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      type: "file" as const,
+      fileInfo: { name: "test.pdf", size: 1024, type: "application/pdf", lastModified: Date.now() },
+      fileId: "file-123",
+      downloadUrl: "http://localhost:3001/api/files/download/file-123",
+      sender: {
+        id: "user-1",
+        name: "Alice",
+        isOnline: true,
+        lastSeen: new Date(),
+        deviceType: "desktop" as const,
+      },
+      timestamp: new Date(),
+      roomKey: "room1a" as any,
+    };
+
+    room.addMessage(fileMessage);
+    const msg = room.getMessages().find((m) => m.id === fileMessage.id);
+    expect(msg).toBeDefined();
+    expect(msg!.type).toBe("file");
+    expect("fileId" in msg!).toBe(true);
+
+    const removed = room.removeMessage(fileMessage.id);
+    expect(removed).toBe(true);
+    expect(room.getMessages().length).toBe(0);
+  });
+
+  it("should remove message via RoomService", () => {
+    const roomService = new RoomService();
+    const roomKey = "room1a";
+    roomService.createRoom(roomKey);
+
+    roomService.addMessage(roomKey, {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      type: "text" as const,
+      content: "hello",
+      sender: {
+        id: "user-1",
+        name: "Alice",
+        isOnline: true,
+        lastSeen: new Date(),
+        deviceType: "desktop" as const,
+      },
+      timestamp: new Date(),
+      roomKey: roomKey as any,
+    });
+
+    expect(roomService.getMessagesInRoom(roomKey).length).toBe(1);
+    expect(roomService.removeMessage(roomKey, "550e8400-e29b-41d4-a716-446655440000")).toBe(true);
+    expect(roomService.getMessagesInRoom(roomKey).length).toBe(0);
+    roomService.destroy();
+  });
+
+  it("should return false when removing message from non-existent room via RoomService", () => {
+    const roomService = new RoomService();
+    expect(roomService.removeMessage("nonexistent1", "550e8400-e29b-41d4-a716-446655440000")).toBe(
+      false,
+    );
+    roomService.destroy();
   });
 });

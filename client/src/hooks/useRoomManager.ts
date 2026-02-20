@@ -48,7 +48,7 @@ export const useRoomManager = () => {
   const [pendingRoomJoin, setPendingRoomJoin] = useState<{
     roomKey: string;
     username: string | undefined;
-    fingerprint: BrowserFingerprint;
+    fingerprint?: BrowserFingerprint;
   } | null>(null);
 
   const { toast } = useToast();
