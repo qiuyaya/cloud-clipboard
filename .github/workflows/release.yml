@@ -284,7 +284,7 @@ jobs:
 
           ---
 
-          **Full Changelog**: https://github.com/\${{ github.repository }}/compare/\${PREVIOUS_TAG}...${{ steps.get_version.outputs.version }}
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ steps.get_version.outputs.version }}
           EOF
 
           echo "Generated release notes"
