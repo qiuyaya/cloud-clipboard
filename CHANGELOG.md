@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.1] - 2026-02-22
+
+- fix: 修复深色主题切换按钮图标错位问题
+
 ## [2.3.0] - 2026-02-20
 
 - feat: 添加消息撤回功能
