@@ -277,9 +277,27 @@ export class SocketService {
     try {
       const validatedData = JoinRoomRequestSchema.parse(data);
 
-      // Check if room requires password
+      // Check if room requires password (skip for reconnecting users)
       if (this.roomService.isRoomPasswordProtected(validatedData.roomKey)) {
-        socket.emit("passwordRequired", { roomKey: validatedData.roomKey });
+        const room = this.roomService.getRoom(validatedData.roomKey);
+        const isReconnecting =
+          room &&
+          validatedData.fingerprint?.hash &&
+          room.getUserList().some((u) => u.fingerprint === validatedData.fingerprint?.hash);
+
+        if (!isReconnecting) {
+          socket.emit("passwordRequired", { roomKey: validatedData.roomKey });
+          return;
+        }
+
+        // Reconnecting user - skip password, proceed with join
+        this.processUserJoin(
+          socket,
+          validatedData.roomKey,
+          validatedData.user,
+          validatedData.fingerprint,
+          room,
+        );
         return;
       }
 
@@ -382,6 +400,10 @@ export class SocketService {
           roomKey,
           isPinned: !!room.isPinned,
         });
+        socket.emit("roomPasswordSet", {
+          roomKey,
+          hasPassword: room.hasPassword(),
+        });
 
         const messages = this.roomService.getMessagesInRoom(roomKey, INITIAL_MESSAGE_LIMIT);
         if (messages.length > 0) {
@@ -443,6 +465,7 @@ export class SocketService {
     socket.emit("userJoined", user);
     socket.emit("userList", room.getUserList());
     socket.emit("roomPinned", { roomKey, isPinned: !!room.isPinned });
+    socket.emit("roomPasswordSet", { roomKey, hasPassword: room.hasPassword() });
 
     const messages = this.roomService.getMessagesInRoom(roomKey, INITIAL_MESSAGE_LIMIT);
     if (messages.length > 0) {
