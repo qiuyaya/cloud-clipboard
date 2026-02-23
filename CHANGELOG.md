@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.2] - 2026-02-23
+
+- fix: 修复刷新页面后密码保护房间的重连和密码状态恢复问题
+- feat: 优化移动端顶栏按钮交互反馈
+- fix: 修复 release notes 中 Full Changelog 链接转义错误
+
 ## [2.3.1] - 2026-02-22
 
 - fix: 修复深色主题切换按钮图标错位问题
