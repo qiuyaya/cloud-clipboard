@@ -13,8 +13,6 @@ import { useToast } from "@/hooks/useToast";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileNav } from "@/components/MobileNav";
 import { SidebarContent } from "./SidebarContent";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { LanguageToggle } from "@/components/LanguageToggle";
 import { ShareModal } from "./Share/ShareModal";
 import { useTranslation } from "react-i18next";
 import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
@@ -61,6 +59,8 @@ export function ClipboardRoom(): JSX.Element {
   } | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [recallConfirmId, setRecallConfirmId] = useState<string | null>(null);
+  const [mobilePasswordChanged, setMobilePasswordChanged] = useState<boolean | null>(null);
+  const [mobileShareCopied, setMobileShareCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -125,10 +125,17 @@ export function ClipboardRoom(): JSX.Element {
 
   const shareRoom = (): void => {
     onShareRoomLink();
+    setTimeout(() => {
+      setMobileShareCopied(true);
+      setTimeout(() => setMobileShareCopied(false), 2000);
+    }, 500);
   };
 
   const toggleRoomPassword = (): void => {
-    onSetRoomPassword(!hasRoomPassword);
+    const newState = !hasRoomPassword;
+    onSetRoomPassword(newState);
+    setMobilePasswordChanged(newState);
+    setTimeout(() => setMobilePasswordChanged(null), 2000);
   };
 
   const handleShareClick = (message: FileMessage): void => {
@@ -169,33 +176,45 @@ export function ClipboardRoom(): JSX.Element {
             <MobileNav onOpenSidebar={() => setIsSidebarOpen(true)} />
             <div className="flex items-center gap-2">
               {/* Room Management - Left */}
-              <Button
-                variant="outline"
-                size="mobile-sm"
-                onClick={toggleRoomPassword}
-                className="mobile-touch"
-                title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
-              >
-                {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="outline"
-                size="mobile-sm"
-                onClick={shareRoom}
-                className="mobile-touch"
-                title={t("room.share")}
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="mobile-sm"
+                  onClick={toggleRoomPassword}
+                  className="mobile-touch"
+                  title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
+                >
+                  {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                </Button>
+                {mobilePasswordChanged !== null && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                    <span className="text-popover-foreground">
+                      {mobilePasswordChanged ? t("room.passwordSet") : t("room.passwordRemoved")}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  size="mobile-sm"
+                  onClick={shareRoom}
+                  className="mobile-touch"
+                  title={t("room.share")}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+                {mobileShareCopied && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                    <span className="text-popover-foreground">{t("room.linkCopied")}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Spacer */}
               <div className="w-px h-6 bg-border mx-1" />
 
               {/* User Actions - Right */}
-              <div className="flex items-center gap-1">
-                <ThemeToggle />
-                <LanguageToggle />
-              </div>
               <Button
                 variant="outline"
                 size="mobile-sm"
