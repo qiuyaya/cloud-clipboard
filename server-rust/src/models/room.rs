@@ -93,6 +93,17 @@ impl Room {
         self.update_activity();
     }
 
+    /// Remove a message by ID, returns true if found and removed
+    pub fn remove_message(&mut self, message_id: &str) -> bool {
+        let initial_len = self.messages.len();
+        self.messages.retain(|m| m.id != message_id);
+        let removed = self.messages.len() < initial_len;
+        if removed {
+            self.update_activity();
+        }
+        removed
+    }
+
     pub fn get_messages(&self) -> &VecDeque<Message> {
         &self.messages
     }

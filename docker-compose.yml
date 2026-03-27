@@ -8,13 +8,13 @@ services:
       - "6030:6030"
     environment:
       - TZ=Asia/Shanghai
-      - NODE_ENV=production
       - PORT=6030
       - UPLOAD_DIR=/app/uploads
+      - STATIC_DIR=/app/public
       - MAX_FILE_SIZE=104857600 # 100MB in bytes
-      - ROOM_CLEANUP_INTERVAL=3600000 # 1 hour in milliseconds
+      - ROOM_CLEANUP_INTERVAL_SECONDS=3600 # 1 hour in seconds
       - FILE_RETENTION_HOURS=12
-      - RATE_LIMIT_WINDOW_MS=60000 # 1 minute
+      - RATE_LIMIT_WINDOW=60 # 1 minute in seconds
       - RATE_LIMIT_MAX_REQUESTS=100
       - ALLOW_HTTP=true # Allow HTTP connections for development
     volumes:

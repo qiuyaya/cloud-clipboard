@@ -88,14 +88,14 @@ cargo test
 
 ## 环境变量
 
-| 变量                   | 默认值            | 说明         |
-| ---------------------- | ----------------- | ------------ |
-| `PORT`                 | 3001              | 服务器端口   |
-| `NODE_ENV`             | development       | 环境模式     |
-| `UPLOAD_DIR`           | ./uploads         | 文件上传目录 |
-| `MAX_FILE_SIZE`        | 104857600 (100MB) | 最大文件大小 |
-| `FILE_RETENTION_HOURS` | 12                | 文件保留时间 |
-| `RUST_LOG`             | info              | 日志级别     |
+| 变量                   | 默认值            | 说明                              |
+| ---------------------- | ----------------- | --------------------------------- |
+| `PORT`                 | 3001              | 服务器端口                        |
+| `ALLOW_HTTP`           | false             | 允许HTTP连接（生产环境设为false） |
+| `UPLOAD_DIR`           | ./uploads         | 文件上传目录                      |
+| `MAX_FILE_SIZE`        | 104857600 (100MB) | 最大文件大小                      |
+| `FILE_RETENTION_HOURS` | 12                | 文件保留时间                      |
+| `RUST_LOG`             | info              | 日志级别                          |
 
 ## 技术栈
 

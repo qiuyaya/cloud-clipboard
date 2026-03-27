@@ -15,13 +15,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Development
 
-- `bun run dev` - Start both server and client in development mode (server on port 3001, client on port 3000)
-- `bun run server:dev` - Start only the server (port 3001)
+- `bun run dev` - Start client in development mode (port 3000)
 - `bun run client:dev` - Start only the client (port 3000)
-- `bun run build` - Build all packages for production
-- `bun run build:production` - Build server with production optimizations
-- `bun run copy-client` - Copy client build to server public directory
-- `bun run start` - Start production server (runs on port 3001)
+- `bun run build` - Build frontend for production
+- `bun run copy-client` - Copy client build to server-rust public directory
 
 ### Rust Backend (server-rust/)
 
@@ -74,8 +71,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - If test files modified, runs relevant tests
 
 - `pre-push` - Runs automatically before each push:
-  - Run full validation (all checks + tests)
-  - Run build test to ensure production build works
+  - Run full validation (format, lint, type-check, tests)
 
 **GitHub Actions (CI/CD)**:
 
@@ -130,9 +126,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 这是一个 Bun-based monorepo，包含以下工作空间：
 
 1. **`shared/`** - Core types and validation schemas using Zod
-2. **`server/`** - Express.js + Socket.IO backend (Node.js)
-3. **`server-rust/`** - Axum + SocketiOxide backend (Rust) ⭐ 新增
-4. **`client/`** - React + Vite frontend
+2. **`server-rust/`** - Axum + SocketiOxide backend (Rust)
+3. **`client/`** - React + Vite frontend
 
 ### Rust Backend Architecture
 
@@ -248,7 +243,6 @@ const userWithDate = {
 
 **Testing Framework**: Comprehensive test coverage with:
 
-- **Node.js Backend**: Unit tests for all modules
 - **Rust Backend**: 15 个测试模块
   - 单元测试：服务、模型、工具函数
   - 集成测试：完整的 API 流程
@@ -403,15 +397,19 @@ const userWithDate = {
 
 ## Active Technologies
 
-- **TypeScript 5.9.3 + Bun 1.x**: Node.js 后端运行时和包管理器
-- **Express.js + Socket.IO**: Node.js 后端 web 框架和 WebSocket
-- **Rust 1.93 + Axum 0.8 + SocketiOxide 0.15**: Rust 后端实现 ⭐ 新增
-- **Zod**: 类型验证和 schema 定义
+- **TypeScript 5.9.3 + Bun 1.x**: 前端运行时和包管理器
+- **Rust 1.93 + Axum 0.8 + SocketiOxide 0.15**: 后端实现
+- **Zod**: 前端类型验证和 schema 定义
 - **React + Vite**: 前端框架和构建工具
-- In-memory Map-based storage (server), Multer for file uploads (001-external-file-sharing)
+- In-memory Map-based storage (server-rust), Multipart for file uploads
 
 ## Recent Changes
 
+- **Remove Node.js Backend** (2026-03):
+  - 删除 Node.js 后端 (server/)，Rust 后端成为唯一后端
+  - 重写 Dockerfile 为多阶段构建（前端 + Rust 后端）
+  - 更新所有 CI/CD 流程
+  - 简化发布流程为单镜像
 - **Rust Backend Implementation** (2026-02):
   - 新增完整的 Rust 后端实现（Axum + SocketiOxide）
   - 添加 15 个测试模块
@@ -419,4 +417,4 @@ const userWithDate = {
   - 更新 CI/CD 流程，添加 Rust 测试、格式化检查、Clippy 检查
   - 完善服务层实现：文件管理、房间服务、分享服务
   - 增强中间件功能和安全测试
-- 001-external-file-sharing: Added TypeScript 5.9.3 + Bun 1.x, Express.js, Socket.IO, Zod, React, Vite
+- 001-external-file-sharing: Added TypeScript 5.9.3 + Bun 1.x, Zod, React, Vite

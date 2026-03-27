@@ -209,7 +209,7 @@ jobs:
           echo "Root version: $ROOT_VERSION"
 
           # Check all package.json files
-          PACKAGES=("client" "server" "shared")
+          PACKAGES=("client" "shared")
           for pkg in "${PACKAGES[@]}"; do
             if [ -f "$pkg/package.json" ]; then
               PKG_VERSION=$(node -p "require('./$pkg/package.json').version")

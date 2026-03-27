@@ -76,13 +76,11 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| "3001".to_string())
         .parse::<u16>()?;
 
-    let is_production = std::env::var("NODE_ENV")
-        .map(|v| v == "production")
-        .unwrap_or(false);
-
     let allow_http = std::env::var("ALLOW_HTTP")
         .map(|v| v.to_lowercase() == "true")
         .unwrap_or(false);
+
+    let is_production = !allow_http;
 
     // BASE_PATH for sub-path deployment (e.g., "/clipboard")
     let base_path = std::env::var("BASE_PATH")

@@ -419,6 +419,25 @@ impl RoomService {
         }
     }
 
+    /// Remove a message from a room
+    pub fn remove_message(&self, room_key: &str, message_id: &str) -> Result<bool, String> {
+        let mut rooms = self.rooms.write().map_err(|e| format!("Lock error: {}", e))?;
+        match rooms.get_mut(room_key) {
+            Some(room) => Ok(room.remove_message(message_id)),
+            None => Err("Room not found".to_string()),
+        }
+    }
+
+    /// Get the sender ID of a message
+    pub fn get_message_sender(&self, room_key: &str, message_id: &str) -> Option<String> {
+        let rooms = self.rooms.read().ok()?;
+        let room = rooms.get(room_key)?;
+        room.messages
+            .iter()
+            .find(|m| m.id == message_id)
+            .map(|m| m.sender.id.clone())
+    }
+
     /// Get room messages
     pub fn get_messages(&self, room_key: &str) -> Vec<Message> {
         self.rooms

@@ -65,40 +65,41 @@ jobs:
       - name: Run shared tests
         run: bun run shared:test
 
-      - name: Run server tests
-        run: bun run server:test
-
       - name: Run client tests
         run: bun run client:test
 
   integration-tests:
-    name: Integration Tests
+    name: Rust Integration Tests
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
+      - name: Create cargo cache directories
+        run: mkdir -p ~/.cargo/registry ~/.cargo/git
 
-      - name: Cache Bun dependencies
+      - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-
+            ${{ runner.os }}-cargo-
 
-      - name: Install dependencies
-        run: bun install
-
-      - name: Run integration tests
-        run: bun run test:integration
+      - name: Run Rust integration tests
+        run: |
+          cd server-rust
+          docker run --rm \
+            -v $(pwd):/app \
+            -v ~/.cargo/registry:/root/.cargo/registry \
+            -v ~/.cargo/git:/root/.cargo/git \
+            -w /app rust:1.93-alpine sh -c "
+            apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static > /dev/null 2>&1 &&
+            cargo test --all-features --no-fail-fast
+          "
 
   e2e-tests:
     name: End-to-End Tests
@@ -127,11 +128,24 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Build frontend and start Rust backend
+        run: |
+          bun run build
+          bun run copy-client
+          cd server-rust
+          docker build -t cloud-clipboard-e2e .
+          docker run -d --name e2e-backend -p 3001:3001 -e ALLOW_HTTP=true cloud-clipboard-e2e
+          for i in $(seq 1 30); do curl -sf http://localhost:3001/api/health && break; sleep 1; done
+
       - name: Install Playwright browsers
         run: cd client && bunx playwright install --with-deps
 
       - name: Run Playwright tests
         run: bun run client:test:e2e
+
+      - name: Stop backend
+        if: always()
+        run: docker rm -f e2e-backend || true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -172,7 +186,6 @@ jobs:
 
       - name: Check build artifacts
         run: |
-          ls -la server/dist/
           ls -la client/dist/
 
   security-scan:
@@ -277,10 +290,13 @@ jobs:
       - name: Build project
         run: bun run build
 
-      - name: Start server for performance test
+      - name: Build and start Rust server for performance test
         run: |
-          bun run server:start &
-          sleep 10
+          bun run copy-client
+          cd server-rust
+          docker build -t cloud-clipboard-perf .
+          docker run -d --name perf-test -p 3001:3001 cloud-clipboard-perf
+          sleep 5
 
       - name: Run basic performance tests
         run: |
@@ -291,4 +307,5 @@ jobs:
           time curl -f http://localhost:3001/api/health
 
       - name: Stop server
-        run: pkill -f "bun run server:start" || true
+        if: always()
+        run: docker rm -f perf-test || true

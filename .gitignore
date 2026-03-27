@@ -18,5 +18,5 @@ playwright-report
 
 # Generated icons (keep source in assets/icons)
 client/public/favicon-*.svg
-server/public/
+server-rust/public/
 site.webmanifest

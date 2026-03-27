@@ -38,26 +38,15 @@ _中文 | [English](#english)_
 
 ## 🏗️ 架构
 
-这个项目采用monorepo架构，包含四个主要包：
+这个项目采用monorepo架构，包含三个主要包：
 
 - **`shared/`** - 公共类型、模式和工具（TypeScript + Zod）
-- **`server/`** - 后端API和WebSocket服务器（Node.js + Express + Socket.IO）
-- **`server-rust/`** - Rust 后端实现（Rust + Axum + SocketiOxide）⭐ 新增
-- **`client/`** - 前端React应用程序（React + Vite + Tailwind CSS）
+- **`server-rust/`** - 后端 API 和 WebSocket 服务器（Rust + Axum + SocketiOxide）
+- **`client/`** - 前端 React 应用程序（React + Vite + Tailwind CSS）
 
 ## 🛠️ 技术栈
 
-### 后端 (Node.js)
-
-- **运行时**: Bun
-- **框架**: Express.js
-- **WebSocket**: Socket.IO
-- **验证**: Zod schemas
-- **安全**: Helmet, CORS
-- **文件上传**: Multer
-- **日志**: 结构化日志系统，支持多级别输出
-
-### 后端 (Rust) ⭐ 新增
+### 后端
 
 - **语言**: Rust 1.93+
 - **框架**: Axum 0.8
@@ -66,8 +55,8 @@ _中文 | [English](#english)_
 - **序列化**: Serde + serde_json
 - **安全**: bcrypt 加密、SHA-256 哈希、secure random
 - **中间件**: Tower + tower-http（CORS、压缩、限流）
-- **测试**: 完善的单元测试覆盖
-- **性能**: 比 Node.js 版本更高性能和内存安全
+- **测试**: 15 个测试模块，完善的单元测试和集成测试覆盖
+- **性能**: 高性能和内存安全
 
 ### 前端
 
@@ -104,38 +93,30 @@ _中文 | [English](#english)_
 
 ### 开发
 
-同时启动服务器和客户端开发模式：
+启动客户端开发模式：
 
 ```bash
 bun run dev
 ```
 
-或者分别启动：
+客户端运行在 http://localhost:3000，开发时通过 Vite 代理连接到后端。
 
-**服务器** (运行在 http://localhost:3001)：
-
-```bash
-bun run server:dev
-```
-
-**客户端** (运行在 http://localhost:3000)：
+Rust 后端需要单独通过 Docker 启动：
 
 ```bash
-bun run client:dev
+cd server-rust && docker build -t cloud-clipboard-rust .
+# 先复制前端构建产物
+bun run copy-client
+docker run -p 3001:3001 -v $(pwd)/server-rust/uploads:/app/uploads cloud-clipboard-rust
 ```
 
 ### 生产环境
 
-构建所有包（包含统一部署）：
+使用 Docker 构建完整应用（前端 + 后端）：
 
 ```bash
-bun run build
-```
-
-启动统一服务（前端+后端）：
-
-```bash
-bun run start
+docker build -t cloud-clipboard .
+docker run -p 3001:3001 -v ./uploads:/app/uploads cloud-clipboard
 ```
 
 > **注意**: 生产环境下，前端和后端会运行在同一个端口（默认3001），无需分别部署。
@@ -183,16 +164,11 @@ cloudClipboardDebug.disable();
 
 ### 后端日志配置
 
-通过环境变量配置服务器日志：
+通过环境变量配置 Rust 后端日志：
 
 ```bash
-export LOG_LEVEL=DEBUG     # DEBUG, INFO, WARN, ERROR, SILENT
-export LOG_COLORS=false    # 禁用彩色输出
-export LOG_TIMESTAMPS=false # 禁用时间戳
-bun run server:dev
+export RUST_LOG=cloud_clipboard_server=debug,tower_http=debug
 ```
-
-详细使用说明请查看：[调试日志使用指南](./docs/调试日志使用指南.md)
 
 ## 🔒 安全特性
 
@@ -200,7 +176,7 @@ bun run server:dev
 - **无持久存储**: 消息仅在会话期间保存在内存中
 - **会话持久**: 浏览器刷新后自动重新加入房间
 - **智能清理**: 用户离线或无活动时自动清理数据
-- **安全头部**: Helmet.js提供安全头部
+- **安全头部**: Tower-HTTP 提供安全头部（CSP、HSTS、X-Frame-Options 等）
 - **输入验证**: 所有数据都使用Zod schemas验证
 - **CORS保护**: 可配置的CORS设置
 
@@ -232,25 +208,20 @@ bun run server:dev
 
 - `PORT` - 服务器端口（默认：3001）
 - `CLIENT_URL` - 前端URL用于CORS（默认：\*）
-- `NODE_ENV` - 环境模式
-- `LOG_LEVEL` - 日志级别（DEBUG, INFO, WARN, ERROR, SILENT）
-- `LOG_COLORS` - 彩色日志输出（true/false）
-- `LOG_TIMESTAMPS` - 时间戳（true/false）
-- `LOG_CONTEXT` - 上下文标签（true/false）
-- `UPLOAD_DIR` - 文件上传目录（默认：/app/uploads）
+- `ALLOW_HTTP` - 允许HTTP连接（默认：false）
+- `UPLOAD_DIR` - 文件上传目录（默认：./uploads）
+- `STATIC_DIR` - 静态文件目录（默认：./public）
 - `MAX_FILE_SIZE` - 最大文件大小（默认：104857600 = 100MB）
-- `ROOM_CLEANUP_INTERVAL` - 房间清理间隔（默认：3600000 = 1小时）
+- `ROOM_CLEANUP_INTERVAL_SECONDS` - 房间清理间隔秒数（默认：60）
 - `FILE_RETENTION_HOURS` - 文件保留时间（默认：12小时）
-- `RATE_LIMIT_WINDOW_MS` - 速率限制窗口（默认：60000 = 1分钟）
-- `RATE_LIMIT_MAX_REQUESTS` - 每窗口最大请求数（默认：100）
-- `SHARE_RATE_LIMIT_WINDOW_MS` - 创建分享链接速率限制窗口（默认：60000 = 1分钟）
-- `SHARE_RATE_LIMIT_MAX_REQUESTS` - 创建分享链接每窗口最大请求数（默认：10）
-- `DOWNLOAD_RATE_LIMIT_WINDOW_MS` - 下载速率限制窗口（默认：60000 = 1分钟）
-- `DOWNLOAD_RATE_LIMIT_MAX_REQUESTS` - 下载每窗口最大请求数（默认：100）
-- `SHARE_DEFAULT_EXPIRY_DAYS` - 分享链接默认过期天数（默认：7）
-- `SHARE_MAX_EXPIRY_DAYS` - 分享链接最大过期天数（默认：30）
-- `SHARE_MIN_PASSWORD_LENGTH` - 密码保护最小密码长度（默认：8）
+- `FILE_CLEANUP_INTERVAL_SECONDS` - 文件清理间隔秒数（默认：600）
+- `RATE_LIMIT_WINDOW` - 速率限制窗口秒数（默认：60）
+- `RATE_LIMIT_MAX_REQUESTS` - 每窗口最大请求数（默认：500）
+- `PUBLIC_DOWNLOAD_RATE_LIMIT` - 公开下载每分钟最大请求数（默认：20）
+- `MAX_PINNED_ROOMS` - 最大固定房间数（默认：50）
+- `BASE_PATH` - 子路径部署（可选，例如：/clipboard）
 - `PUBLIC_URL` - 公网访问地址，用于生成分享链接（例如：https://clipboard.example.com）
+- `RUST_LOG` - 日志级别（默认：cloud_clipboard_server=info,tower_http=info）
 
 ### 客户端
 
@@ -262,10 +233,10 @@ bun run server:dev
 # 安装依赖
 bun install
 
-# 启动开发服务器
+# 启动前端开发服务器
 bun run dev
 
-# 构建所有包
+# 构建前端
 bun run build
 
 # 运行类型检查
@@ -279,16 +250,10 @@ bun run lint:fix               # 自动修复ESLint错误
 bun run format                 # 使用Prettier格式化代码
 bun run format:check           # 检查代码格式
 
-# 构建单个包
-bun run server:build
-bun run client:build
-
-# 启动单个服务
-bun run server:dev
-bun run client:dev
-
-# 启动生产服务器
-bun run start                  # 前端和后端统一运行在端口3001
+# Rust 后端（需要 Docker）
+cd server-rust && docker build -t cloud-clipboard-rust .                    # 构建
+docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine \
+  sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test --all-features"  # 测试
 
 # 图标管理
 bun run icons:generate         # 生成Web图标
@@ -359,26 +324,15 @@ A real-time cloud clipboard application that allows you to share text and files 
 
 ## 🏗️ Architecture
 
-This project is built as a monorepo with four main packages:
+This project is built as a monorepo with three main packages:
 
 - **`shared/`** - Common types, schemas, and utilities (TypeScript + Zod)
-- **`server/`** - Backend API and WebSocket server (Node.js + Express + Socket.IO)
-- **`server-rust/`** - Rust backend implementation (Rust + Axum + SocketiOxide) ⭐ New
+- **`server-rust/`** - Backend API and WebSocket server (Rust + Axum + SocketiOxide)
 - **`client/`** - Frontend React application (React + Vite + Tailwind CSS)
 
 ## 🛠️ Tech Stack
 
-### Backend (Node.js)
-
-- **Runtime**: Bun
-- **Framework**: Express.js
-- **WebSockets**: Socket.IO
-- **Validation**: Zod schemas
-- **Security**: Helmet, CORS
-- **File Upload**: Multer
-- **Logging**: Structured logging with multiple levels
-
-### Backend (Rust) ⭐ New
+### Backend
 
 - **Language**: Rust 1.93+
 - **Framework**: Axum 0.8
@@ -387,7 +341,8 @@ This project is built as a monorepo with four main packages:
 - **Serialization**: Serde + serde_json
 - **Security**: bcrypt encryption, SHA-256 hashing, secure random
 - **Middleware**: Tower + tower-http (CORS, compression, rate limiting)
-- **Performance**: Higher performance and memory safety compared to Node.js version
+- **Testing**: 15 test modules with comprehensive unit and integration test coverage
+- **Performance**: High performance and memory safety
 
 ### Frontend
 
@@ -424,38 +379,30 @@ This project is built as a monorepo with four main packages:
 
 ### Development
 
-Start both server and client in development mode:
+Start the client in development mode:
 
 ```bash
 bun run dev
 ```
 
-Or start them separately:
+The client runs on http://localhost:3000 and connects to the backend via Vite proxy during development.
 
-**Server** (runs on http://localhost:3001):
-
-```bash
-bun run server:dev
-```
-
-**Client** (runs on http://localhost:3000):
+The Rust backend needs to be started separately via Docker:
 
 ```bash
-bun run client:dev
+cd server-rust && docker build -t cloud-clipboard-rust .
+# Copy frontend build artifacts first
+bun run copy-client
+docker run -p 3001:3001 -v $(pwd)/server-rust/uploads:/app/uploads cloud-clipboard-rust
 ```
 
 ### Production
 
-Build all packages (with unified deployment):
+Build the full application (frontend + backend) with Docker:
 
 ```bash
-bun run build
-```
-
-Start unified service (frontend + backend):
-
-```bash
-bun run start
+docker build -t cloud-clipboard .
+docker run -p 3001:3001 -v ./uploads:/app/uploads cloud-clipboard
 ```
 
 > **Note**: In production, frontend and backend run on the same port (default 3001), no separate deployment needed.
@@ -503,16 +450,11 @@ cloudClipboardDebug.disable();
 
 ### Backend Logging Configuration
 
-Configure server logging via environment variables:
+Configure Rust backend logging via environment variables:
 
 ```bash
-export LOG_LEVEL=DEBUG     # DEBUG, INFO, WARN, ERROR, SILENT
-export LOG_COLORS=false    # Disable colored output
-export LOG_TIMESTAMPS=false # Disable timestamps
-bun run server:dev
+export RUST_LOG=cloud_clipboard_server=debug,tower_http=debug
 ```
-
-For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志使用指南.md)
 
 ## 🔒 Security Features
 
@@ -520,7 +462,7 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 - **No Persistent Storage**: Messages are only kept in memory during the session
 - **Session Persistence**: Automatically rejoin rooms after browser refresh
 - **Smart Cleanup**: Automatic data cleanup when users go offline or inactive
-- **Secure Headers**: Helmet.js provides security headers
+- **Secure Headers**: Tower-HTTP provides security headers (CSP, HSTS, X-Frame-Options, etc.)
 - **Input Validation**: All data is validated using Zod schemas
 - **CORS Protection**: Configurable CORS settings
 
@@ -552,25 +494,20 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 
 - `PORT` - Server port (default: 3001)
 - `CLIENT_URL` - Frontend URL for CORS (default: \*)
-- `NODE_ENV` - Environment mode
-- `LOG_LEVEL` - Log level (DEBUG, INFO, WARN, ERROR, SILENT)
-- `LOG_COLORS` - Colored log output (true/false)
-- `LOG_TIMESTAMPS` - Timestamps (true/false)
-- `LOG_CONTEXT` - Context labels (true/false)
-- `UPLOAD_DIR` - File upload directory (default: /app/uploads)
+- `ALLOW_HTTP` - Allow HTTP connections (default: false)
+- `UPLOAD_DIR` - File upload directory (default: ./uploads)
+- `STATIC_DIR` - Static file directory (default: ./public)
 - `MAX_FILE_SIZE` - Max file size (default: 104857600 = 100MB)
-- `ROOM_CLEANUP_INTERVAL` - Room cleanup interval (default: 3600000 = 1 hour)
+- `ROOM_CLEANUP_INTERVAL_SECONDS` - Room cleanup interval in seconds (default: 60)
 - `FILE_RETENTION_HOURS` - File retention period (default: 12 hours)
-- `RATE_LIMIT_WINDOW_MS` - Rate limit window (default: 60000 = 1 minute)
-- `RATE_LIMIT_MAX_REQUESTS` - Max requests per window (default: 100)
-- `SHARE_RATE_LIMIT_WINDOW_MS` - Share link creation rate limit window (default: 60000 = 1 minute)
-- `SHARE_RATE_LIMIT_MAX_REQUESTS` - Max share link creations per window (default: 10)
-- `DOWNLOAD_RATE_LIMIT_WINDOW_MS` - Download rate limit window (default: 60000 = 1 minute)
-- `DOWNLOAD_RATE_LIMIT_MAX_REQUESTS` - Max downloads per window (default: 100)
-- `SHARE_DEFAULT_EXPIRY_DAYS` - Default share link expiration in days (default: 7)
-- `SHARE_MAX_EXPIRY_DAYS` - Max share link expiration in days (default: 30)
-- `SHARE_MIN_PASSWORD_LENGTH` - Minimum password length for password protection (default: 8)
+- `FILE_CLEANUP_INTERVAL_SECONDS` - File cleanup interval in seconds (default: 600)
+- `RATE_LIMIT_WINDOW` - Rate limit window in seconds (default: 60)
+- `RATE_LIMIT_MAX_REQUESTS` - Max requests per window (default: 500)
+- `PUBLIC_DOWNLOAD_RATE_LIMIT` - Max public download requests per minute (default: 20)
+- `MAX_PINNED_ROOMS` - Max pinned rooms (default: 50)
+- `BASE_PATH` - Sub-path deployment (optional, e.g., /clipboard)
 - `PUBLIC_URL` - Public access URL for generating share links (e.g., https://clipboard.example.com)
+- `RUST_LOG` - Log level (default: cloud_clipboard_server=info,tower_http=info)
 
 ### Client
 
@@ -582,10 +519,10 @@ For detailed usage instructions, see: [Debug Logging Guide](./docs/调试日志�
 # Install dependencies
 bun install
 
-# Start development servers
+# Start frontend development server
 bun run dev
 
-# Build all packages
+# Build frontend
 bun run build
 
 # Run type checking
@@ -599,16 +536,10 @@ bun run lint:fix               # Auto-fix ESLint errors
 bun run format                 # Format code with Prettier
 bun run format:check           # Check code formatting
 
-# Build individual packages
-bun run server:build
-bun run client:build
-
-# Start individual services
-bun run server:dev
-bun run client:dev
-
-# Start production server
-bun run start                  # Frontend and backend unified on port 3001
+# Rust backend (requires Docker)
+cd server-rust && docker build -t cloud-clipboard-rust .                    # Build
+docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine \
+  sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test --all-features"  # Test
 
 # Icon management
 bun run icons:generate         # Generate web icons

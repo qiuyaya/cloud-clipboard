@@ -16,7 +16,6 @@ const WORKSPACE_ROOT = path.resolve(__dirname, "..");
 const PACKAGES = [
   { name: "root", path: WORKSPACE_ROOT },
   { name: "client", path: path.join(WORKSPACE_ROOT, "client") },
-  { name: "server", path: path.join(WORKSPACE_ROOT, "server") },
   { name: "shared", path: path.join(WORKSPACE_ROOT, "shared") },
 ];
 
@@ -98,7 +97,7 @@ function listOutdatedDependencies() {
     }
 
     // Check workspace dependencies
-    ["client", "server", "shared"].forEach((workspace) => {
+    ["client", "shared"].forEach((workspace) => {
       const workspacePath = path.join(WORKSPACE_ROOT, workspace);
       if (fs.existsSync(path.join(workspacePath, "package.json"))) {
         log(`  ${workspace} dependencies:`);

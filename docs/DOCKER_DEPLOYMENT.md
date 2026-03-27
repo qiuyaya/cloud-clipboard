@@ -59,7 +59,7 @@ docker run -d \
   --name cloud-clipboard \
   -p 80:3001 \
   -v $(pwd)/data/uploads:/app/uploads \
-  -e NODE_ENV=production \
+  -e ALLOW_HTTP=false \
   cloud-clipboard:latest
 
 # 应用将在 http://localhost 可用
@@ -78,7 +78,7 @@ docker-compose -f docker-compose.dev.yml up -d
 
 | 变量                      | 默认值                  | 描述                         |
 | ------------------------- | ----------------------- | ---------------------------- |
-| `NODE_ENV`                | `production`            | 环境模式                     |
+| `ALLOW_HTTP`              | `false`                 | 允许HTTP连接（开发设为true） |
 | `PORT`                    | `3001`                  | 服务器端口                   |
 | `CLIENT_URL`              | `http://localhost:3000` | 允许的客户端 URL（逗号分隔） |
 | `UPLOAD_DIR`              | `/app/uploads`          | 文件上传目录                 |
@@ -358,7 +358,7 @@ docker run -d \
   --name cloud-clipboard \
   -p 80:3001 \
   -v $(pwd)/data/uploads:/app/uploads \
-  -e NODE_ENV=production \
+  -e ALLOW_HTTP=false \
   cloud-clipboard:latest
 
 # Application will be available at http://localhost
@@ -375,17 +375,17 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ### Environment Variables
 
-| Variable                  | Default                 | Description                           |
-| ------------------------- | ----------------------- | ------------------------------------- |
-| `NODE_ENV`                | `production`            | Environment mode                      |
-| `PORT`                    | `3001`                  | Server port                           |
-| `CLIENT_URL`              | `http://localhost:3000` | Allowed client URLs (comma-separated) |
-| `UPLOAD_DIR`              | `/app/uploads`          | File upload directory                 |
-| `MAX_FILE_SIZE`           | `104857600`             | Max file size (100MB)                 |
-| `ROOM_CLEANUP_INTERVAL`   | `3600000`               | Room cleanup interval (1 hour)        |
-| `FILE_RETENTION_HOURS`    | `12`                    | File retention period                 |
-| `RATE_LIMIT_WINDOW_MS`    | `60000`                 | Rate limit window                     |
-| `RATE_LIMIT_MAX_REQUESTS` | `100`                   | Max requests per window               |
+| Variable                  | Default                 | Description                               |
+| ------------------------- | ----------------------- | ----------------------------------------- |
+| `ALLOW_HTTP`              | `false`                 | Allow HTTP connections (set true for dev) |
+| `PORT`                    | `3001`                  | Server port                               |
+| `CLIENT_URL`              | `http://localhost:3000` | Allowed client URLs (comma-separated)     |
+| `UPLOAD_DIR`              | `/app/uploads`          | File upload directory                     |
+| `MAX_FILE_SIZE`           | `104857600`             | Max file size (100MB)                     |
+| `ROOM_CLEANUP_INTERVAL`   | `3600000`               | Room cleanup interval (1 hour)            |
+| `FILE_RETENTION_HOURS`    | `12`                    | File retention period                     |
+| `RATE_LIMIT_WINDOW_MS`    | `60000`                 | Rate limit window                         |
+| `RATE_LIMIT_MAX_REQUESTS` | `100`                   | Max requests per window                   |
 
 ### Volume Mounts
 

@@ -123,6 +123,13 @@ pub struct P2PIceCandidateRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RecallMessageRequest {
+    room_key: String,
+    message_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SendMessageRequest {
     pub room_key: String,
     #[serde(rename = "type")]
@@ -247,6 +254,10 @@ fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
         },
         "setRoomPassword" | "pinRoom" => SocketRateLimitConfig {
             max_requests: 10,
+            window_ms: 60_000,
+        },
+        "recallMessage" => SocketRateLimitConfig {
+            max_requests: 30,
             window_ms: 60_000,
         },
         "shareRoomLink" => SocketRateLimitConfig {
@@ -493,6 +504,33 @@ pub fn setup_socket_handlers(io: &SocketIo, room_service: Arc<RoomService>) {
                     };
                     if allowed {
                         handle_pin_room(socket, data, room_service).await;
+                    } else {
+                        let _ = socket.emit("error", &"Too many requests. Please wait.");
+                    }
+                }
+            }
+        });
+
+        // Handle recall message
+        socket.on("recallMessage", {
+            let room_service = room_service.clone();
+            let rate_limiter = rate_limiter.clone();
+            move |socket: SocketRef, Data::<RecallMessageRequest>(data)| {
+                let room_service = room_service.clone();
+                let rate_limiter = rate_limiter.clone();
+                async move {
+                    let config = get_rate_limit_config("recallMessage");
+                    let allowed = {
+                        let mut limiter = rate_limiter.write().await;
+                        limiter.check_rate_limit(
+                            &socket.id.to_string(),
+                            "recallMessage",
+                            config.max_requests,
+                            config.window_ms,
+                        )
+                    };
+                    if allowed {
+                        handle_recall_message(socket, data, room_service).await;
                     } else {
                         let _ = socket.emit("error", &"Too many requests. Please wait.");
                     }
@@ -1126,6 +1164,64 @@ async fn handle_pin_room(socket: SocketRef, data: PinRoomPayload, room_service: 
         Err(error) => {
             tracing::error!("Failed to pin/unpin room: {}", error);
             let _ = socket.emit("error", &error.as_str());
+        }
+    }
+}
+
+async fn handle_recall_message(
+    socket: SocketRef,
+    data: RecallMessageRequest,
+    room_service: Arc<RoomService>,
+) {
+    let socket_id = socket.id.to_string();
+
+    // Verify user is authenticated
+    let user = match room_service.get_user_by_socket(&socket_id) {
+        Some(u) => u,
+        None => {
+            let _ = socket.emit("error", &"User not authenticated");
+            return;
+        }
+    };
+
+    // Verify user is in the target room
+    if user.room_key != data.room_key {
+        let _ = socket.emit("error", &"User not in room");
+        return;
+    }
+
+    // Verify user is the message sender (only allow recalling own messages)
+    if let Some(sender_id) = room_service.get_message_sender(&data.room_key, &data.message_id) {
+        if sender_id != user.id {
+            let _ = socket.emit("error", &"Can only recall your own messages");
+            return;
+        }
+    } else {
+        let _ = socket.emit("error", &"Message not found");
+        return;
+    }
+
+    // Remove the message
+    match room_service.remove_message(&data.room_key, &data.message_id) {
+        Ok(true) => {
+            // Broadcast messageRecalled to all in room
+            let recall_data = serde_json::json!({ "messageId": data.message_id });
+            let _ = socket
+                .to(data.room_key.clone())
+                .emit("messageRecalled", &recall_data);
+            let _ = socket.emit("messageRecalled", &recall_data);
+            tracing::info!(
+                "Message {} recalled in room {} by {}",
+                data.message_id,
+                data.room_key,
+                user.username
+            );
+        }
+        Ok(false) => {
+            let _ = socket.emit("error", &"Message not found");
+        }
+        Err(error) => {
+            let _ = socket.emit("error", &error);
         }
     }
 }

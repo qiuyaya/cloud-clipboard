@@ -1,12 +1,8 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/h"
 
-# 运行完整的校验流程（包含测试）
-echo "Running full validation before push..."
+# 运行校验流程（格式、lint、类型检查 + 前端/shared 测试）
+echo "Running validation before push..."
 bun run validate
-
-# 运行构建测试，确保可以成功构建
-echo "Running build test..."
-bun run build
 
 echo "All checks passed! Ready to push."

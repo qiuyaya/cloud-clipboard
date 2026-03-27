@@ -1,29 +1,26 @@
-version: "3.8"
-
 services:
   # Main application service
   cloud-clipboard:
-    images: ghcr.io/qiuyaya/cloud-clipboard:latest
+    image: ghcr.io/qiuyaya/cloud-clipboard:latest
     container_name: cloud-clipboard-app
     restart: unless-stopped
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
       - PORT=3001
       - UPLOAD_DIR=/app/uploads
+      - STATIC_DIR=/app/public
       - MAX_FILE_SIZE=104857600 # 100MB in bytes
-      - ROOM_CLEANUP_INTERVAL=3600000 # 1 hour in milliseconds
+      - ROOM_CLEANUP_INTERVAL_SECONDS=3600 # 1 hour in seconds
       - FILE_RETENTION_HOURS=12
-      - RATE_LIMIT_WINDOW_MS=60000 # 1 minute
+      - RATE_LIMIT_WINDOW=60 # 1 minute in seconds
       - RATE_LIMIT_MAX_REQUESTS=100
     volumes:
       - uploads:/app/uploads
-      - ./logs:/app/logs
     networks:
       - cloud-clipboard-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -33,7 +30,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=100M,noexec,nosuid,nodev
-    user: "1001:1001"
 
   # Nginx reverse proxy for production deployment
   nginx:
