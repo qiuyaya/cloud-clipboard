@@ -1,5 +1,5 @@
 // Use the library modules instead of redefining them
-use cloud_clipboard_server::{AppState, middleware, routes, services};
+use cloud_clipboard_server::{AppState, config, middleware, routes, services};
 
 use axum::http::{HeaderName, HeaderValue, header};
 use axum::{Json, Router, extract::DefaultBodyLimit, http::Method, http::StatusCode, routing::get};
@@ -22,42 +22,6 @@ use crate::middleware::rate_limit::{
 use crate::routes::{api_info, files, health, rooms, share};
 use crate::services::{FileManager, RoomEvent, RoomService, ShareService};
 
-/// Cleanup task configuration
-#[derive(Clone, Debug)]
-pub struct CleanupConfig {
-    pub room_cleanup_interval_secs: u64,
-    pub file_cleanup_interval_secs: u64,
-    pub startup_orphaned_files_cleanup: bool,
-}
-
-impl Default for CleanupConfig {
-    fn default() -> Self {
-        Self {
-            room_cleanup_interval_secs: 60,  // 1 minute (aligned with Node.js)
-            file_cleanup_interval_secs: 600, // 10 minutes (aligned with Node.js)
-            startup_orphaned_files_cleanup: true,
-        }
-    }
-}
-
-impl CleanupConfig {
-    pub fn from_env() -> Self {
-        Self {
-            room_cleanup_interval_secs: std::env::var("ROOM_CLEANUP_INTERVAL_SECONDS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(60),
-            file_cleanup_interval_secs: std::env::var("FILE_CLEANUP_INTERVAL_SECONDS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(600),
-            startup_orphaned_files_cleanup: std::env::var("CLEANUP_ORPHANED_FILES_AT_STARTUP")
-                .map(|v| v.to_lowercase() == "true")
-                .unwrap_or(true),
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load environment variables
@@ -72,34 +36,20 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "3001".to_string())
-        .parse::<u16>()?;
+    // Initialize centralized config (reads all env vars once)
+    let cfg = config::init_config();
 
-    let allow_http = std::env::var("ALLOW_HTTP")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(false);
+    let is_production = cfg.is_production();
 
-    let is_production = !allow_http;
-
-    // BASE_PATH for sub-path deployment (e.g., "/clipboard")
-    let base_path = std::env::var("BASE_PATH")
-        .unwrap_or_default()
-        .trim_end_matches('/')
-        .to_string();
-
-    // Load configurations
-    let rate_limit_config = RateLimitConfig::from_env();
+    // Build RateLimitConfig from AppConfig
+    let rate_limit_config = RateLimitConfig::from_app_config(cfg);
     tracing::info!(?rate_limit_config, "Rate limit configuration loaded");
 
-    let cleanup_config = CleanupConfig::from_env();
-    tracing::info!(?cleanup_config, "Cleanup configuration loaded");
-
     tracing::info!("Starting Cloud Clipboard Server (Rust)");
-    tracing::info!("Port: {}", port);
+    tracing::info!("Port: {}", cfg.port);
     tracing::info!("Production mode: {}", is_production);
-    if !base_path.is_empty() {
-        tracing::info!("Base path: {}", base_path);
+    if !cfg.base_path.is_empty() {
+        tracing::info!("Base path: {}", cfg.base_path);
     }
 
     // Initialize rate limiters
@@ -112,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     let share_service = Arc::new(ShareService::new());
 
     // Startup orphaned files cleanup
-    if cleanup_config.startup_orphaned_files_cleanup {
+    if cfg.cleanup_orphaned_files_at_startup {
         tracing::info!("Running startup orphaned files cleanup...");
         let cleaned = file_manager.cleanup_orphaned_files().await;
         tracing::info!("Startup cleanup: removed {} orphaned files", cleaned);
@@ -195,17 +145,61 @@ async fn main() -> anyhow::Result<()> {
 
     // Build CORS layer
     let cors = if is_production {
-        CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-            .allow_headers(Any)
-            .allow_credentials(false)
+        // In production, read allowed origins from CLIENT_URL env var (comma-separated)
+        // If not configured, do not allow any cross-origin requests (same-origin only)
+        let allowed_origins: Vec<HeaderValue> = cfg
+            .client_url
+            .as_ref()
+            .map(|urls| {
+                urls.split(',')
+                    .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if allowed_origins.is_empty() {
+            tracing::warn!(
+                "No CLIENT_URL configured in production. CORS will reject cross-origin requests."
+            );
+            // No allowed origins: only same-origin requests will work
+            CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                .allow_headers([
+                    header::CONTENT_TYPE,
+                    header::AUTHORIZATION,
+                    header::ACCEPT,
+                    header::ORIGIN,
+                    header::CACHE_CONTROL,
+                ])
+                .allow_credentials(false)
+        } else {
+            CorsLayer::new()
+                .allow_origin(allowed_origins)
+                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                .allow_headers([
+                    header::CONTENT_TYPE,
+                    header::AUTHORIZATION,
+                    header::ACCEPT,
+                    header::ORIGIN,
+                    header::CACHE_CONTROL,
+                ])
+                .allow_credentials(true)
+        }
     } else {
-        let allowed_origins: Vec<HeaderValue> = std::env::var("CLIENT_URL")
-            .unwrap_or_else(|_| "http://localhost:3000,http://localhost:3002".to_string())
-            .split(',')
-            .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
-            .collect();
+        let allowed_origins: Vec<HeaderValue> = cfg
+            .client_url
+            .as_ref()
+            .map(|urls| {
+                urls.split(',')
+                    .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                "http://localhost:3000,http://localhost:3002"
+                    .split(',')
+                    .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
+                    .collect()
+            });
 
         if allowed_origins.is_empty() {
             CorsLayer::new()
@@ -238,12 +232,15 @@ async fn main() -> anyhow::Result<()> {
     let cleanup_share_service = share_service.clone();
 
     // Start background cleanup tasks
+    let room_cleanup_interval = cfg.room_cleanup_interval_secs;
+    let file_cleanup_interval = cfg.file_cleanup_interval_secs;
     tokio::spawn(async move {
         run_cleanup_tasks(
             cleanup_room_service,
             cleanup_file_manager,
             cleanup_share_service,
-            cleanup_config,
+            room_cleanup_interval,
+            file_cleanup_interval,
         )
         .await;
     });
@@ -276,13 +273,13 @@ async fn main() -> anyhow::Result<()> {
         .with_state(app_state);
 
     // Apply BASE_PATH nesting if configured
-    let app = if base_path.is_empty() {
+    let app = if cfg.base_path.is_empty() {
         Router::new().merge(api_router)
     } else {
-        Router::new().nest(&base_path, api_router)
+        Router::new().nest(&cfg.base_path, api_router)
     }
         // Global request body size limit (100MB, matching MAX_FILE_SIZE)
-        .layer(RequestBodyLimitLayer::new(100 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(cfg.max_file_size as usize))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(cors)
@@ -317,7 +314,7 @@ async fn main() -> anyhow::Result<()> {
         ));
 
     // Add HSTS header when HTTPS is enforced (ALLOW_HTTP not set)
-    let app = if !allow_http {
+    let app = if !cfg.allow_http {
         tracing::info!("HSTS enabled (ALLOW_HTTP not set)");
         axum::Router::new()
             .merge(app)
@@ -331,26 +328,24 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Static file serving for production (SPA fallback)
-    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "./public".to_string());
-
-    let app = if std::path::Path::new(&static_dir).exists() {
-        let index_path = format!("{}/index.html", static_dir);
-        tracing::info!("Serving static files from: {}", static_dir);
+    let app = if std::path::Path::new(&cfg.static_dir).exists() {
+        let index_path = format!("{}/index.html", cfg.static_dir);
+        tracing::info!("Serving static files from: {}", cfg.static_dir);
         app.fallback_service(
-            ServeDir::new(&static_dir).not_found_service(ServeFile::new(index_path)),
+            ServeDir::new(&cfg.static_dir).not_found_service(ServeFile::new(index_path)),
         )
     } else {
         tracing::info!(
             "Static directory '{}' not found, skipping static file serving",
-            static_dir
+            cfg.static_dir
         );
         app
     }
     .layer(socket_layer);
 
     // Start server
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-    tracing::info!("Cloud Clipboard server listening on port {}", port);
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cfg.port)).await?;
+    tracing::info!("Cloud Clipboard server listening on port {}", cfg.port);
     tracing::info!("WebSocket server ready for connections");
 
     axum::serve(listener, app)
@@ -365,12 +360,13 @@ async fn run_cleanup_tasks(
     room_service: Arc<RoomService>,
     file_manager: Arc<FileManager>,
     share_service: Arc<ShareService>,
-    config: CleanupConfig,
+    room_cleanup_interval_secs: u64,
+    file_cleanup_interval_secs: u64,
 ) {
     tracing::info!(
         "Cleanup tasks started: room_interval={}s, file_interval={}s",
-        config.room_cleanup_interval_secs,
-        config.file_cleanup_interval_secs
+        room_cleanup_interval_secs,
+        file_cleanup_interval_secs
     );
 
     // Initial cleanup
@@ -396,12 +392,12 @@ async fn run_cleanup_tasks(
     }
 
     // Room cleanup interval
-    let room_interval = Duration::from_secs(config.room_cleanup_interval_secs);
+    let room_interval = Duration::from_secs(room_cleanup_interval_secs);
     let mut room_interval = tokio::time::interval(room_interval);
     room_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     // File cleanup interval (same as share cleanup)
-    let file_interval = Duration::from_secs(config.file_cleanup_interval_secs);
+    let file_interval = Duration::from_secs(file_cleanup_interval_secs);
     let mut file_interval = tokio::time::interval(file_interval);
     file_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 

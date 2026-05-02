@@ -196,18 +196,7 @@ mod tests {
                 (None, None)
             };
 
-            // Store plain password in metadata
-            let metadata = if let Some(ref pwd) = generated_password {
-                let mut m = metadata.unwrap_or_default();
-                m.insert(
-                    "plainPassword".to_string(),
-                    serde_json::Value::String(pwd.clone()),
-                );
-                Some(m)
-            } else {
-                metadata
-            };
-
+            // Password is only returned via generated_password, never stored in metadata
             let share = ShareInfo::new(ShareInfoParams {
                 share_id: share_id.clone(),
                 file_path: file_id.to_string(),

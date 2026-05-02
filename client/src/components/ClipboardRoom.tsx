@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import React, { useState, useRef } from "react";
+import { useTemporaryState } from "@/hooks/useTemporaryState";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,23 +14,10 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileNav } from "@/components/MobileNav";
 import { SidebarContent } from "./SidebarContent";
 import { ShareModal } from "./Share/ShareModal";
+import { MessageList } from "./MessageList";
 import { useTranslation } from "react-i18next";
-import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
 import type { FileMessage } from "@cloud-clipboard/shared";
-import {
-  Copy,
-  Send,
-  Upload,
-  File,
-  Download,
-  Share2,
-  Lock,
-  Unlock,
-  LogOut,
-  Undo2,
-  Check,
-  X,
-} from "lucide-react";
+import { Send, Upload, Share2, Lock, Unlock, LogOut } from "lucide-react";
 import { useRoom } from "@/contexts/RoomContext";
 
 export function ClipboardRoom(): JSX.Element {
@@ -57,19 +44,17 @@ export function ClipboardRoom(): JSX.Element {
     id: string;
     name: string;
   } | null>(null);
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useTemporaryState<string | null>(null, 2000);
   const [recallConfirmId, setRecallConfirmId] = useState<string | null>(null);
-  const [mobilePasswordChanged, setMobilePasswordChanged] = useState<boolean | null>(null);
-  const [mobileShareCopied, setMobileShareCopied] = useState(false);
+  const [mobilePasswordChanged, setMobilePasswordChanged] = useTemporaryState<boolean | null>(
+    null,
+    2000,
+  );
+  const [mobileShareCopied, setMobileShareCopied] = useTemporaryState(false, 2000);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const isMobile = useMediaQuery("(max-width: 1024px)");
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const handleSendText = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -96,13 +81,10 @@ export function ClipboardRoom(): JSX.Element {
     e.target.value = "";
   };
 
-  const copyToClipboard = async (text: string, messageId?: string): Promise<void> => {
+  const copyToClipboard = async (messageId: string, text: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text);
-      if (messageId) {
-        setCopiedMessageId(messageId);
-        setTimeout(() => setCopiedMessageId(null), 2000);
-      }
+      setCopiedMessageId(messageId);
     } catch {
       toast({
         variant: "destructive",
@@ -127,7 +109,6 @@ export function ClipboardRoom(): JSX.Element {
     onShareRoomLink();
     setTimeout(() => {
       setMobileShareCopied(true);
-      setTimeout(() => setMobileShareCopied(false), 2000);
     }, 500);
   };
 
@@ -135,12 +116,11 @@ export function ClipboardRoom(): JSX.Element {
     const newState = !hasRoomPassword;
     onSetRoomPassword(newState);
     setMobilePasswordChanged(newState);
-    setTimeout(() => setMobilePasswordChanged(null), 2000);
   };
 
   const handleShareClick = (message: FileMessage): void => {
     setSelectedFileForShare({
-      id: message.fileId || message.id, // Use fileId if available, fallback to message.id
+      id: message.fileId || message.id,
       name: message.fileInfo.name,
     });
     setShareModalOpen(true);
@@ -184,7 +164,11 @@ export function ClipboardRoom(): JSX.Element {
                   className="mobile-touch"
                   title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
                 >
-                  {hasRoomPassword ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                  {hasRoomPassword ? (
+                    <Unlock className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Lock className="h-4 w-4" aria-hidden="true" />
+                  )}
                 </Button>
                 {mobilePasswordChanged !== null && (
                   <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
@@ -202,7 +186,7 @@ export function ClipboardRoom(): JSX.Element {
                   className="mobile-touch"
                   title={t("room.share")}
                 >
-                  <Share2 className="h-4 w-4" />
+                  <Share2 className="h-4 w-4" aria-hidden="true" />
                 </Button>
                 {mobileShareCopied && (
                   <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
@@ -212,7 +196,7 @@ export function ClipboardRoom(): JSX.Element {
               </div>
 
               {/* Spacer */}
-              <div className="w-px h-6 bg-border mx-1" />
+              <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
 
               {/* User Actions - Right */}
               <Button
@@ -222,137 +206,28 @@ export function ClipboardRoom(): JSX.Element {
                 className="mobile-touch"
                 title={t("room.leave")}
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           </div>
         )}
 
         {/* 消息列表 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 mobile-scroll">
-          {messages.length === 0 ? (
-            <div className="text-center text-muted-foreground py-12">
-              <p>{t("room.noMessages")}</p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <Card
-                key={message.id}
-                className={`group max-w-full lg:max-w-2xl ${
-                  message.sender.id === currentUser.id ? "ml-auto" : "mr-auto"
-                }`}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between relative">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">
-                        {message.sender.name}
-                        {message.sender.id === currentUser.id && ` ${t("message.you")}`}
-                      </span>
-                      {message.sender.fingerprint && (
-                        <span
-                          className="text-xs text-muted-foreground/50 font-mono"
-                          title={message.sender.fingerprint}
-                        >
-                          {message.sender.fingerprint.substring(0, 8)}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {formatTimestamp(message.timestamp, i18n.language)}
-                      </span>
-                    </div>
-                    {recallConfirmId === message.id ? (
-                      <div className="flex items-center gap-1 animate-in fade-in-0 duration-150">
-                        <span className="text-xs text-destructive mr-1">
-                          {t("message.recallConfirm")}
-                        </span>
-                        <button
-                          onClick={() => {
-                            onRecallMessage(message.id);
-                            setRecallConfirmId(null);
-                          }}
-                          className="p-1.5 text-destructive hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                          title={t("message.recallConfirm")}
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setRecallConfirmId(null)}
-                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                          title={t("message.recallCancel")}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1 opacity-100 md:opacity-0 group-hover:md:opacity-100">
-                        {message.type === "text" && (
-                          <button
-                            onClick={() => copyToClipboard(message.content, message.id)}
-                            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                            title={t("message.copy")}
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {message.type === "file" && message.downloadUrl && (
-                          <>
-                            <button
-                              onClick={() => downloadFile(message)}
-                              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                              title={t("message.download")}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleShareClick(message)}
-                              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                              title={t("share.button")}
-                            >
-                              <Share2 className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
-                        {message.sender.id === currentUser.id && (
-                          <button
-                            onClick={() => setRecallConfirmId(message.id)}
-                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                            title={t("message.recall")}
-                          >
-                            <Undo2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {copiedMessageId === message.id && (
-                      <div className="absolute top-full mt-2 right-0 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">{t("room.copied")}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {message.type === "text" ? (
-                    <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                      <pre className="whitespace-pre-wrap text-sm font-mono">{message.content}</pre>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <File className="h-8 w-8 text-blue-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{message.fileInfo.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(message.fileInfo.size)} • {message.fileInfo.type}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+        <MessageList
+          messages={messages}
+          currentUserId={currentUser.id}
+          copiedMessageId={copiedMessageId}
+          recallConfirmId={recallConfirmId}
+          onCopy={copyToClipboard}
+          onRecallConfirm={(messageId) => setRecallConfirmId(messageId)}
+          onRecallCancel={() => setRecallConfirmId(null)}
+          onRecall={(messageId) => {
+            onRecallMessage(messageId);
+            setRecallConfirmId(null);
+          }}
+          onDownload={downloadFile}
+          onShare={handleShareClick}
+        />
 
         {/* 输入区域 */}
         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
@@ -371,8 +246,9 @@ export function ClipboardRoom(): JSX.Element {
               size="mobile-sm"
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 mobile-touch"
+              aria-label={t("input.uploadFile")}
             >
-              <Upload className="h-4 w-4" />
+              <Upload className="h-4 w-4" aria-hidden="true" />
               <span className="lg:inline hidden">{t("input.fileButton")}</span>
             </Button>
             <Button
@@ -380,8 +256,9 @@ export function ClipboardRoom(): JSX.Element {
               size="mobile-sm"
               disabled={!textInput.trim()}
               className="mobile-touch"
+              aria-label={t("input.sendButton")}
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-4 w-4" aria-hidden="true" />
             </Button>
           </form>
           <p className="text-xs text-muted-foreground mt-2">{t("room.maxLimits")}</p>

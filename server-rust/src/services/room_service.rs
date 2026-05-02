@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 
 use crate::models::room::RoomInfo;
@@ -10,17 +10,12 @@ use crate::models::{Message, Room, User};
 /// This allows users to reconnect after browser refresh without losing their session.
 const ROOM_DESTROY_GRACE_PERIOD_SECS: u64 = 30;
 
-/// Maximum number of pinned rooms allowed (cached from environment variable)
-static MAX_PINNED_ROOMS: OnceLock<usize> = OnceLock::new();
-
-/// Get the maximum number of pinned rooms (reads from env var once, then caches)
+/// Get the maximum number of pinned rooms from centralized config.
+/// Falls back to default (50) if config is not initialized (e.g., in tests).
 fn max_pinned_rooms() -> usize {
-    *MAX_PINNED_ROOMS.get_or_init(|| {
-        std::env::var("MAX_PINNED_ROOMS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(50)
-    })
+    crate::config::try_config()
+        .map(|c| c.max_pinned_rooms)
+        .unwrap_or(50)
 }
 
 /// Events emitted by RoomService
@@ -549,14 +544,25 @@ impl RoomService {
 
     /// Get room statistics
     pub fn get_room_stats(&self) -> RoomStats {
-        let rooms = self.rooms.read().unwrap_or_else(|e| e.into_inner());
-        let total_users: usize = rooms.values().map(|r| r.user_count()).sum();
-        let online_users: usize = rooms.values().map(|r| r.online_user_count()).sum();
+        match self.rooms.read() {
+            Ok(rooms) => {
+                let total_users: usize = rooms.values().map(|r| r.user_count()).sum();
+                let online_users: usize = rooms.values().map(|r| r.online_user_count()).sum();
 
-        RoomStats {
-            total_rooms: rooms.len(),
-            total_users,
-            online_users,
+                RoomStats {
+                    total_rooms: rooms.len(),
+                    total_users,
+                    online_users,
+                }
+            }
+            Err(_) => {
+                tracing::warn!("Failed to acquire rooms lock in get_room_stats: lock poisoned");
+                RoomStats {
+                    total_rooms: 0,
+                    total_users: 0,
+                    online_users: 0,
+                }
+            }
         }
     }
 

@@ -115,7 +115,6 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
       // Fallback to toast if clipboard API fails
       toast({
         title: t("share.list.toast.copySuccess"),
-        variant: "destructive",
       });
     }
   };

@@ -21,7 +21,7 @@ mod tests {
 
     fn create_file_manager() -> FileManager {
         let test_dir = env::temp_dir().join(format!("test_integration_{}", uuid::Uuid::new_v4()));
-        FileManager::new_with_config(test_dir, 10 * 1024 * 1024, 12).unwrap()
+        FileManager::new_with_config(test_dir, 10 * 1024 * 1024, 1024 * 1024 * 1024, 12).unwrap()
     }
 
     fn create_share_service() -> ShareService {

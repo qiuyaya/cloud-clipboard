@@ -3,7 +3,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Version } from "@/components/Version";
 import { useTranslation } from "react-i18next";
-import { useState, useRef, useEffect } from "react";
+import { useTemporaryState } from "@/hooks/useTemporaryState";
 import { formatTimestamp } from "@cloud-clipboard/shared";
 import { Users, LogOut, Share2, Lock, Unlock, Settings, Pin, PinOff } from "lucide-react";
 import { useRoom } from "@/contexts/RoomContext";
@@ -26,43 +26,17 @@ export function SidebarContent({ isMobile }: SidebarContentProps): JSX.Element {
     onPinRoom,
   } = useRoom();
   const { t, i18n } = useTranslation();
-  const [copiedRoomKey, setCopiedRoomKey] = useState(false);
-  const [copiedShareLink, setCopiedShareLink] = useState(false);
-  const [passwordChanged, setPasswordChanged] = useState<boolean | null>(null);
-  const [pinChanged, setPinChanged] = useState<boolean | null>(null);
-
-  // Refs to store timeout IDs for cleanup
-  const passwordTimeoutRef = useRef<number | null>(null);
-  const pinTimeoutRef = useRef<number | null>(null);
-  const shareTimeoutRef = useRef<number | null>(null);
-  const shareLinkTimeoutRef = useRef<number | null>(null);
-  const roomKeyTimeoutRef = useRef<number | null>(null);
+  const [copiedRoomKey, setCopiedRoomKey] = useTemporaryState(false, 2000);
+  const [copiedShareLink, setCopiedShareLink] = useTemporaryState(false, 2000);
+  const [passwordChanged, setPasswordChanged] = useTemporaryState<boolean | null>(null, 2000);
+  const [pinChanged, setPinChanged] = useTemporaryState<boolean | null>(null, 2000);
 
   const onlineUsers = users.filter((user) => user.isOnline);
-
-  // Cleanup all timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (passwordTimeoutRef.current) clearTimeout(passwordTimeoutRef.current);
-      if (pinTimeoutRef.current) clearTimeout(pinTimeoutRef.current);
-      if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
-      if (shareLinkTimeoutRef.current) clearTimeout(shareLinkTimeoutRef.current);
-      if (roomKeyTimeoutRef.current) clearTimeout(roomKeyTimeoutRef.current);
-    };
-  }, []);
 
   const handleToggleRoomPassword = (): void => {
     const newState = !hasRoomPassword;
     onSetRoomPassword(newState);
-    // Show temporary feedback
     setPasswordChanged(newState);
-    if (passwordTimeoutRef.current) {
-      clearTimeout(passwordTimeoutRef.current);
-    }
-    passwordTimeoutRef.current = setTimeout(() => {
-      setPasswordChanged(null);
-      passwordTimeoutRef.current = null;
-    }, 2000);
   };
 
   const handleTogglePin = (): void => {
@@ -70,32 +44,14 @@ export function SidebarContent({ isMobile }: SidebarContentProps): JSX.Element {
     const newState = !isPinned;
     onPinRoom(newState);
     setPinChanged(newState);
-    if (pinTimeoutRef.current) {
-      clearTimeout(pinTimeoutRef.current);
-    }
-    pinTimeoutRef.current = setTimeout(() => {
-      setPinChanged(null);
-      pinTimeoutRef.current = null;
-    }, 2000);
   };
 
   const handleShareRoom = async (): Promise<void> => {
     try {
       onShareRoomLink();
       // Give time for the link to be generated and copied
-      if (shareTimeoutRef.current) {
-        clearTimeout(shareTimeoutRef.current);
-      }
-      if (shareLinkTimeoutRef.current) {
-        clearTimeout(shareLinkTimeoutRef.current);
-      }
-      shareTimeoutRef.current = setTimeout(() => {
+      setTimeout(() => {
         setCopiedShareLink(true);
-        shareTimeoutRef.current = null;
-        shareLinkTimeoutRef.current = setTimeout(() => {
-          setCopiedShareLink(false);
-          shareLinkTimeoutRef.current = null;
-        }, 2000);
       }, 500);
     } catch (err) {
       console.error("Failed to share room:", err);
@@ -106,13 +62,6 @@ export function SidebarContent({ isMobile }: SidebarContentProps): JSX.Element {
     try {
       await navigator.clipboard.writeText(roomKey);
       setCopiedRoomKey(true);
-      if (roomKeyTimeoutRef.current) {
-        clearTimeout(roomKeyTimeoutRef.current);
-      }
-      roomKeyTimeoutRef.current = setTimeout(() => {
-        setCopiedRoomKey(false);
-        roomKeyTimeoutRef.current = null;
-      }, 2000);
     } catch (err) {
       console.error("Failed to copy room key:", err);
     }

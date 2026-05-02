@@ -1065,6 +1065,19 @@ async fn handle_p2p_offer(
     if let Some(sender) = room_service.get_user_by_socket(&socket_id) {
         // Find target user's socket
         if let Some(target_socket_id) = room_service.get_socket_by_user(&data.target_user_id) {
+            // Verify sender and target are in the same room
+            if let Some(target_user) = room_service.get_user_by_socket(&target_socket_id) {
+                if sender.room_key != target_user.room_key {
+                    tracing::warn!(
+                        "P2P offer rejected: sender {} and target {} are in different rooms",
+                        sender.id,
+                        data.target_user_id
+                    );
+                    return;
+                }
+            } else {
+                return;
+            }
             let event = serde_json::json!({
                 "from": sender.id,
                 "offer": data.offer
@@ -1084,6 +1097,19 @@ async fn handle_p2p_answer(
     if let Some(sender) = room_service.get_user_by_socket(&socket_id) {
         // Find target user's socket
         if let Some(target_socket_id) = room_service.get_socket_by_user(&data.target_user_id) {
+            // Verify sender and target are in the same room
+            if let Some(target_user) = room_service.get_user_by_socket(&target_socket_id) {
+                if sender.room_key != target_user.room_key {
+                    tracing::warn!(
+                        "P2P answer rejected: sender {} and target {} are in different rooms",
+                        sender.id,
+                        data.target_user_id
+                    );
+                    return;
+                }
+            } else {
+                return;
+            }
             let event = serde_json::json!({
                 "from": sender.id,
                 "answer": data.answer
@@ -1103,6 +1129,19 @@ async fn handle_p2p_ice_candidate(
     if let Some(sender) = room_service.get_user_by_socket(&socket_id) {
         // Find target user's socket
         if let Some(target_socket_id) = room_service.get_socket_by_user(&data.target_user_id) {
+            // Verify sender and target are in the same room
+            if let Some(target_user) = room_service.get_user_by_socket(&target_socket_id) {
+                if sender.room_key != target_user.room_key {
+                    tracing::warn!(
+                        "P2P ICE candidate rejected: sender {} and target {} are in different rooms",
+                        sender.id,
+                        data.target_user_id
+                    );
+                    return;
+                }
+            } else {
+                return;
+            }
             let event = serde_json::json!({
                 "from": sender.id,
                 "candidate": data.candidate

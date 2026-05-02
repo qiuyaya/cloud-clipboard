@@ -14,15 +14,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 use tokio_util::io::ReaderStream;
 
-// Download timeout configuration (matching Node.js DOWNLOAD_TIMEOUT env var, default 30s)
-static DOWNLOAD_TIMEOUT: std::sync::LazyLock<std::time::Duration> =
-    std::sync::LazyLock::new(|| {
-        let timeout_ms: u64 = std::env::var("DOWNLOAD_TIMEOUT")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(30_000);
-        std::time::Duration::from_millis(timeout_ms)
-    });
+// Download timeout from centralized config
+fn download_timeout() -> std::time::Duration {
+    std::time::Duration::from_secs(crate::config::config().download_timeout_secs)
+}
 
 use super::ApiResponse;
 use crate::AppState;
@@ -107,22 +102,11 @@ impl Default for BandwidthTracker {
 }
 
 impl BandwidthTracker {
-    pub fn new() -> Self {
-        // Default: MAX_FILE_SIZE * 10 per minute (matching Node.js behavior)
-        // Node.js uses MAX_FILE_SIZE (default 100MB) * 10 = 1000MB/min
-        let max_file_size: u64 = std::env::var("MAX_FILE_SIZE")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(100 * 1024 * 1024); // 100MB default
-
-        let max_bytes = std::env::var("MAX_DOWNLOAD_BYTES_PER_MINUTE")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(max_file_size * 10); // MAX_FILE_SIZE * 10 default
-
+    fn new() -> Self {
+        let cfg = crate::config::config();
         Self {
             entries: std::sync::RwLock::new(HashMap::new()),
-            max_bytes_per_minute: max_bytes,
+            max_bytes_per_minute: cfg.max_download_bytes_per_minute,
         }
     }
 
@@ -330,34 +314,17 @@ async fn create_share(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(payload): Json<CreateShareRequest>,
-) -> Result<Json<ApiResponse<CreateShareResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
+) -> Result<Json<ApiResponse<CreateShareResponse>>, crate::error::AppError> {
     let expires_in_days = payload.expires_in_days.unwrap_or(7);
 
     if !(1..=30).contains(&expires_in_days) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Expiration must be 1-30 days".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(crate::error::AppError::BadRequest("Expiration must be 1-30 days".to_string()));
     }
 
-    // Look up file info from FileManager using fileId (matching Node.js behavior)
     let file_info = state
         .file_manager
         .get_file(&payload.file_id)
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse {
-                    success: false,
-                    message: Some("File not found".to_string()),
-                    data: None,
-                }),
-            )
-        })?;
+        .ok_or_else(|| crate::error::AppError::NotFound("File not found".to_string()))?;
 
     let file_path = file_info.path.to_string_lossy().to_string();
     let file_name = file_info.filename.clone();
@@ -425,14 +392,7 @@ async fn create_share(
                 }),
             }))
         }
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse {
-                success: false,
-                message: Some(e),
-                data: None,
-            }),
-        )),
+        Err(e) => Err(crate::error::AppError::Internal(e)),
     }
 }
 
@@ -483,20 +443,9 @@ async fn list_shares(
             } else {
                 "expired"
             };
-            let mut url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
-            // Append password to URL if available in metadata
-            if let Some(pwd) = share
-                .metadata
-                .as_ref()
-                .and_then(|m| m.get("plainPassword"))
-                .and_then(|v| v.as_str())
-            {
-                url = format!(
-                    "{}?password={}",
-                    url,
-                    utf8_percent_encode(pwd, NON_ALPHANUMERIC)
-                );
-            }
+            let url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
+            // Note: passwords are not included in list URLs for security.
+            // Passwords are only returned once at share creation time.
             // Use originalFilename from metadata if available, fallback to file_name
             let original_filename = share
                 .metadata
@@ -535,24 +484,14 @@ async fn list_shares(
 async fn get_share(
     State(state): State<AppState>,
     Path(share_id): Path<String>,
-) -> Result<
-    Json<ApiResponse<crate::models::share::ShareInfoResponse>>,
-    (StatusCode, Json<ApiResponse<()>>),
-> {
+) -> Result<Json<ApiResponse<crate::models::share::ShareInfoResponse>>, crate::error::AppError> {
     match state.share_service.get_share_info(&share_id) {
         Some(info) => Ok(Json(ApiResponse {
             success: true,
             message: None,
             data: Some(info),
         })),
-        None => Err((
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        )),
+        None => Err(crate::error::AppError::NotFound("Share not found".to_string())),
     }
 }
 
@@ -561,40 +500,15 @@ async fn delete_share(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(share_id): Path<String>,
-) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
-    // Require user_id for ownership verification
-    let user_id = extract_user_id(&headers).ok_or_else(|| {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiResponse {
-                success: false,
-                message: Some("User ID required (x-user-id header)".to_string()),
-                data: None,
-            }),
-        )
-    })?;
+) -> Result<Json<ApiResponse<()>>, crate::error::AppError> {
+    let user_id = extract_user_id(&headers)
+        .ok_or_else(|| crate::error::AppError::Unauthorized("User ID required (x-user-id header)".to_string()))?;
 
-    // Check share exists and verify ownership
-    let share = state.share_service.get_share(&share_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        )
-    })?;
+    let share = state.share_service.get_share(&share_id)
+        .ok_or_else(|| crate::error::AppError::NotFound("Share not found".to_string()))?;
 
     if share.created_by != user_id {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(ApiResponse {
-                success: false,
-                message: Some("You do not have permission to revoke this share".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(crate::error::AppError::Forbidden("You do not have permission to revoke this share".to_string()));
     }
 
     match state.share_service.revoke_share(&share_id) {
@@ -603,22 +517,8 @@ async fn delete_share(
             message: Some("Share revoked".to_string()),
             data: None,
         })),
-        Ok(false) => Err((
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        )),
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse {
-                success: false,
-                message: Some(e),
-                data: None,
-            }),
-        )),
+        Ok(false) => Err(crate::error::AppError::NotFound("Share not found".to_string())),
+        Err(e) => Err(crate::error::AppError::Internal(e)),
     }
 }
 
@@ -628,34 +528,19 @@ async fn permanent_delete(
     headers: HeaderMap,
     Path(share_id): Path<String>,
     payload: Option<Json<PermanentDeleteRequest>>,
-) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
+) -> Result<Json<ApiResponse<()>>, crate::error::AppError> {
     // Get user_id from header or body
     let user_id = extract_user_id(&headers)
         .or_else(|| payload.and_then(|p| p.0.user_id))
         .unwrap_or_else(|| "temp-user-id".to_string());
 
     // Check if share exists
-    let share = state.share_service.get_share(&share_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        )
-    })?;
+    let share = state.share_service.get_share(&share_id)
+        .ok_or_else(|| crate::error::AppError::NotFound("Share not found".to_string()))?;
 
     // Verify ownership
     if share.created_by != user_id {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(ApiResponse {
-                success: false,
-                message: Some("You do not have permission to delete this share".to_string()),
-                data: None,
-            }),
-        ));
+        return Err(crate::error::AppError::Forbidden("You do not have permission to delete this share".to_string()));
     }
 
     // Permanently delete
@@ -665,22 +550,8 @@ async fn permanent_delete(
             message: Some("Share permanently deleted".to_string()),
             data: None,
         })),
-        Ok(None) => Err((
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse {
-                success: false,
-                message: Some("Share not found".to_string()),
-                data: None,
-            }),
-        )),
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse {
-                success: false,
-                message: Some(e),
-                data: None,
-            }),
-        )),
+        Ok(None) => Err(crate::error::AppError::NotFound("Share not found".to_string())),
+        Err(e) => Err(crate::error::AppError::Internal(e)),
     }
 }
 
@@ -878,7 +749,7 @@ pub async fn public_download(
     }
 
     // Open file with timeout protection (matching Node.js DOWNLOAD_TIMEOUT)
-    let file = match tokio::time::timeout(*DOWNLOAD_TIMEOUT, tokio::fs::File::open(&canonical_path))
+    let file = match tokio::time::timeout(download_timeout(), tokio::fs::File::open(&canonical_path))
         .await
     {
         Ok(Ok(f)) => f,

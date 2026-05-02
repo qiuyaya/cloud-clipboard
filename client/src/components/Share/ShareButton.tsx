@@ -22,10 +22,23 @@ import { useTranslation } from "react-i18next";
 import { getApiPath } from "@/utils/api";
 import { Copy, Link as LinkIcon, Shield, ShieldOff, Calendar } from "lucide-react";
 
+interface ShareData {
+  url: string;
+  hasPassword: boolean;
+  password?: string;
+  expiresAt: string;
+}
+
+interface CreateShareRequestBody {
+  fileId: string;
+  expiresInDays: number;
+  password?: string;
+}
+
 interface ShareButtonProps {
   fileId: string;
   fileName: string;
-  onShareCreated?: (shareData: any) => void;
+  onShareCreated?: (shareData: ShareData) => void;
   onClose?: () => void;
 }
 
@@ -36,7 +49,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   onClose,
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
-  const [shareData, setShareData] = React.useState<any>(null);
+  const [shareData, setShareData] = React.useState<ShareData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [enablePassword, setEnablePassword] = React.useState(false);
   const [expiresInDays, setExpiresInDays] = React.useState<string>("7");
@@ -56,7 +69,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     setError(null);
 
     try {
-      const requestBody: any = {
+      const requestBody: CreateShareRequestBody = {
         fileId,
         expiresInDays: parseInt(expiresInDays),
       };
@@ -83,11 +96,12 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
 
       setShareData(data.data);
       onShareCreated?.(data.data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
       toast({
         title: t("share.modal.toast.createFailed"),
-        description: err.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

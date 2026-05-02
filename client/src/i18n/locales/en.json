@@ -73,7 +73,8 @@
     "pinned": "Room pinned!",
     "unpinned": "Room unpinned!",
     "pinLimitReached": "Maximum pinned rooms reached",
-    "onlyCreatorCanPin": "Only the room creator can pin/unpin"
+    "onlyCreatorCanPin": "Only the room creator can pin/unpin",
+    "openSidebar": "Open sidebar"
   },
   "message": {
     "you": "(You)",
@@ -87,6 +88,7 @@
   "input": {
     "placeholder": "Type your message or paste text here...",
     "fileButton": "File",
+    "uploadFile": "Upload file",
     "sendButton": "Send"
   },
   "toast": {
@@ -122,6 +124,9 @@
       "failedToRecallMessage": "Failed to recall message"
     },
     "notConnected": "Not connected to server. Please try again.",
+    "joinTimeout": "Room join timeout. Please try again.",
+    "connectionLost": "Connection lost. Please refresh the page.",
+    "waitingForConnection": "Please wait for the connection to be established",
     "error": "Error",
     "fileTooLarge": "File too large",
     "fileTooLargeDesc": "Maximum file size is 100MB",

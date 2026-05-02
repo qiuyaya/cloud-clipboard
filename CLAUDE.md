@@ -26,15 +26,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `cd server-rust && docker build -t cloud-clipboard-rust .` - 使用 Docker 构建 Rust 后端
 - `cd server-rust && docker build --target builder -t cloud-clipboard-rust-builder .` - 仅编译不导出
-- 编译检查（不产生二进制）：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo check"`
-- 运行测试：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test --all-features"`
-- 运行特定测试：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && cargo test --test 测试文件名"`
-- 代码格式化检查：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev && rustup component add rustfmt && cargo fmt -- --check"`
-- Clippy 代码质量检查：`docker run --rm -v $(pwd)/server-rust:/app -w /app rust:1.93-alpine sh -c "apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static && rustup component add clippy && cargo clippy --all-targets --all-features -- -D warnings"`
+- **基础镜像**（首次使用需构建一次，后续复用）：
+  - `docker build -t cloud-clipboard-rust-base -f- server-rust/ <<'EOF'\nFROM rust:1.93-alpine\nRUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static\nRUN cargo install cargo-watch\nEOF` - 构建预装依赖和 cargo-watch 的基础镜像
+- **Watch 模式**（编辑时自动编译，无需手动重跑）：
+  - `docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base cargo watch -x check` - 文件变更自动编译检查
+  - `docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base cargo watch -x 'test --all-features'` - 文件变更自动运行测试
+  - `docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base cargo watch -x check -x 'test --all-features'` - 先编译再测试
+- 编译检查：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base cargo check`
+- 运行测试：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base cargo test --all-features`
+- 运行特定测试：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base cargo test --test 测试文件名`
+- 代码格式化检查：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base sh -c "rustup component add rustfmt && cargo fmt -- --check"`
+- Clippy 代码质量检查：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base sh -c "rustup component add clippy && cargo clippy --all-targets --all-features -- -D warnings"`
 - Dockerfile 位于 `server-rust/Dockerfile`，基于 `rust:1.93-alpine`
-- 测试覆盖：15 个测试模块，包含单元测试、集成测试、安全测试等
+- 测试覆盖：16 个测试模块，包含单元测试、集成测试、安全测试等
 - 测试模块包括：
   - `auth_middleware_tests.rs` - 认证中间件测试
+  - `concurrency_tests.rs` - 并发安全测试
   - `file_routes_tests.rs` - 文件路由测试
   - `integration_tests.rs` - 集成测试
   - `logger_tests.rs` - 日志系统测试
@@ -150,6 +157,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Serde**: 序列化/反序列化
 - **bcrypt**: 密码加密
 - **Governor**: 速率限制
+- **async-trait**: 异步 trait 支持（存储后端抽象）
+- **thiserror**: 错误类型派生宏
+
+**模块结构**:
+
+- `config.rs` - 集中配置管理（OnceLock 单例，统一读取环境变量）
+- `error.rs` - 统一错误类型（AppError，实现 IntoResponse）
+- `services/storage.rs` - 存储后端抽象（StorageBackend trait，LocalStorage 实现）
 
 **库导出**: `src/lib.rs` 导出所有模块供测试使用，确保测试可以访问内部实现。
 
@@ -401,10 +416,19 @@ const userWithDate = {
 - **Rust 1.93 + Axum 0.8 + SocketiOxide 0.15**: 后端实现
 - **Zod**: 前端类型验证和 schema 定义
 - **React + Vite**: 前端框架和构建工具
+- **@tanstack/react-virtual**: 消息列表虚拟化渲染
 - In-memory Map-based storage (server-rust), Multipart for file uploads
 
 ## Recent Changes
 
+- **Architecture Improvements** (2026-05):
+  - 前端：useReducer 替换多个 useState 修复 stale closure bug，提取 MessageCard/MessageList 组件，添加虚拟列表渲染，useTemporaryState 统一临时状态管理
+  - 后端：集中配置管理（config.rs）、统一错误处理（error.rs/AppError）、存储后端抽象（storage.rs/StorageBackend trait）
+  - 安全：P2P 信令跨房间校验、分享链接不再存储明文密码、CORS 生产模式收紧
+  - 文件管理：新增存储配额追踪（MAX_TOTAL_STORAGE_SIZE）、RwLock poisoned 降级为 warn 日志
+  - 测试：新增并发安全测试模块（concurrency_tests.rs），修复 rand 0.9 API 兼容性
+  - i18n：补全缺失的中文单数形式、所有硬编码字符串国际化
+  - 无障碍：添加 aria-label/aria-hidden/role=status 等辅助属性
 - **Remove Node.js Backend** (2026-03):
   - 删除 Node.js 后端 (server/)，Rust 后端成为唯一后端
   - 重写 Dockerfile 为多阶段构建（前端 + Rust 后端）

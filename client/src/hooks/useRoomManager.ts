@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useReducer } from "react";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { socketService } from "@/services/socket";
@@ -18,42 +18,206 @@ import type {
   SetRoomPasswordRequest,
 } from "@cloud-clipboard/shared";
 
-export const useRoomManager = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = loadFromLocalStorage("cloudClipboard_user");
-    if (saved && saved.fingerprint) {
-      return {
-        ...saved,
-        lastSeen: new Date(saved.lastSeen),
-        isOnline: true,
-      };
-    }
-    if (saved) {
-      localStorage.removeItem("cloudClipboard_user");
-      localStorage.removeItem("cloudClipboard_roomKey");
-    }
-    return null;
-  });
+/** Raw message from API with dates possibly serialized as strings */
+interface RawApiMessage {
+  type: string;
+  timestamp: string | Date;
+  sender: {
+    lastSeen: string | Date;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
 
-  const [roomKey, setRoomKey] = useState<RoomKey | null>(() => {
-    return loadFromLocalStorage("cloudClipboard_roomKey");
-  });
+// --- Reducer types ---
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [messages, setMessages] = useState<(TextMessage | FileMessage)[]>([]);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [showPasswordInput, setShowPasswordInput] = useState(false);
-  const [hasRoomPassword, setHasRoomPassword] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
-  const [pendingRoomJoin, setPendingRoomJoin] = useState<{
+type RoomState = {
+  currentUser: User | null;
+  roomKey: RoomKey | null;
+  users: User[];
+  messages: (TextMessage | FileMessage)[];
+  isConnecting: boolean;
+  showPasswordInput: boolean;
+  hasRoomPassword: boolean;
+  isPinned: boolean;
+  pendingRoomJoin: {
     roomKey: string;
     username: string | undefined;
     fingerprint?: BrowserFingerprint;
-  } | null>(null);
+  } | null;
+};
+
+type RoomAction =
+  | { type: "SET_USER"; payload: User | null }
+  | { type: "UPDATE_USER"; payload: (prev: User | null) => User | null }
+  | { type: "SET_ROOM_KEY"; payload: RoomKey | null }
+  | { type: "SET_USERS"; payload: User[] }
+  | { type: "UPDATE_USERS"; payload: (prev: User[]) => User[] }
+  | { type: "SET_MESSAGES"; payload: (TextMessage | FileMessage)[] }
+  | {
+      type: "UPDATE_MESSAGES";
+      payload: (prev: (TextMessage | FileMessage)[]) => (TextMessage | FileMessage)[];
+    }
+  | { type: "SET_CONNECTING"; payload: boolean }
+  | { type: "SET_SHOW_PASSWORD_INPUT"; payload: boolean }
+  | { type: "SET_ROOM_HAS_PASSWORD"; payload: boolean }
+  | { type: "SET_ROOM_PINNED"; payload: boolean }
+  | { type: "SET_PENDING_ROOM_JOIN"; payload: RoomState["pendingRoomJoin"] }
+  | { type: "LEAVE_ROOM" }
+  | { type: "CANCEL_PASSWORD" }
+  | { type: "CHECK_JOIN_TIMEOUT" };
+
+function roomReducer(state: RoomState, action: RoomAction): RoomState {
+  switch (action.type) {
+    case "SET_USER":
+      return { ...state, currentUser: action.payload };
+    case "UPDATE_USER":
+      return { ...state, currentUser: action.payload(state.currentUser) };
+    case "SET_ROOM_KEY":
+      return { ...state, roomKey: action.payload };
+    case "SET_USERS":
+      return { ...state, users: action.payload };
+    case "UPDATE_USERS":
+      return { ...state, users: action.payload(state.users) };
+    case "SET_MESSAGES":
+      return { ...state, messages: action.payload };
+    case "UPDATE_MESSAGES":
+      return { ...state, messages: action.payload(state.messages) };
+    case "SET_CONNECTING":
+      return { ...state, isConnecting: action.payload };
+    case "SET_SHOW_PASSWORD_INPUT":
+      return { ...state, showPasswordInput: action.payload };
+    case "SET_ROOM_HAS_PASSWORD":
+      return { ...state, hasRoomPassword: action.payload };
+    case "SET_ROOM_PINNED":
+      return { ...state, isPinned: action.payload };
+    case "SET_PENDING_ROOM_JOIN":
+      return { ...state, pendingRoomJoin: action.payload };
+    case "LEAVE_ROOM":
+      return {
+        ...state,
+        currentUser: null,
+        roomKey: null,
+        users: [],
+        messages: [],
+        isConnecting: false,
+      };
+    case "CANCEL_PASSWORD":
+      return {
+        ...state,
+        showPasswordInput: false,
+        isConnecting: false,
+        pendingRoomJoin: null,
+        roomKey: null,
+      };
+    case "CHECK_JOIN_TIMEOUT":
+      // Only act if still connecting and no user has been set
+      if (state.isConnecting && !state.currentUser) {
+        return {
+          ...state,
+          isConnecting: false,
+        };
+      }
+      return state;
+    default:
+      return state;
+  }
+}
+
+function getInitialState(): RoomState {
+  let currentUser: User | null = null;
+  const saved = loadFromLocalStorage("cloudClipboard_user");
+  if (saved && saved.fingerprint) {
+    currentUser = {
+      ...saved,
+      lastSeen: new Date(saved.lastSeen),
+      isOnline: true,
+    };
+  } else if (saved) {
+    localStorage.removeItem("cloudClipboard_user");
+    localStorage.removeItem("cloudClipboard_roomKey");
+  }
+
+  const roomKey: RoomKey | null = loadFromLocalStorage("cloudClipboard_roomKey");
+
+  return {
+    currentUser,
+    roomKey,
+    users: [],
+    messages: [],
+    isConnecting: false,
+    showPasswordInput: false,
+    hasRoomPassword: false,
+    isPinned: false,
+    pendingRoomJoin: null,
+  };
+}
+
+export const useRoomManager = () => {
+  const [state, dispatch] = useReducer(roomReducer, undefined, getInitialState);
 
   const { toast } = useToast();
   const { t } = useTranslation();
   const joinTimeoutRef = useRef<number | null>(null);
+
+  // Stable setter wrappers that match the useState API (value or updater function)
+  const setCurrentUser = useCallback(
+    (valueOrUpdater: User | null | ((prev: User | null) => User | null)) => {
+      if (typeof valueOrUpdater === "function") {
+        dispatch({ type: "UPDATE_USER", payload: valueOrUpdater });
+      } else {
+        dispatch({ type: "SET_USER", payload: valueOrUpdater });
+      }
+    },
+    [],
+  );
+
+  const setRoomKey = useCallback((value: RoomKey | null) => {
+    dispatch({ type: "SET_ROOM_KEY", payload: value });
+  }, []);
+
+  const setUsers = useCallback((valueOrUpdater: User[] | ((prev: User[]) => User[])) => {
+    if (typeof valueOrUpdater === "function") {
+      dispatch({ type: "UPDATE_USERS", payload: valueOrUpdater });
+    } else {
+      dispatch({ type: "SET_USERS", payload: valueOrUpdater });
+    }
+  }, []);
+
+  const setMessages = useCallback(
+    (
+      valueOrUpdater:
+        | (TextMessage | FileMessage)[]
+        | ((prev: (TextMessage | FileMessage)[]) => (TextMessage | FileMessage)[]),
+    ) => {
+      if (typeof valueOrUpdater === "function") {
+        dispatch({ type: "UPDATE_MESSAGES", payload: valueOrUpdater });
+      } else {
+        dispatch({ type: "SET_MESSAGES", payload: valueOrUpdater });
+      }
+    },
+    [],
+  );
+
+  const setIsConnecting = useCallback((value: boolean) => {
+    dispatch({ type: "SET_CONNECTING", payload: value });
+  }, []);
+
+  const setShowPasswordInput = useCallback((value: boolean) => {
+    dispatch({ type: "SET_SHOW_PASSWORD_INPUT", payload: value });
+  }, []);
+
+  const setHasRoomPassword = useCallback((value: boolean) => {
+    dispatch({ type: "SET_ROOM_HAS_PASSWORD", payload: value });
+  }, []);
+
+  const setIsPinned = useCallback((value: boolean) => {
+    dispatch({ type: "SET_ROOM_PINNED", payload: value });
+  }, []);
+
+  const setPendingRoomJoin = useCallback((value: RoomState["pendingRoomJoin"]) => {
+    dispatch({ type: "SET_PENDING_ROOM_JOIN", payload: value });
+  }, []);
 
   useEffect(() => {
     try {
@@ -92,7 +256,7 @@ export const useRoomManager = () => {
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
-          const messagesWithDates = result.data.map((msg: any) => ({
+          const messagesWithDates = result.data.map((msg: RawApiMessage) => ({
             ...msg,
             timestamp: typeof msg.timestamp === "string" ? new Date(msg.timestamp) : msg.timestamp,
             sender: {
@@ -103,7 +267,7 @@ export const useRoomManager = () => {
                   : msg.sender.lastSeen,
             },
           }));
-          setMessages(messagesWithDates);
+          dispatch({ type: "SET_MESSAGES", payload: messagesWithDates });
         }
       }
     } catch (error) {
@@ -132,38 +296,39 @@ export const useRoomManager = () => {
       }
 
       debug.info("Starting room join process");
-      setIsConnecting(true);
-      setRoomKey(data.roomKey);
+      dispatch({ type: "SET_CONNECTING", payload: true });
+      dispatch({ type: "SET_ROOM_KEY", payload: data.roomKey });
 
-      setPendingRoomJoin({
-        roomKey: data.roomKey,
-        username: data.user.name,
-        fingerprint: data.fingerprint,
+      dispatch({
+        type: "SET_PENDING_ROOM_JOIN",
+        payload: {
+          roomKey: data.roomKey,
+          username: data.user.name,
+          fingerprint: data.fingerprint,
+        },
       });
 
       saveToLocalStorage("cloudClipboard_roomKey", data.roomKey);
 
-      setCurrentUser(null);
-      setUsers([]);
-      setMessages([]);
+      dispatch({ type: "SET_USER", payload: null });
+      dispatch({ type: "SET_USERS", payload: [] });
+      dispatch({ type: "SET_MESSAGES", payload: [] });
 
       debug.debug("Calling socketService.joinRoom", { data });
       socketService.joinRoom(data);
 
       joinTimeoutRef.current = setTimeout(() => {
-        if (isConnecting && !currentUser) {
-          debug.warn("Join room timeout");
-          setIsConnecting(false);
-          toast({
-            variant: "destructive",
-            title: t("toast.connectionError"),
-            description: "Room join timeout. Please try again.",
-          });
-        }
+        // Dispatch a self-contained action that reads current state in the reducer
+        dispatch({ type: "CHECK_JOIN_TIMEOUT" });
+        toast({
+          variant: "destructive",
+          title: t("toast.connectionError"),
+          description: t("toast.joinTimeout"),
+        });
         joinTimeoutRef.current = null;
       }, 10000);
     },
-    [isConnecting, currentUser, toast, t],
+    [toast, t],
   );
 
   const handleJoinRoomWithPassword = useCallback(
@@ -179,14 +344,14 @@ export const useRoomManager = () => {
         return;
       }
 
-      setIsConnecting(true);
-      setShowPasswordInput(false);
-      setRoomKey(data.roomKey);
+      dispatch({ type: "SET_CONNECTING", payload: true });
+      dispatch({ type: "SET_SHOW_PASSWORD_INPUT", payload: false });
+      dispatch({ type: "SET_ROOM_KEY", payload: data.roomKey });
 
       // Clear user-related state to ensure proper room join flow
-      setCurrentUser(null);
-      setUsers([]);
-      setMessages([]);
+      dispatch({ type: "SET_USER", payload: null });
+      dispatch({ type: "SET_USERS", payload: [] });
+      dispatch({ type: "SET_MESSAGES", payload: [] });
 
       // Save room key to localStorage for persistence
       saveToLocalStorage("cloudClipboard_roomKey", data.roomKey);
@@ -197,11 +362,7 @@ export const useRoomManager = () => {
   );
 
   const handleCancelPassword = useCallback(() => {
-    setShowPasswordInput(false);
-    setIsConnecting(false);
-    setPendingRoomJoin(null);
-
-    setRoomKey(null);
+    dispatch({ type: "CANCEL_PASSWORD" });
     localStorage.removeItem("cloudClipboard_roomKey");
   }, []);
 
@@ -209,21 +370,17 @@ export const useRoomManager = () => {
     (options?: { silent?: boolean; localOnly?: boolean }) => {
       // Only send leaveRoom event to server if not local-only mode
       // localOnly is used when server has already destroyed the room
-      if (!options?.localOnly && currentUser && roomKey) {
+      if (!options?.localOnly && state.currentUser && state.roomKey) {
         const leaveData: LeaveRoomRequest = {
           type: "leave_room",
-          roomKey,
-          userId: currentUser.id,
+          roomKey: state.roomKey,
+          userId: state.currentUser.id,
         };
 
         socketService.leaveRoom(leaveData);
       }
 
-      setCurrentUser(null);
-      setRoomKey(null);
-      setUsers([]);
-      setMessages([]);
-      setIsConnecting(false);
+      dispatch({ type: "LEAVE_ROOM" });
 
       localStorage.removeItem("cloudClipboard_user");
       localStorage.removeItem("cloudClipboard_roomKey");
@@ -235,69 +392,69 @@ export const useRoomManager = () => {
         });
       }
     },
-    [currentUser, roomKey, toast, t],
+    [state.currentUser, state.roomKey, toast, t],
   );
 
   const handleSetRoomPassword = useCallback(
     (shouldHavePassword: boolean) => {
-      if (!roomKey) return;
+      if (!state.roomKey) return;
 
       const request: SetRoomPasswordRequest = shouldHavePassword
         ? {
             type: "set_room_password" as const,
-            roomKey,
+            roomKey: state.roomKey,
             password: "",
           }
         : {
             type: "set_room_password" as const,
-            roomKey,
+            roomKey: state.roomKey,
           };
 
       socketService.setRoomPassword(request);
     },
-    [roomKey],
+    [state.roomKey],
   );
 
   const handleShareRoomLink = useCallback(() => {
-    if (!roomKey) return;
+    if (!state.roomKey) return;
 
     socketService.shareRoomLink({
       type: "share_room_link",
-      roomKey,
+      roomKey: state.roomKey,
     });
-  }, [roomKey]);
+  }, [state.roomKey]);
 
   const handlePinRoom = useCallback(
     (pinned: boolean) => {
-      if (!roomKey) return;
+      if (!state.roomKey) return;
 
       socketService.pinRoom({
         type: "pin_room",
-        roomKey,
+        roomKey: state.roomKey,
         pinned,
       });
     },
-    [roomKey],
+    [state.roomKey],
   );
 
   return {
-    currentUser,
+    currentUser: state.currentUser,
     setCurrentUser,
-    roomKey,
+    roomKey: state.roomKey,
     setRoomKey,
-    users,
+    users: state.users,
     setUsers,
-    messages,
+    messages: state.messages,
     setMessages,
-    isConnecting,
+    isConnecting: state.isConnecting,
     setIsConnecting,
-    showPasswordInput,
+    showPasswordInput: state.showPasswordInput,
     setShowPasswordInput,
-    hasRoomPassword,
+    hasRoomPassword: state.hasRoomPassword,
     setHasRoomPassword,
-    isPinned,
+    isPinned: state.isPinned,
     setIsPinned,
-    pendingRoomJoin,
+    pendingRoomJoin: state.pendingRoomJoin,
     setPendingRoomJoin,
     fetchRoomMessages,
     handleJoinRoom,

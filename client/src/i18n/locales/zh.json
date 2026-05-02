@@ -45,6 +45,7 @@
   },
   "room": {
     "label": "房间：",
+    "usersOnline_one": "{{count}} 人在线",
     "usersOnline_other": "{{count}} 名用户在线",
     "leave": "离开",
     "share": "分享",
@@ -72,7 +73,8 @@
     "pinned": "已固定！",
     "unpinned": "已取消固定！",
     "pinLimitReached": "固定房间数量已达上限",
-    "onlyCreatorCanPin": "仅房间创建者可以固定/取消固定"
+    "onlyCreatorCanPin": "仅房间创建者可以固定/取消固定",
+    "openSidebar": "打开侧边栏"
   },
   "message": {
     "you": "（您）",
@@ -86,6 +88,7 @@
   "input": {
     "placeholder": "在此输入您的消息或粘贴文本...",
     "fileButton": "文件",
+    "uploadFile": "上传文件",
     "sendButton": "发送"
   },
   "toast": {
@@ -121,6 +124,9 @@
       "failedToRecallMessage": "撤回消息失败"
     },
     "notConnected": "未连接到服务器。请重试。",
+    "joinTimeout": "加入房间超时，请重试。",
+    "connectionLost": "连接已断开，请刷新页面。",
+    "waitingForConnection": "请等待连接建立完成",
     "error": "错误",
     "fileTooLarge": "文件过大",
     "fileTooLargeDesc": "最大文件大小为 100MB",

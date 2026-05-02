@@ -35,6 +35,8 @@ pub struct FileManager {
     room_files: RwLock<HashMap<String, Vec<String>>>, // room_key -> [filename]
     hash_to_file_id: RwLock<HashMap<String, String>>, // sha256_hash -> filename
     max_file_size: u64,
+    max_total_size: u64,
+    current_total_size: AtomicU64,
     retention_hours: i64,
     deleted_file_count: AtomicU64,
     total_deleted_size: AtomicU64,
@@ -51,17 +53,23 @@ impl FileManager {
             .and_then(|s| s.parse().ok())
             .unwrap_or(100 * 1024 * 1024); // 100MB default
 
+        let max_total_size = std::env::var("MAX_TOTAL_STORAGE_SIZE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1024 * 1024 * 1024); // 1GB default
+
         let retention_hours = std::env::var("FILE_RETENTION_HOURS")
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(12);
 
-        Self::new_with_config(upload_dir, max_file_size, retention_hours)
+        Self::new_with_config(upload_dir, max_file_size, max_total_size, retention_hours)
     }
 
     pub fn new_with_config(
         upload_dir: PathBuf,
         max_file_size: u64,
+        max_total_size: u64,
         retention_hours: i64,
     ) -> anyhow::Result<Self> {
         // Create upload directory if it doesn't exist
@@ -73,6 +81,8 @@ impl FileManager {
             room_files: RwLock::new(HashMap::new()),
             hash_to_file_id: RwLock::new(HashMap::new()),
             max_file_size,
+            max_total_size,
+            current_total_size: AtomicU64::new(0),
             retention_hours,
             deleted_file_count: AtomicU64::new(0),
             total_deleted_size: AtomicU64::new(0),
@@ -99,6 +109,18 @@ impl FileManager {
     ) -> anyhow::Result<FileInfo> {
         if data.len() as u64 > self.max_file_size {
             anyhow::bail!("File too large");
+        }
+
+        // Check total storage quota
+        let file_size = data.len() as u64;
+        let current_usage = self.current_total_size.load(Ordering::Relaxed);
+        if current_usage + file_size > self.max_total_size {
+            anyhow::bail!(
+                "Storage quota exceeded: current usage {} + file size {} exceeds limit {}",
+                current_usage,
+                file_size,
+                self.max_total_size
+            );
         }
 
         // Compute SHA-256 hash
@@ -166,6 +188,10 @@ impl FileManager {
                     .or_default()
                     .push(filename);
             }
+
+            // Update total storage size tracking
+            self.current_total_size
+                .fetch_add(file_size, Ordering::Relaxed);
 
             tracing::info!(
                 "File deduplicated: {} (duplicate of {})",
@@ -236,6 +262,10 @@ impl FileManager {
             hash_map.insert(hash_hex, filename);
         }
 
+        // Update total storage size tracking
+        self.current_total_size
+            .fetch_add(file_size, Ordering::Relaxed);
+
         tracing::info!("File uploaded: {} for room {}", original_name, room_key);
         Ok(file_info)
     }
@@ -298,6 +328,12 @@ impl FileManager {
             self.deleted_file_count.fetch_add(1, Ordering::Relaxed);
             self.total_deleted_size
                 .fetch_add(info.size, Ordering::Relaxed);
+            // Decrease current storage usage (saturating to avoid underflow)
+            let _ = self.current_total_size.fetch_update(
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+                |current| Some(current.saturating_sub(info.size)),
+            );
         }
 
         Ok(file_info)
@@ -308,13 +344,19 @@ impl FileManager {
         // Unified lock order: files → room_files → hash_to_file_id
         let mut files = match self.files.write() {
             Ok(f) => f,
-            Err(_) => return Vec::new(),
+            Err(_) => {
+                tracing::warn!("Failed to acquire files lock in delete_room_files: lock poisoned");
+                return Vec::new();
+            }
         };
 
         let filenames = {
             let mut room_files = match self.room_files.write() {
                 Ok(rf) => rf,
-                Err(_) => return Vec::new(),
+                Err(_) => {
+                    tracing::warn!("Failed to acquire room_files lock in delete_room_files: lock poisoned");
+                    return Vec::new();
+                }
             };
             room_files.remove(room_key).unwrap_or_default()
         };
@@ -342,6 +384,13 @@ impl FileManager {
         }
 
         if !deleted.is_empty() {
+            // Decrease current storage usage for all deleted files
+            let total_deleted_size: u64 = deleted.iter().map(|f| f.size).sum();
+            let current = self.current_total_size.load(Ordering::Relaxed);
+            self.current_total_size.store(
+                current.saturating_sub(total_deleted_size),
+                Ordering::Relaxed,
+            );
             tracing::info!("Deleted {} files for room {}", deleted.len(), room_key);
         }
 
@@ -356,7 +405,10 @@ impl FileManager {
         let filenames: Vec<String> = {
             let files = match self.files.read() {
                 Ok(f) => f,
-                Err(_) => return Vec::new(),
+                Err(_) => {
+                    tracing::warn!("Failed to acquire files lock in cleanup_expired_files: lock poisoned");
+                    return Vec::new();
+                }
             };
             files
                 .iter()
@@ -382,20 +434,41 @@ impl FileManager {
 
     /// Get statistics
     pub fn get_stats(&self) -> FileStats {
-        let files = self.files.read().unwrap_or_else(|e| e.into_inner());
-        let total_size: u64 = files.values().map(|f| f.size).sum();
-        let room_count = {
-            let rooms: std::collections::HashSet<&str> =
-                files.values().map(|f| f.room_key.as_str()).collect();
-            rooms.len()
-        };
+        match self.files.read() {
+            Ok(files) => {
+                let total_size: u64 = files.values().map(|f| f.size).sum();
+                let room_count = {
+                    let rooms: std::collections::HashSet<&str> =
+                        files.values().map(|f| f.room_key.as_str()).collect();
+                    rooms.len()
+                };
 
-        FileStats {
-            total_files: files.len(),
-            total_size,
-            room_count,
-            deleted_files: self.deleted_file_count.load(Ordering::Relaxed),
-            deleted_size: self.total_deleted_size.load(Ordering::Relaxed),
+                FileStats {
+                    total_files: files.len(),
+                    total_size,
+                    room_count,
+                    deleted_files: self.deleted_file_count.load(Ordering::Relaxed),
+                    deleted_size: self.total_deleted_size.load(Ordering::Relaxed),
+                }
+            }
+            Err(_) => {
+                tracing::warn!("Failed to acquire files lock in get_stats: lock poisoned");
+                FileStats {
+                    total_files: 0,
+                    total_size: 0,
+                    room_count: 0,
+                    deleted_files: self.deleted_file_count.load(Ordering::Relaxed),
+                    deleted_size: self.total_deleted_size.load(Ordering::Relaxed),
+                }
+            }
+        }
+    }
+
+    /// Get current storage usage in bytes
+    pub fn get_storage_usage(&self) -> StorageUsage {
+        StorageUsage {
+            used: self.current_total_size.load(Ordering::Relaxed),
+            limit: self.max_total_size,
         }
     }
 
@@ -408,7 +481,10 @@ impl FileManager {
             let tracked_files: std::collections::HashSet<String> = {
                 let files = match self.files.read() {
                     Ok(f) => f,
-                    Err(_) => return 0,
+                    Err(_) => {
+                        tracing::warn!("Failed to acquire files lock in cleanup_orphaned_files: lock poisoned");
+                        return 0;
+                    }
                 };
                 files.keys().cloned().collect()
             };
@@ -458,18 +534,44 @@ pub struct FileStats {
     pub deleted_size: u64,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsage {
+    pub used: u64,
+    pub limit: u64,
+}
+
+impl StorageUsage {
+    /// Returns the usage as a percentage (0.0 - 100.0)
+    pub fn usage_percent(&self) -> f64 {
+        if self.limit == 0 {
+            return 100.0;
+        }
+        (self.used as f64 / self.limit as f64) * 100.0
+    }
+
+    /// Returns true if the storage is full
+    pub fn is_full(&self) -> bool {
+        self.used >= self.limit
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
     use tokio::fs;
 
-    // Helper to create test directory
+    // Helper to create test directory (1GB total storage limit)
     async fn setup_test_manager() -> (FileManager, TempDir) {
         let tmp_dir = TempDir::new().unwrap();
-        let manager =
-            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 100 * 1024 * 1024, 12)
-                .unwrap();
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            100 * 1024 * 1024,
+            1024 * 1024 * 1024,
+            12,
+        )
+        .unwrap();
         (manager, tmp_dir)
     }
 
@@ -491,7 +593,7 @@ mod tests {
 
         // Create manager - should not delete existing directory
         let manager =
-            FileManager::new_with_config(test_dir.clone(), 100 * 1024 * 1024, 12).unwrap();
+            FileManager::new_with_config(test_dir.clone(), 100 * 1024 * 1024, 1024 * 1024 * 1024, 12).unwrap();
 
         // Marker file should still exist
         assert!(marker_file.exists());
@@ -802,7 +904,7 @@ mod tests {
     #[tokio::test]
     async fn test_file_size_limit() {
         let tmp_dir = TempDir::new().unwrap();
-        let manager = FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024, 12).unwrap(); // 1KB limit
+        let manager = FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024, 1024 * 1024 * 1024, 12).unwrap(); // 1KB file limit
 
         // Create data larger than max size
         let large_data = vec![0u8; 1025];
@@ -825,8 +927,125 @@ mod tests {
     fn test_max_file_size_default() {
         let tmp_dir = TempDir::new().unwrap();
         let manager =
-            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 100 * 1024 * 1024, 12)
+            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 100 * 1024 * 1024, 1024 * 1024 * 1024, 12)
                 .unwrap();
         assert_eq!(manager.max_file_size(), 100 * 1024 * 1024); // 100MB
+    }
+
+    // Storage quota tests
+    #[tokio::test]
+    async fn test_storage_quota_exceeded() {
+        let tmp_dir = TempDir::new().unwrap();
+        // Set total storage limit to 100 bytes
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            1024 * 1024,
+            100,
+            12,
+        )
+        .unwrap();
+
+        // First upload: 60 bytes - should succeed
+        let data1 = vec![b'a'; 60];
+        let result1 = manager
+            .save_file("room1", "file1.txt", "text/plain", &data1)
+            .await;
+        assert!(result1.is_ok());
+
+        // Second upload: 60 bytes - should fail (60 + 60 = 120 > 100)
+        let data2 = vec![b'b'; 60];
+        let result2 = manager
+            .save_file("room1", "file2.txt", "text/plain", &data2)
+            .await;
+        assert!(result2.is_err());
+        assert!(result2.unwrap_err().to_string().contains("Storage quota exceeded"));
+    }
+
+    #[tokio::test]
+    async fn test_storage_quota_freed_after_delete() {
+        let tmp_dir = TempDir::new().unwrap();
+        // Set total storage limit to 100 bytes
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            1024 * 1024,
+            100,
+            12,
+        )
+        .unwrap();
+
+        // Upload 60 bytes
+        let data1 = vec![b'a'; 60];
+        let file1 = manager
+            .save_file("room1", "file1.txt", "text/plain", &data1)
+            .await
+            .unwrap();
+
+        // Delete the file
+        manager.delete_file(&file1.filename).await.unwrap();
+
+        // Now uploading 60 bytes should succeed again
+        let data2 = vec![b'b'; 60];
+        let result = manager
+            .save_file("room1", "file2.txt", "text/plain", &data2)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_storage_usage() {
+        let tmp_dir = TempDir::new().unwrap();
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            1024 * 1024,
+            1000,
+            12,
+        )
+        .unwrap();
+
+        let usage = manager.get_storage_usage();
+        assert_eq!(usage.used, 0);
+        assert_eq!(usage.limit, 1000);
+        assert!(!usage.is_full());
+
+        // Upload some data
+        let data = vec![b'x'; 500];
+        manager
+            .save_file("room1", "file1.txt", "text/plain", &data)
+            .await
+            .unwrap();
+
+        let usage = manager.get_storage_usage();
+        assert_eq!(usage.used, 500);
+        assert_eq!(usage.limit, 1000);
+        assert!((usage.usage_percent() - 50.0).abs() < 0.01);
+        assert!(!usage.is_full());
+    }
+
+    #[tokio::test]
+    async fn test_storage_usage_decreases_on_room_delete() {
+        let tmp_dir = TempDir::new().unwrap();
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            1024 * 1024,
+            10000,
+            12,
+        )
+        .unwrap();
+
+        let data = vec![b'x'; 100];
+        manager
+            .save_file("room1", "f1.txt", "text/plain", &data)
+            .await
+            .unwrap();
+        manager
+            .save_file("room1", "f2.txt", "text/plain", &data)
+            .await
+            .unwrap();
+
+        assert_eq!(manager.get_storage_usage().used, 200);
+
+        manager.delete_room_files("room1");
+
+        assert_eq!(manager.get_storage_usage().used, 0);
     }
 }

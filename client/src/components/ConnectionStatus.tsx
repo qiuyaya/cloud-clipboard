@@ -42,7 +42,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   const config = getStatusConfig();
 
   return (
-    <div className={cn("relative group", className)}>
+    <div className={cn("relative group", className)} role="status" aria-live="polite">
       {/* Status dot */}
       <div
         className={cn(
@@ -50,7 +50,11 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           config.bgColor,
           config.hoverColor,
         )}
+        aria-hidden="true"
       />
+
+      {/* Screen reader text */}
+      <span className="sr-only">{config.text}</span>
 
       {/* Tooltip on hover */}
       <div
@@ -64,6 +68,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           "transition-opacity duration-200",
           "z-50",
         )}
+        aria-hidden="true"
       >
         {config.text}
         {/* Tooltip arrow */}

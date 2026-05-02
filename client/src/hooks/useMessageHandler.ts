@@ -5,7 +5,7 @@ import { socketService } from "@/services/socket";
 import { debug } from "@/utils/debug";
 import { getApiPath } from "@/utils/api";
 import { generateUserId, FileMessageSchema } from "@cloud-clipboard/shared";
-import type { User, FileMessage, RoomKey } from "@cloud-clipboard/shared";
+import type { User, TextMessage, FileMessage, RoomKey } from "@cloud-clipboard/shared";
 
 interface UseMessageHandlerProps {
   currentUser: User | null;
@@ -22,7 +22,7 @@ export const useMessageHandler = ({ currentUser, roomKey }: UseMessageHandlerPro
         toast({
           variant: "destructive",
           title: t("toast.error"),
-          description: "Please wait for the connection to be established",
+          description: t("toast.waitingForConnection"),
         });
         return;
       }
@@ -34,7 +34,7 @@ export const useMessageHandler = ({ currentUser, roomKey }: UseMessageHandlerPro
       };
 
       try {
-        socketService.sendMessage(message as any);
+        socketService.sendMessage(message as unknown as TextMessage);
       } catch {
         toast({
           variant: "destructive",
@@ -124,7 +124,7 @@ export const useMessageHandler = ({ currentUser, roomKey }: UseMessageHandlerPro
             toast({
               variant: "destructive",
               title: t("toast.error"),
-              description: "Connection lost. Please refresh the page.",
+              description: t("toast.connectionLost"),
             });
             return;
           }

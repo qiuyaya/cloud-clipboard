@@ -7,13 +7,6 @@ pub mod share;
 use axum::http::HeaderMap;
 use serde::Serialize;
 
-static BASE_PATH: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-    std::env::var("BASE_PATH")
-        .unwrap_or_default()
-        .trim_end_matches('/')
-        .to_string()
-});
-
 /// Unified API response type used across all route modules
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,10 +18,16 @@ pub struct ApiResponse<T> {
     pub data: Option<T>,
 }
 
-/// Build base URL from PUBLIC_URL env var or request headers for constructing absolute URLs
+/// Get BASE_PATH from centralized config
+pub fn get_base_path() -> &'static str {
+    &crate::config::config().base_path
+}
+
+/// Build base URL from PUBLIC_URL config or request headers for constructing absolute URLs
 /// Priority: PUBLIC_URL > request headers (X-Forwarded-Proto + Host)
 pub fn build_base_url(headers: &HeaderMap) -> String {
-    if let Ok(public_url) = std::env::var("PUBLIC_URL") {
+    let cfg = crate::config::config();
+    if let Some(ref public_url) = cfg.public_url {
         return public_url.trim_end_matches('/').to_string();
     }
     let proto = headers
@@ -40,8 +39,4 @@ pub fn build_base_url(headers: &HeaderMap) -> String {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("localhost:3001");
     format!("{}://{}", proto, host)
-}
-
-pub fn get_base_path() -> &'static str {
-    &BASE_PATH
 }

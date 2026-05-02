@@ -26,9 +26,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, fileId,
         <ShareButton
           fileId={fileId}
           fileName={fileName}
-          onShareCreated={(shareData) => {
-            console.log("Share created:", shareData);
-          }}
+          onShareCreated={() => {}}
           onClose={onClose}
         />
       </div>

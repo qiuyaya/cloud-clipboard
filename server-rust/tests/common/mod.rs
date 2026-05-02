@@ -73,10 +73,12 @@ impl TestDataFactory {
             timestamp: Utc::now(),
             room_key: room_key.to_string(),
             file_id: Some(format!("{}-{}", Utc::now().timestamp_millis(), file_name)),
-            file_info: Some(serde_json::json!({
-                "name": file_name,
-                "size": file_size,
-            })),
+            file_info: Some(cloud_clipboard_server::models::message::FileInfo {
+                name: file_name.to_string(),
+                size: file_size,
+                file_type: "application/octet-stream".to_string(),
+                last_modified: 0,
+            }),
             download_url: Some(format!("/api/files/{}", file_name)),
         }
     }
@@ -87,7 +89,7 @@ impl TestDataFactory {
         room_key: &str,
         password: &str,
     ) -> Result<(), String> {
-        service.create_room(room_key, Some(password))?;
+        service.create_room(room_key, Some(password), None)?;
         Ok(())
     }
 }
@@ -324,8 +326,8 @@ pub mod random {
 
     /// 生成随机字符串
     pub fn random_string(len: usize) -> String {
-        rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
+        rand::rng()
+            .sample_iter(&rand::distr::Alphanumeric)
             .take(len)
             .map(char::from)
             .collect()
@@ -348,13 +350,13 @@ pub mod random {
 
     /// 生成随机 IP 地址
     pub fn random_ip() -> String {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         format!(
             "{}.{}.{}.{}",
-            rng.gen_range(1..255),
-            rng.gen_range(0..255),
-            rng.gen_range(0..255),
-            rng.gen_range(1..255)
+            rng.random_range(1..255),
+            rng.random_range(0..255),
+            rng.random_range(0..255),
+            rng.random_range(1..255)
         )
     }
 }

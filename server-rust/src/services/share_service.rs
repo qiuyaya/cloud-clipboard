@@ -99,17 +99,9 @@ impl ShareService {
             (None, None)
         };
 
-        // Store plain password in metadata for URL construction
-        let metadata = if let Some(ref pwd) = generated_password {
-            let mut m = req.metadata.unwrap_or_default();
-            m.insert(
-                "plainPassword".to_string(),
-                serde_json::Value::String(pwd.clone()),
-            );
-            Some(m)
-        } else {
-            req.metadata
-        };
+        // Use request metadata directly - password is only returned via generated_password,
+        // never stored in metadata
+        let metadata = req.metadata;
 
         let share = ShareInfo::new(ShareInfoParams {
             share_id: share_id.clone(),
