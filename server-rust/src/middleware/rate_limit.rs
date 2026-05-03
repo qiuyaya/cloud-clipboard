@@ -35,7 +35,18 @@ impl Default for RateLimitConfig {
 }
 
 impl RateLimitConfig {
-    /// Load configuration from environment variables
+    /// Build from centralized AppConfig
+    pub fn from_app_config(cfg: &crate::config::AppConfig) -> Self {
+        Self {
+            window_secs: cfg.rate_limit_window,
+            general_max: cfg.rate_limit_max,
+            strict_max: cfg.strict_limit_max,
+            strict_window_secs: 300, // 5 minutes
+            public_download_max: cfg.public_download_rate_limit,
+        }
+    }
+
+    /// Load configuration from environment variables (legacy, for backward compat)
     pub fn from_env() -> Self {
         let parse_u32 = |key: &str, default: u32| -> u32 {
             std::env::var(key)
