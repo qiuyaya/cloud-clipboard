@@ -62,6 +62,7 @@
     "online": "Online",
     "lastSeen": "Last seen {{time}}",
     "noMessages": "No messages yet. Send a text or file to get started!",
+    "newMessages": "New messages",
     "maxLimits": "Max text: 100k chars • Max file: 100MB",
     "doubleClickToCopy": "Double-click to copy room key",
     "copied": "Copied!",

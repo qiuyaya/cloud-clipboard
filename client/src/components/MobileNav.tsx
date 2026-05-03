@@ -15,10 +15,10 @@ export function MobileNav({ onOpenSidebar }: MobileNavProps): JSX.Element {
       variant="outline"
       size="icon"
       onClick={onOpenSidebar}
-      className="lg:hidden h-12 w-12"
+      className="lg:hidden h-10 w-10"
       aria-label={t("room.openSidebar")}
     >
-      <Menu className="h-6 w-6" aria-hidden="true" />
+      <Menu className="h-5 w-5" aria-hidden="true" />
     </Button>
   );
 }

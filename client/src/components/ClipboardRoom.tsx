@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/useToast";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useKeyboard } from "@/hooks/useKeyboard";
 import { MobileNav } from "@/components/MobileNav";
 import { SidebarContent } from "./SidebarContent";
 import { ShareModal } from "./Share/ShareModal";
@@ -55,6 +56,7 @@ export function ClipboardRoom(): JSX.Element {
   const { toast } = useToast();
   const { t } = useTranslation();
   const isMobile = useMediaQuery("(max-width: 1024px)");
+  const keyboard = useKeyboard();
 
   const handleSendText = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -127,23 +129,23 @@ export function ClipboardRoom(): JSX.Element {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 safe-area-inset">
+    <div className="flex h-dvh bg-gray-50 dark:bg-gray-900">
       {/* 桌面端侧边栏 */}
       {!isMobile && (
         <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-          <SidebarContent isMobile={isMobile} />
+          <SidebarContent />
         </div>
       )}
 
       {/* 移动端抽屉式侧边栏 */}
       {isMobile && (
         <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-          <SheetContent className="w-80 p-0">
+          <SheetContent className="p-0">
             <SheetHeader className="sr-only">
               <SheetTitle>{t("room.sidebarTitle")}</SheetTitle>
               <SheetDescription>{t("room.sidebarDescription")}</SheetDescription>
             </SheetHeader>
-            <SidebarContent isMobile={isMobile} />
+            <SidebarContent />
           </SheetContent>
         </Sheet>
       )}
@@ -152,9 +154,9 @@ export function ClipboardRoom(): JSX.Element {
       <div className="flex-1 flex flex-col">
         {/* 移动端顶部导航栏 */}
         {isMobile && (
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 pt-[calc(1rem+env(safe-area-inset-top))] flex items-center justify-between">
             <MobileNav onOpenSidebar={() => setIsSidebarOpen(true)} />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Room Management - Left */}
               <div className="relative">
                 <Button
@@ -195,9 +197,6 @@ export function ClipboardRoom(): JSX.Element {
                 )}
               </div>
 
-              {/* Spacer */}
-              <div className="w-px h-6 bg-border mx-1" aria-hidden="true" />
-
               {/* User Actions - Right */}
               <Button
                 variant="outline"
@@ -230,8 +229,20 @@ export function ClipboardRoom(): JSX.Element {
         />
 
         {/* 输入区域 */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
-          <form onSubmit={handleSendText} className="flex gap-2">
+        <div
+          className={`border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800 pb-[env(safe-area-inset-bottom)] ${
+            keyboard.isKeyboardOpen ? "fixed z-50 left-0" : ""
+          }`}
+          style={
+            keyboard.isKeyboardOpen
+              ? {
+                  bottom: keyboard.viewportOffsetTop,
+                  width: keyboard.viewportWidth,
+                }
+              : undefined
+          }
+        >
+          <form onSubmit={handleSendText} className="flex items-stretch gap-2">
             <Input
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
@@ -243,7 +254,6 @@ export function ClipboardRoom(): JSX.Element {
             <Button
               type="button"
               variant="outline"
-              size="mobile-sm"
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 mobile-touch"
               aria-label={t("input.uploadFile")}
@@ -253,7 +263,6 @@ export function ClipboardRoom(): JSX.Element {
             </Button>
             <Button
               type="submit"
-              size="mobile-sm"
               disabled={!textInput.trim()}
               className="mobile-touch"
               aria-label={t("input.sendButton")}
@@ -261,7 +270,7 @@ export function ClipboardRoom(): JSX.Element {
               <Send className="h-4 w-4" aria-hidden="true" />
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground mt-2">{t("room.maxLimits")}</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("room.maxLimits")}</p>
         </div>
       </div>
 

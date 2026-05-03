@@ -62,6 +62,7 @@
     "online": "在线",
     "lastSeen": "最后见于 {{time}}",
     "noMessages": "暂无消息。发送文本或文件开始使用吧！",
+    "newMessages": "新消息",
     "maxLimits": "最大文本：10万字符 • 最大文件：100MB",
     "doubleClickToCopy": "双击复制房间密钥",
     "copied": "已复制！",

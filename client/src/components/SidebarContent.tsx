@@ -8,11 +8,7 @@ import { formatTimestamp } from "@cloud-clipboard/shared";
 import { Users, LogOut, Share2, Lock, Unlock, Settings, Pin, PinOff } from "lucide-react";
 import { useRoom } from "@/contexts/RoomContext";
 
-interface SidebarContentProps {
-  isMobile: boolean;
-}
-
-export function SidebarContent({ isMobile }: SidebarContentProps): JSX.Element {
+export function SidebarContent(): JSX.Element {
   const {
     roomKey,
     currentUser,
@@ -93,109 +89,107 @@ export function SidebarContent({ isMobile }: SidebarContentProps): JSX.Element {
               {t("room.usersOnline", { count: onlineUsers.length })}
             </p>
           </div>
-          {!isMobile && (
-            <div className="flex flex-col gap-1.5">
-              {/* Top Row - Room Management */}
-              <div className="flex items-center justify-center gap-0.5">
-                {/* Password Lock */}
-                <div className="min-w-0 flex-shrink-0">
-                  <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleToggleRoomPassword}
-                      className="flex items-center gap-2 min-w-fit mobile-touch"
-                      title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
-                    >
-                      {hasRoomPassword ? (
-                        <Unlock className="h-4 w-4" />
-                      ) : (
-                        <Lock className="h-4 w-4" />
-                      )}
-                    </Button>
-                    {passwordChanged !== null && (
-                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">
-                          {passwordChanged ? t("room.passwordSet") : t("room.passwordRemoved")}
-                        </span>
-                      </div>
+          <div className="flex flex-col gap-1.5">
+            {/* Top Row - Room Management */}
+            <div className="flex items-center justify-center gap-0.5">
+              {/* Password Lock */}
+              <div className="min-w-0 flex-shrink-0">
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleToggleRoomPassword}
+                    className="flex items-center gap-2 min-w-fit mobile-touch"
+                    title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
+                  >
+                    {hasRoomPassword ? (
+                      <Unlock className="h-4 w-4" />
+                    ) : (
+                      <Lock className="h-4 w-4" />
                     )}
-                  </div>
-                </div>
-
-                {/* Share Room */}
-                <div className="min-w-0 flex-shrink-0">
-                  <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleShareRoom}
-                      className="flex items-center gap-2 min-w-fit mobile-touch"
-                      title={t("room.share")}
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                    {copiedShareLink && (
-                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">{t("room.linkCopied")}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Pin Room */}
-                <div className="min-w-0 flex-shrink-0">
-                  <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleTogglePin}
-                      className="flex items-center gap-2 min-w-fit mobile-touch"
-                      title={isPinned ? t("room.unpin") : t("room.pin")}
-                    >
-                      {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                    </Button>
-                    {pinChanged !== null && (
-                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                        <span className="text-popover-foreground">
-                          {pinChanged ? t("room.pinned") : t("room.unpinned")}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  </Button>
+                  {passwordChanged !== null && (
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                      <span className="text-popover-foreground">
+                        {passwordChanged ? t("room.passwordSet") : t("room.passwordRemoved")}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Bottom Row - User Actions */}
-              <div className="flex items-center justify-center gap-0.5">
-                {/* Settings */}
-                <div className="min-w-0 flex-shrink-0">
+              {/* Share Room */}
+              <div className="min-w-0 flex-shrink-0">
+                <div className="relative">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={onNavigateToShare}
+                    onClick={handleShareRoom}
                     className="flex items-center gap-2 min-w-fit mobile-touch"
-                    title={t("share.list.title")}
+                    title={t("room.share")}
                   >
-                    <Settings className="h-4 w-4" />
+                    <Share2 className="h-4 w-4" />
                   </Button>
+                  {copiedShareLink && (
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                      <span className="text-popover-foreground">{t("room.linkCopied")}</span>
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Leave Room */}
-                <div className="min-w-0 flex-shrink-0">
+              {/* Pin Room */}
+              <div className="min-w-0 flex-shrink-0">
+                <div className="relative">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={onLeaveRoom}
+                    onClick={handleTogglePin}
                     className="flex items-center gap-2 min-w-fit mobile-touch"
-                    title={t("room.leave")}
+                    title={isPinned ? t("room.unpin") : t("room.pin")}
                   >
-                    <LogOut className="h-4 w-4" />
+                    {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
                   </Button>
+                  {pinChanged !== null && (
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                      <span className="text-popover-foreground">
+                        {pinChanged ? t("room.pinned") : t("room.unpinned")}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Bottom Row - User Actions */}
+            <div className="flex items-center justify-center gap-0.5">
+              {/* Settings */}
+              <div className="min-w-0 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onNavigateToShare}
+                  className="flex items-center gap-2 min-w-fit mobile-touch"
+                  title={t("share.list.title")}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Leave Room */}
+              <div className="min-w-0 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onLeaveRoom}
+                  className="flex items-center gap-2 min-w-fit mobile-touch"
+                  title={t("room.leave")}
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

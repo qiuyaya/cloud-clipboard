@@ -30,7 +30,7 @@ const SheetContent = React.forwardRef<
     ref={ref}
     className={cn(
       "fixed z-50 gap-4 bg-background shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
-      "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+      "inset-y-0 left-0 h-full w-[85%] max-w-xs border-r pb-[env(safe-area-inset-bottom)]",
       className,
     )}
     {...props}

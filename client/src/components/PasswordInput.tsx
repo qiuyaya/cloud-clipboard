@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import type { JoinRoomWithPasswordRequest, BrowserFingerprint } from "@cloud-clipboard/shared";
+import { detectDeviceType } from "@/utils/device";
 
 interface PasswordInputProps {
   roomKey: string;
@@ -26,24 +27,6 @@ export function PasswordInput({
   const [password, setPassword] = useState("");
   const { toast } = useToast();
   const { t } = useTranslation();
-
-  const detectDeviceType = (): "mobile" | "desktop" | "tablet" | "unknown" => {
-    const userAgent = navigator.userAgent.toLowerCase();
-
-    if (/mobile|android|iphone|phone/.test(userAgent)) {
-      return "mobile";
-    }
-
-    if (/tablet|ipad/.test(userAgent)) {
-      return "tablet";
-    }
-
-    if (/desktop|windows|mac|linux/.test(userAgent)) {
-      return "desktop";
-    }
-
-    return "unknown";
-  };
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -72,15 +55,15 @@ export function PasswordInput({
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader className="text-center">
+    <div className="flex items-center justify-center min-h-dvh bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 safe-area-inset">
+      <Card className="w-full max-w-md mx-3">
+        <CardHeader className="text-center sm:p-6 p-4">
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             {t("passwordInput.title")}
           </CardTitle>
           <CardDescription>{t("passwordInput.description", { roomKey })}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="sm:p-6 p-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
@@ -93,7 +76,7 @@ export function PasswordInput({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isConnecting}
-                className="w-full"
+                className="w-full h-12 min-h-[44px]"
                 autoFocus
               />
             </div>
@@ -102,13 +85,19 @@ export function PasswordInput({
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1"
+                size="mobile"
+                className="flex-1 mobile-touch"
                 onClick={onCancel}
                 disabled={isConnecting}
               >
                 {t("passwordInput.cancelButton")}
               </Button>
-              <Button type="submit" className="flex-1" disabled={isConnecting || !password.trim()}>
+              <Button
+                type="submit"
+                size="mobile"
+                className="flex-1 mobile-touch"
+                disabled={isConnecting || !password.trim()}
+              >
                 {isConnecting ? t("passwordInput.joining") : t("passwordInput.joinButton")}
               </Button>
             </div>

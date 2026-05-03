@@ -429,6 +429,14 @@ const userWithDate = {
   - 测试：新增并发安全测试模块（concurrency_tests.rs），修复 rand 0.9 API 兼容性
   - i18n：补全缺失的中文单数形式、所有硬编码字符串国际化
   - 无障碍：添加 aria-label/aria-hidden/role=status 等辅助属性
+- **Mobile UI Optimization** (2026-05):
+  - 键盘适配：新增 useKeyboard hook（visualViewport API），h-screen → h-dvh，输入区域键盘弹出时 fixed 定位
+  - 触摸优化：统一按钮尺寸（MobileNav h-10 w-10），操作按钮 p-2 + h-4 w-4，间距 gap-3
+  - 布局精简：CardHeader p-3 sm:p-6，消息气泡区分自己/他人（蓝色/灰色），侧边栏 w-[85%] max-w-xs
+  - 功能补全：移动端侧边栏显示全部按钮（置顶、设置），移除 isMobile 条件
+  - 滚底优化：智能滚底逻辑（新消息提示条），estimateSize 按消息类型动态估算
+  - 安全区域：viewport-fit=cover，顶栏/输入区域精细化 safe-area，移除笼统 safe-area-inset
+  - 代码优化：提取 detectDeviceType 到 utils/device.ts，useMediaQuery 初始值同步获取消除闪烁
 - **Remove Node.js Backend** (2026-03):
   - 删除 Node.js 后端 (server/)，Rust 后端成为唯一后端
   - 重写 Dockerfile 为多阶段构建（前端 + Rust 后端）

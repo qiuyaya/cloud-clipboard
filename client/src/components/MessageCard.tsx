@@ -33,8 +33,10 @@ export const MessageCard = React.memo(function MessageCard({
   const { t, i18n } = useTranslation();
 
   return (
-    <Card className={`group max-w-full lg:max-w-2xl ${isOwnMessage ? "ml-auto" : "mr-auto"}`}>
-      <CardHeader className="pb-2">
+    <Card
+      className={`group max-w-full min-w-0 lg:max-w-2xl ${isOwnMessage ? "ml-auto" : "mr-auto"}`}
+    >
+      <CardHeader className="p-3 pb-2 sm:p-6">
         <div className="flex items-start justify-between relative">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">
@@ -54,67 +56,67 @@ export const MessageCard = React.memo(function MessageCard({
             </span>
           </div>
           {recallConfirmId === message.id ? (
-            <div className="flex items-center gap-1 animate-in fade-in-0 duration-150">
+            <div className="flex items-center gap-2 animate-in fade-in-0 duration-150">
               <span className="text-xs text-destructive mr-1">{t("message.recallConfirm")}</span>
               <button
                 onClick={() => {
                   onRecall(message.id);
                 }}
-                className="p-1.5 text-destructive hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                className="p-2 text-destructive hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                 title={t("message.recallConfirm")}
                 aria-label={t("message.recall")}
               >
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                <Check className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 onClick={onRecallCancel}
-                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                 title={t("message.recallCancel")}
                 aria-label={t("message.recallCancel")}
               >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           ) : (
-            <div className="flex gap-1 opacity-100 md:opacity-0 group-hover:md:opacity-100">
+            <div className="flex gap-2 opacity-100 md:opacity-0 group-hover:md:opacity-100">
               {message.type === "text" && (
                 <button
                   onClick={() => onCopy(message.id, message.content)}
-                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                   title={t("message.copy")}
                   aria-label={t("message.copy")}
                 >
-                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Copy className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
               {message.type === "file" && message.downloadUrl && (
                 <>
                   <button
                     onClick={() => onDownload?.(message)}
-                    className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                     title={t("message.download")}
                     aria-label={t("message.download")}
                   >
-                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Download className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => onShare?.(message)}
-                    className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                     title={t("share.button")}
                     aria-label={t("share.button")}
                   >
-                    <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Share2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </>
               )}
               {isOwnMessage && (
                 <button
                   onClick={() => onRecallConfirm(message.id)}
-                  className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  className="p-2 text-muted-foreground hover:text-destructive hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                   title={t("message.recall")}
                   aria-label={t("message.recall")}
                 >
-                  <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Undo2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -126,13 +128,17 @@ export const MessageCard = React.memo(function MessageCard({
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
         {message.type === "text" ? (
-          <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+          <div
+            className={`${isOwnMessage ? "bg-blue-50 dark:bg-blue-900/30" : "bg-gray-50 dark:bg-gray-800"} p-3 rounded-lg`}
+          >
             <pre className="whitespace-pre-wrap text-sm font-mono">{message.content}</pre>
           </div>
         ) : (
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div
+            className={`flex items-center gap-3 p-3 ${isOwnMessage ? "bg-blue-50 dark:bg-blue-900/30" : "bg-gray-50 dark:bg-gray-800"} rounded-lg`}
+          >
             <File className="h-8 w-8 text-blue-500" aria-hidden="true" />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{message.fileInfo.name}</p>

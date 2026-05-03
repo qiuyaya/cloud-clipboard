@@ -20,6 +20,7 @@ import {
   generateRoomKey,
   generateDefaultUsername,
 } from "@cloud-clipboard/shared";
+import { detectDeviceType } from "@/utils/device";
 
 interface RoomJoinProps {
   onJoinRoom: (data: JoinRoomRequest) => void;
@@ -318,21 +319,21 @@ export function RoomJoin({
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 safe-area-inset">
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+    <div className="flex items-center justify-center min-h-dvh bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 safe-area-inset">
+      <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 flex items-center gap-2 z-10">
         <ConnectionStatus isConnected={isConnected} isConnecting={isConnecting} />
         <LanguageToggle />
         <ThemeToggle />
       </div>
 
-      <Card className="w-full max-w-md mx-4 mt-8">
-        <CardHeader className="text-center">
+      <Card className="w-full max-w-md mx-3 mt-8">
+        <CardHeader className="text-center sm:p-6 p-4">
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             {t("roomJoin.title")}
           </CardTitle>
           <CardDescription>{t("roomJoin.description")}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="sm:p-6 p-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="roomKey" className="text-sm font-medium">
