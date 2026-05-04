@@ -433,3 +433,217 @@ async fn verify_password(
         )),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::User;
+    use chrono::Utc;
+
+    #[test]
+    fn user_response_from_user() {
+        let now = Utc::now();
+        let user = User {
+            id: "u1".to_string(),
+            username: "Alice".to_string(),
+            room_key: "room1".to_string(),
+            is_online: true,
+            last_seen: now,
+            device_type: "desktop".to_string(),
+            fingerprint: Some("fp123".to_string()),
+        };
+        let resp = UserResponse::from(&user);
+        assert_eq!(resp.id, "u1");
+        assert_eq!(resp.name, "Alice");
+        assert!(resp.is_online);
+        assert_eq!(resp.device_type, "desktop");
+        assert_eq!(resp.fingerprint, Some("fp123".to_string()));
+    }
+
+    #[test]
+    fn user_response_from_user_no_fingerprint() {
+        let now = Utc::now();
+        let user = User {
+            id: "u2".to_string(),
+            username: "Bob".to_string(),
+            room_key: "room2".to_string(),
+            is_online: false,
+            last_seen: now,
+            device_type: "mobile".to_string(),
+            fingerprint: None,
+        };
+        let resp = UserResponse::from(&user);
+        assert_eq!(resp.fingerprint, None);
+    }
+
+    #[test]
+    fn room_stats_serialization() {
+        let stats = RoomStats {
+            total_rooms: 5,
+            total_users: 20,
+            online_users: 8,
+            total_messages: 100,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"totalRooms\":5"));
+        assert!(json.contains("\"onlineUsers\":8"));
+    }
+
+    #[test]
+    fn room_exists_data_serialization() {
+        let data = RoomExistsData {
+            exists: true,
+            has_password: false,
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("\"exists\":true"));
+        assert!(json.contains("\"hasPassword\":false"));
+    }
+
+    #[test]
+    fn password_verify_data_serialization() {
+        let data = PasswordVerifyData { valid: true };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("\"valid\":true"));
+    }
+
+    #[test]
+    fn validate_user_data_serialization() {
+        let data = ValidateUserData {
+            room_exists: true,
+            user_exists: false,
+            user: None,
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("\"roomExists\":true"));
+        assert!(json.contains("\"userExists\":false"));
+        // When user is None, it should be skipped due to skip_serializing_if
+        assert!(!json.contains("\"user\":"));
+    }
+
+    #[test]
+    fn validate_user_data_with_user() {
+        let now = Utc::now();
+        let user_resp = UserResponse {
+            id: "u1".to_string(),
+            name: "Alice".to_string(),
+            is_online: true,
+            last_seen: now,
+            device_type: "desktop".to_string(),
+            fingerprint: None,
+        };
+        let data = ValidateUserData {
+            room_exists: true,
+            user_exists: true,
+            user: Some(user_resp),
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        assert!(json.contains("\"userExists\":true"));
+        assert!(json.contains("\"name\":\"Alice\""));
+    }
+
+    #[test]
+    fn create_room_request_deserialize() {
+        let json = r#"{"roomKey":"test123","password":"secret"}"#;
+        let req: CreateRoomRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.room_key, "test123");
+        assert_eq!(req.password, Some("secret".to_string()));
+    }
+
+    #[test]
+    fn create_room_request_no_password() {
+        let json = r#"{"roomKey":"test456"}"#;
+        let req: CreateRoomRequest = serde_json::from_str(json).unwrap();
+        assert!(req.password.is_none());
+    }
+
+    #[test]
+    fn verify_password_request_deserialize() {
+        let json = r#"{"password":"mypass"}"#;
+        let req: VerifyPasswordRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.password, "mypass");
+    }
+
+    #[test]
+    fn validate_user_request_deserialize() {
+        let json = r#"{"roomKey":"room1","userFingerprint":"fp123"}"#;
+        let req: ValidateUserRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.room_key, "room1");
+        assert_eq!(req.user_fingerprint, "fp123");
+    }
+
+    #[test]
+    fn messages_query_deserialize() {
+        let json = r#"{"limit":50}"#;
+        let q: MessagesQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.limit, Some(50));
+    }
+
+    #[test]
+    fn messages_query_no_limit() {
+        let json = r#"{}"#;
+        let q: MessagesQuery = serde_json::from_str(json).unwrap();
+        assert!(q.limit.is_none());
+    }
+
+    #[test]
+    fn room_info_response_serialization() {
+        let now = Utc::now();
+        let resp = RoomInfoResponse {
+            key: "room1".to_string(),
+            users: vec![],
+            message_count: 5,
+            created_at: now,
+            last_activity: now,
+            has_password: true,
+            is_pinned: false,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"key\":\"room1\""));
+        assert!(json.contains("\"hasPassword\":true"));
+        assert!(json.contains("\"isPinned\":false"));
+    }
+
+    #[test]
+    fn extract_room_key_from_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-room-key", "myroom".parse().unwrap());
+        assert_eq!(extract_room_key(&headers), Some("myroom".to_string()));
+    }
+
+    #[test]
+    fn extract_room_key_missing() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_room_key(&headers), None);
+    }
+
+    #[test]
+    fn require_room_key_valid() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-room-key", "room1a".parse().unwrap());
+        let result = require_room_key(&headers);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "room1a");
+    }
+
+    #[test]
+    fn require_room_key_missing() {
+        let headers = HeaderMap::new();
+        let result = require_room_key(&headers);
+        assert!(result.is_err());
+        let (status, json) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(!json.success);
+    }
+
+    #[test]
+    fn require_room_key_invalid_format() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-room-key", "ab".parse().unwrap()); // too short
+        let result = require_room_key(&headers);
+        assert!(result.is_err());
+        let (status, json) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert!(!json.success);
+    }
+}

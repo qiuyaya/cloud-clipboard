@@ -71,6 +71,12 @@ tokio-test = "0.4"
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2"
 tempfile = "3"
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["full"] }
+socketioxide = { version = "0.15", features = ["state", "__test_harness"] }
+socketioxide-core = "0.15"
+socketioxide-parser-common = "0.15"
+engineioxide = { version = "0.15", features = ["__test_harness"] }
 
 [profile.release]
 lto = true

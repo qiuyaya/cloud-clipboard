@@ -9,6 +9,9 @@ use std::sync::{
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
+use async_trait::async_trait;
+use crate::services::traits::FileManagerTrait;
+
 /// File metadata
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -556,6 +559,46 @@ impl StorageUsage {
     }
 }
 
+#[async_trait]
+impl FileManagerTrait for FileManager {
+    fn upload_dir(&self) -> PathBuf {
+        Self::upload_dir(self).to_path_buf()
+    }
+    fn max_file_size(&self) -> u64 {
+        Self::max_file_size(self)
+    }
+    fn get_retention_hours(&self) -> i64 {
+        Self::get_retention_hours(self)
+    }
+    fn get_file(&self, filename: &str) -> Option<FileInfo> {
+        Self::get_file(self, filename)
+    }
+    fn get_file_path(&self, filename: &str) -> Option<PathBuf> {
+        Self::get_file_path(self, filename)
+    }
+    fn delete_room_files(&self, room_key: &str) -> Vec<FileInfo> {
+        Self::delete_room_files(self, room_key)
+    }
+    fn get_stats(&self) -> FileStats {
+        Self::get_stats(self)
+    }
+    fn get_storage_usage(&self) -> StorageUsage {
+        Self::get_storage_usage(self)
+    }
+    async fn save_file(&self, room_key: &str, original_name: &str, mime_type: &str, data: &[u8]) -> anyhow::Result<FileInfo> {
+        Self::save_file(self, room_key, original_name, mime_type, data).await
+    }
+    async fn delete_file(&self, filename: &str) -> anyhow::Result<Option<FileInfo>> {
+        Self::delete_file(self, filename).await
+    }
+    async fn cleanup_expired_files(&self) -> Vec<FileInfo> {
+        Self::cleanup_expired_files(self).await
+    }
+    async fn cleanup_orphaned_files(&self) -> usize {
+        Self::cleanup_orphaned_files(self).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1047,5 +1090,124 @@ mod tests {
         manager.delete_room_files("room1");
 
         assert_eq!(manager.get_storage_usage().used, 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_file_path() {
+        let (manager, _tmp_dir) = setup_test_manager().await;
+        let file_info = manager
+            .save_file("room1", "test.txt", "text/plain", b"content")
+            .await
+            .unwrap();
+        let path = manager.get_file_path(&file_info.filename);
+        assert!(path.is_some());
+        assert_eq!(path.unwrap(), file_info.path);
+    }
+
+    #[tokio::test]
+    async fn test_get_file_path_nonexistent() {
+        let (manager, _tmp_dir) = setup_test_manager().await;
+        let path = manager.get_file_path("nonexistent.txt");
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn test_get_upload_dir_path() {
+        let tmp_dir = TempDir::new().unwrap();
+        let path = tmp_dir.path().to_path_buf();
+        let manager = FileManager::new_with_config(path.clone(), 1024, 1024, 12).unwrap();
+        assert_eq!(manager.get_upload_dir_path(), path);
+    }
+
+    #[test]
+    fn test_get_retention_hours() {
+        let tmp_dir = TempDir::new().unwrap();
+        let manager = FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024, 1024, 24).unwrap();
+        assert_eq!(manager.get_retention_hours(), 24);
+    }
+
+    #[test]
+    fn test_storage_usage_percent_zero_limit() {
+        let usage = StorageUsage { used: 0, limit: 0 };
+        assert_eq!(usage.usage_percent(), 100.0);
+    }
+
+    #[test]
+    fn test_storage_usage_is_full() {
+        let usage = StorageUsage { used: 100, limit: 100 };
+        assert!(usage.is_full());
+        let usage2 = StorageUsage { used: 99, limit: 100 };
+        assert!(!usage2.is_full());
+    }
+
+    #[test]
+    fn test_file_stats_serialization() {
+        let stats = FileStats {
+            total_files: 5,
+            total_size: 1024,
+            room_count: 3,
+            deleted_files: 1,
+            deleted_size: 256,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"totalFiles\":5"));
+        assert!(json.contains("\"totalSize\":1024"));
+        assert!(json.contains("\"roomCount\":3"));
+    }
+
+    #[test]
+    fn test_file_info_serialization() {
+        let info = FileInfo {
+            filename: "test.txt".to_string(),
+            original_name: "test.txt".to_string(),
+            size: 100,
+            mime_type: "text/plain".to_string(),
+            room_key: "room1".to_string(),
+            uploaded_at: Utc::now(),
+            path: PathBuf::from("/uploads/test.txt"),
+            hash: None,
+            is_duplicate: None,
+            original_file_id: None,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"filename\":\"test.txt\""));
+        assert!(!json.contains("hash"));
+        assert!(!json.contains("isDuplicate"));
+    }
+
+    #[test]
+    fn test_file_manager_new_default() {
+        let manager = FileManager::new();
+        assert!(manager.is_ok());
+        let manager = manager.unwrap();
+        assert_eq!(manager.max_file_size(), 100 * 1024 * 1024);
+        assert_eq!(manager.get_retention_hours(), 12);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_orphaned_files() {
+        let tmp_dir = TempDir::new().unwrap();
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            1024 * 1024,
+            1024 * 1024 * 1024,
+            12,
+        )
+        .unwrap();
+
+        // Create an orphaned file in upload directory
+        let orphan_path = tmp_dir.path().join("orphan_file.txt");
+        fs::write(&orphan_path, b"orphan content").await.unwrap();
+
+        // Create a tracked file
+        manager
+            .save_file("room1", "tracked.txt", "text/plain", b"tracked content")
+            .await
+            .unwrap();
+
+        // Cleanup orphaned files
+        let cleaned = manager.cleanup_orphaned_files().await;
+        assert_eq!(cleaned, 1);
+        assert!(!orphan_path.exists());
     }
 }

@@ -3,6 +3,7 @@ use std::sync::RwLock;
 
 use crate::models::share::{ShareInfoParams, ShareInfoResponse};
 use crate::models::{ShareAccessLog, ShareInfo};
+use crate::services::traits::ShareServiceTrait;
 use crate::utils::generate_share_id;
 
 /// Request parameters for creating a share
@@ -299,6 +300,42 @@ impl ShareService {
 impl Default for ShareService {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ShareServiceTrait for ShareService {
+    fn create_share(&self, req: CreateShareRequest) -> Result<(ShareInfo, Option<String>), String> {
+        Self::create_share(self, req)
+    }
+    fn get_share(&self, share_id: &str) -> Option<ShareInfo> {
+        Self::get_share(self, share_id)
+    }
+    fn get_share_info(&self, share_id: &str) -> Option<ShareInfoResponse> {
+        Self::get_share_info(self, share_id)
+    }
+    fn get_user_shares(&self, user_id: &str) -> Vec<ShareInfo> {
+        Self::get_user_shares(self, user_id)
+    }
+    fn get_user_shares_response(&self, user_id: &str) -> Vec<ShareInfoResponse> {
+        Self::get_user_shares_response(self, user_id)
+    }
+    fn verify_password(&self, share_id: &str, password: &str) -> Result<bool, String> {
+        Self::verify_password(self, share_id, password)
+    }
+    fn record_access(&self, share_id: &str, ip_address: String, success: bool, bytes: Option<u64>, error: Option<String>, user_agent: Option<String>) -> Result<(), String> {
+        Self::record_access(self, share_id, ip_address, success, bytes, error, user_agent)
+    }
+    fn get_access_logs(&self, share_id: &str) -> Vec<ShareAccessLog> {
+        Self::get_access_logs(self, share_id)
+    }
+    fn revoke_share(&self, share_id: &str) -> Result<bool, String> {
+        Self::revoke_share(self, share_id)
+    }
+    fn delete_share(&self, share_id: &str) -> Result<Option<ShareInfo>, String> {
+        Self::delete_share(self, share_id)
+    }
+    fn cleanup_expired_shares(&self) -> Vec<ShareInfo> {
+        Self::cleanup_expired_shares(self)
     }
 }
 
@@ -720,5 +757,65 @@ mod tests {
         let service = ShareService::new();
         let result = service.verify_password("nonexistent", "password");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_share_with_metadata() {
+        let service = ShareService::new();
+        let mut meta = HashMap::new();
+        meta.insert("key".to_string(), serde_json::Value::String("value".to_string()));
+        let result = service.create_share(
+            CreateShareRequest::new("test.txt", "test.txt", 100, "room1", "user1")
+                .with_metadata(meta),
+        );
+        let (share, _) = result.unwrap();
+        assert!(share.metadata.is_some());
+        assert_eq!(share.metadata.unwrap().get("key").unwrap(), "value");
+    }
+
+    #[test]
+    fn test_get_user_shares_response() {
+        let service = ShareService::new();
+        service
+            .create_share(CreateShareRequest::new(
+                "file1.txt", "file1.txt", 100, "room1", "user1",
+            ))
+            .unwrap();
+        service
+            .create_share(CreateShareRequest::new(
+                "file2.txt", "file2.txt", 200, "room1", "user1",
+            ))
+            .unwrap();
+
+        let responses = service.get_user_shares_response("user1");
+        assert_eq!(responses.len(), 2);
+        assert!(responses.iter().all(|r| r.is_active));
+    }
+
+    #[test]
+    fn test_share_service_default() {
+        let service = ShareService::default();
+        let shares = service.get_user_shares("nobody");
+        assert!(shares.is_empty());
+    }
+
+    #[test]
+    fn test_create_share_with_expiration() {
+        let service = ShareService::new();
+        let result = service.create_share(
+            CreateShareRequest::new("test.txt", "test.txt", 100, "room1", "user1")
+                .with_expiration(1),
+        );
+        let (share, _) = result.unwrap();
+        let expected = Utc::now() + Duration::days(1);
+        let delta = (share.expires_at - expected).num_seconds().abs();
+        assert!(delta < 5);
+    }
+
+    #[test]
+    fn test_get_share_info_nonexistent() {
+        let service = ShareService::new();
+        let result = service.get_share_info("nonexistent");
+        assert!(result.is_none());
     }
 }

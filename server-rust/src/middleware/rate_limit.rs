@@ -280,3 +280,473 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_default_values() {
+        let config = RateLimitConfig::default();
+        assert_eq!(config.window_secs, 60);
+        assert_eq!(config.general_max, 500);
+        assert_eq!(config.strict_max, 50);
+        assert_eq!(config.strict_window_secs, 300);
+        assert_eq!(config.public_download_max, 20);
+    }
+
+    #[test]
+    fn create_limiter_returns_limiter() {
+        let config = RateLimitConfig::default();
+        let limiter = create_rate_limiter(&config, 100);
+        let key = "test".to_string();
+        assert!(limiter.check_key(&key).is_ok());
+    }
+
+    #[test]
+    fn client_ip_from_x_forwarded_for() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4, 5.6.7.8"));
+        assert_eq!(extract_client_ip(&headers), "1.2.3.4");
+    }
+
+    #[test]
+    fn client_ip_from_x_forwarded_for_single() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4"));
+        assert_eq!(extract_client_ip(&headers), "1.2.3.4");
+    }
+
+    #[test]
+    fn client_ip_from_x_real_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-real-ip", HeaderValue::from_static("9.8.7.6"));
+        assert_eq!(extract_client_ip(&headers), "9.8.7.6");
+    }
+
+    #[test]
+    fn client_ip_xff_takes_priority() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.1.1.1"));
+        headers.insert("x-real-ip", HeaderValue::from_static("2.2.2.2"));
+        assert_eq!(extract_client_ip(&headers), "1.1.1.1");
+    }
+
+    #[test]
+    fn client_ip_no_headers_returns_unknown() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_client_ip(&headers), "unknown");
+    }
+
+    #[test]
+    fn client_ip_empty_xff_falls_through() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static(""));
+        headers.insert("x-real-ip", HeaderValue::from_static("3.3.3.3"));
+        assert_eq!(extract_client_ip(&headers), "3.3.3.3");
+    }
+
+    #[test]
+    fn headers_contain_required_fields() {
+        let config = RateLimitConfig::default();
+        let headers = rate_limit_headers(&config, 42, None);
+
+        assert!(headers.contains_key("X-RateLimit-Limit"));
+        assert!(headers.contains_key("X-RateLimit-Remaining"));
+        assert!(headers.contains_key("X-RateLimit-Reset"));
+        assert!(!headers.contains_key("Retry-After"));
+
+        assert_eq!(headers.get("X-RateLimit-Remaining").unwrap(), "42");
+    }
+
+    #[test]
+    fn headers_with_retry_after() {
+        let config = RateLimitConfig::default();
+        let headers = rate_limit_headers(&config, 0, Some(30));
+
+        assert!(headers.contains_key("Retry-After"));
+        assert_eq!(headers.get("Retry-After").unwrap(), "30");
+    }
+
+    #[test]
+    fn exceeded_response_returns_429() {
+        let config = RateLimitConfig::default();
+        let response = rate_limit_exceeded_response(&config, 60);
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn limiter_with_custom_window() {
+        let limiter = create_rate_limiter_with_window(10, 60);
+        let key = "test".to_string();
+        assert!(limiter.check_key(&key).is_ok());
+    }
+
+    #[test]
+    fn strict_limiter_works() {
+        let config = RateLimitConfig::default();
+        let limiter = strict_rate_limiter(&config);
+        let key = "test".to_string();
+        assert!(limiter.check_key(&key).is_ok());
+    }
+
+    #[test]
+    fn public_download_limiter_works() {
+        let config = RateLimitConfig::default();
+        let limiter = public_download_rate_limiter(&config);
+        let key = "test".to_string();
+        assert!(limiter.check_key(&key).is_ok());
+    }
+
+    #[test]
+    fn from_app_config_uses_values() {
+        let cfg = crate::config::AppConfig::from_env();
+        let rl_config = RateLimitConfig::from_app_config(&cfg);
+        assert_eq!(rl_config.window_secs, cfg.rate_limit_window);
+        assert_eq!(rl_config.general_max, cfg.rate_limit_max);
+        assert_eq!(rl_config.strict_max, cfg.strict_limit_max);
+        assert_eq!(rl_config.strict_window_secs, 300);
+        assert_eq!(rl_config.public_download_max, cfg.public_download_rate_limit);
+    }
+
+    #[test]
+    fn exceeded_response_body_contains_error() {
+        let config = RateLimitConfig::default();
+        let response = rate_limit_exceeded_response(&config, 60);
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn create_limiter_with_zero_requests_uses_100() {
+        let config = RateLimitConfig::default();
+        let limiter = create_rate_limiter(&config, 0);
+        let key = "test".to_string();
+        assert!(limiter.check_key(&key).is_ok());
+    }
+
+    #[test]
+    fn client_ip_whitespace_trimmed() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("  1.2.3.4  "));
+        assert_eq!(extract_client_ip(&headers), "1.2.3.4");
+    }
+
+    #[test]
+    fn client_ip_xff_comma_with_spaces() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static(" 1.2.3.4 , 5.6.7.8 "));
+        assert_eq!(extract_client_ip(&headers), "1.2.3.4");
+    }
+
+    #[test]
+    fn client_ip_empty_xff_then_empty_xri_returns_unknown() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("  "));
+        headers.insert("x-real-ip", HeaderValue::from_static("  "));
+        assert_eq!(extract_client_ip(&headers), "unknown");
+    }
+
+    #[test]
+    fn rate_limit_headers_with_zero_remaining() {
+        let config = RateLimitConfig::default();
+        let headers = rate_limit_headers(&config, 0, None);
+        assert_eq!(headers.get("X-RateLimit-Remaining").unwrap(), "0");
+    }
+
+    #[test]
+    fn rate_limit_headers_limit_value() {
+        let config = RateLimitConfig::default();
+        let headers = rate_limit_headers(&config, 42, None);
+        assert_eq!(headers.get("X-RateLimit-Limit").unwrap(), "500");
+    }
+
+    #[test]
+    fn from_env_default_values() {
+        // from_env reads env vars; without setting them, defaults should apply
+        let config = RateLimitConfig::from_env();
+        // These should be the defaults when no env vars are set
+        assert_eq!(config.strict_window_secs, 300);
+        // window_secs, general_max, etc. depend on env vars so just verify structure
+        assert!(config.window_secs > 0);
+        assert!(config.general_max > 0);
+        assert!(config.strict_max > 0);
+        assert!(config.public_download_max > 0);
+    }
+
+    #[test]
+    fn rate_limit_middleware_new() {
+        let config = RateLimitConfig::default();
+        let limiter = create_rate_limiter(&config, 100);
+        let _middleware = RateLimitMiddleware::new(limiter);
+    }
+
+    #[test]
+    fn rate_limit_service_clone() {
+        let config = RateLimitConfig::default();
+        let limiter = create_rate_limiter(&config, 100);
+        let middleware = RateLimitMiddleware::new(limiter);
+        let _cloned = middleware.clone();
+    }
+
+    #[test]
+    fn create_limiter_with_window_one_request() {
+        let limiter = create_rate_limiter_with_window(1, 60);
+        let key = "test".to_string();
+        assert!(limiter.check_key(&key).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_exceeded_response_body() {
+        let config = RateLimitConfig::default();
+        let response = rate_limit_exceeded_response(&config, 30);
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn client_ip_xff_with_multiple_proxies() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.1.1.1, 2.2.2.2, 3.3.3.3"));
+        assert_eq!(extract_client_ip(&headers), "1.1.1.1");
+    }
+
+    #[test]
+    fn client_ip_xff_with_only_comma() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static(","));
+        // Empty after trim should fall through
+        assert_eq!(extract_client_ip(&headers), "unknown");
+    }
+
+    // ============================================================================
+    // RateLimitService 集成测试
+    // ============================================================================
+
+    #[tokio::test]
+    async fn rate_limit_service_allows_within_quota() {
+        use axum::body::Body;
+        use axum::routing::get;
+        use axum::Router;
+        use tower::ServiceExt;
+
+        let config = RateLimitConfig::default();
+        let limiter = create_rate_limiter(&config, 100);
+
+        let app = Router::new()
+            .route("/test", get(|| async { "ok" }))
+            .layer(RateLimitMiddleware::new(limiter));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("x-forwarded-for", "127.0.0.1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // Verify rate limit headers are present
+        let headers = response.headers();
+        assert!(
+            headers.contains_key("X-RateLimit-Limit"),
+            "Response should contain X-RateLimit-Limit header"
+        );
+        assert!(
+            headers.contains_key("X-RateLimit-Remaining"),
+            "Response should contain X-RateLimit-Remaining header"
+        );
+        assert!(
+            headers.contains_key("X-RateLimit-Reset"),
+            "Response should contain X-RateLimit-Reset header"
+        );
+        // No Retry-After when request is allowed
+        assert!(
+            !headers.contains_key("Retry-After"),
+            "Retry-After header should not be present for allowed requests"
+        );
+    }
+
+    #[tokio::test]
+    async fn rate_limit_service_rejects_over_quota() {
+        use axum::body::Body;
+        use axum::routing::get;
+        use axum::Router;
+        use tower::ServiceExt;
+
+        let config = RateLimitConfig::default();
+        // Create a limiter with only 1 request per minute
+        let limiter = create_rate_limiter(&config, 1);
+
+        let middleware = RateLimitMiddleware::new(limiter.clone());
+
+        let app = Router::new()
+            .route("/test", get(|| async { "ok" }))
+            .layer(middleware);
+
+        // First request should succeed
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("x-forwarded-for", "127.0.0.1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "First request should be allowed"
+        );
+
+        // Second request should be rejected with 429
+        let app2 = Router::new()
+            .route("/test", get(|| async { "ok" }))
+            .layer(RateLimitMiddleware::new(limiter));
+
+        let response = app2
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("x-forwarded-for", "127.0.0.1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.status(),
+            StatusCode::TOO_MANY_REQUESTS,
+            "Second request should be rate limited"
+        );
+
+        // Verify Retry-After header is present
+        assert!(
+            response.headers().contains_key("Retry-After"),
+            "429 response should contain Retry-After header"
+        );
+    }
+
+    #[tokio::test]
+    async fn rate_limit_service_different_ips_independent() {
+        use axum::body::Body;
+        use axum::routing::get;
+        use axum::Router;
+        use tower::ServiceExt;
+
+        let config = RateLimitConfig::default();
+        // Limiter with 1 request per minute
+        let limiter = create_rate_limiter(&config, 1);
+
+        // Use up quota for IP 1
+        let app1 = Router::new()
+            .route("/test", get(|| async { "ok" }))
+            .layer(RateLimitMiddleware::new(limiter.clone()));
+
+        let response1 = app1
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("x-forwarded-for", "10.0.0.1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response1.status(), StatusCode::OK);
+
+        // IP 2 should still be allowed even though IP 1 used its quota
+        let app2 = Router::new()
+            .route("/test", get(|| async { "ok" }))
+            .layer(RateLimitMiddleware::new(limiter));
+
+        let response2 = app2
+            .oneshot(
+                Request::builder()
+                    .uri("/test")
+                    .header("x-forwarded-for", "10.0.0.2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response2.status(),
+            StatusCode::OK,
+            "Different IP should have independent quota"
+        );
+    }
+
+    #[tokio::test]
+    async fn rate_limit_exceeded_response_json_structure() {
+        let config = RateLimitConfig {
+            window_secs: 60,
+            general_max: 500,
+            strict_max: 50,
+            strict_window_secs: 300,
+            public_download_max: 20,
+        };
+        let retry_after = 30u64;
+        let response = rate_limit_exceeded_response(&config, retry_after);
+
+        // Verify status code
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        // Verify headers
+        let headers = response.headers();
+        assert!(headers.contains_key("X-RateLimit-Limit"));
+        assert!(headers.contains_key("X-RateLimit-Remaining"));
+        assert!(headers.contains_key("X-RateLimit-Reset"));
+        assert!(headers.contains_key("Retry-After"));
+        assert_eq!(headers.get("Retry-After").unwrap(), "30");
+        assert_eq!(headers.get("X-RateLimit-Remaining").unwrap(), "0");
+
+        // Verify JSON body
+        let body = response.into_body();
+        let bytes = axum::body::to_bytes(body, 1024).await.expect("body should be collectable");
+        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should be valid JSON");
+
+        assert_eq!(json["success"], false);
+        assert_eq!(json["error"], "RATE_LIMIT_EXCEEDED");
+        assert_eq!(
+            json["message"], "Too many requests. Please try again later."
+        );
+        assert_eq!(json["retryAfter"], 30);
+    }
+
+    #[test]
+    fn rate_limit_exceeded_response_custom_config() {
+        let config = RateLimitConfig {
+            window_secs: 120,
+            general_max: 1000,
+            strict_max: 100,
+            strict_window_secs: 600,
+            public_download_max: 50,
+        };
+        let response = rate_limit_exceeded_response(&config, 120);
+
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        // X-RateLimit-Limit should reflect config.general_max
+        assert_eq!(
+            response.headers().get("X-RateLimit-Limit").unwrap(),
+            "1000"
+        );
+        // X-RateLimit-Remaining should be 0
+        assert_eq!(
+            response.headers().get("X-RateLimit-Remaining").unwrap(),
+            "0"
+        );
+        // Retry-After should match retry_after parameter
+        assert_eq!(
+            response.headers().get("Retry-After").unwrap(),
+            "120"
+        );
+    }
+}

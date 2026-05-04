@@ -21,6 +21,7 @@ use crate::middleware::rate_limit::{
 };
 use crate::routes::{api_info, files, health, rooms, share};
 use crate::services::{FileManager, RoomEvent, RoomService, ShareService};
+use crate::services::traits::{FileManagerTrait, RoomServiceTrait, ShareServiceTrait};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -68,12 +69,11 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Startup cleanup: removed {} orphaned files", cleaned);
     }
 
-    let app_state = AppState {
-        room_service: room_service.clone(),
-        file_manager: file_manager.clone(),
-        share_service: share_service.clone(),
-        start_time: std::time::Instant::now(),
-    };
+    let app_state = AppState::new(
+        room_service.clone() as Arc<dyn RoomServiceTrait>,
+        file_manager.clone() as Arc<dyn FileManagerTrait>,
+        share_service.clone() as Arc<dyn ShareServiceTrait>,
+    );
 
     // Setup Socket.IO
     let (socket_layer, io) = SocketIo::builder()

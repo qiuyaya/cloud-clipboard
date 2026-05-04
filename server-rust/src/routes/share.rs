@@ -594,6 +594,444 @@ async fn get_user_shares(
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_user_id_from_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-user-id", "user123".parse().unwrap());
+        assert_eq!(extract_user_id(&headers), Some("user123".to_string()));
+    }
+
+    #[test]
+    fn extract_user_id_missing_header() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_user_id(&headers), None);
+    }
+
+    #[test]
+    fn extract_basic_auth_password_valid() {
+        let mut headers = HeaderMap::new();
+        // base64("user:mypassword") = "dXNlcjpteXBhc3N3b3Jk"
+        let encoded = general_purpose::STANDARD.encode("user:mypassword");
+        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        assert_eq!(
+            extract_basic_auth_password(&headers),
+            Some("mypassword".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_basic_auth_password_empty_username() {
+        let mut headers = HeaderMap::new();
+        // base64(":mypassword") - empty username is valid
+        let encoded = general_purpose::STANDARD.encode(":mypassword");
+        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        assert_eq!(
+            extract_basic_auth_password(&headers),
+            Some("mypassword".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_basic_auth_password_empty_password() {
+        let mut headers = HeaderMap::new();
+        let encoded = general_purpose::STANDARD.encode("user:");
+        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        assert_eq!(extract_basic_auth_password(&headers), None);
+    }
+
+    #[test]
+    fn extract_basic_auth_password_no_header() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_basic_auth_password(&headers), None);
+    }
+
+    #[test]
+    fn extract_basic_auth_password_wrong_scheme() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::AUTHORIZATION, "Bearer token123".parse().unwrap());
+        assert_eq!(extract_basic_auth_password(&headers), None);
+    }
+
+    #[test]
+    fn extract_basic_auth_password_invalid_base64() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::AUTHORIZATION, "Basic !!!invalid!!!".parse().unwrap());
+        assert_eq!(extract_basic_auth_password(&headers), None);
+    }
+
+    #[test]
+    fn extract_basic_auth_password_no_colon() {
+        let mut headers = HeaderMap::new();
+        let encoded = general_purpose::STANDARD.encode("justastring");
+        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        assert_eq!(extract_basic_auth_password(&headers), None);
+    }
+
+    #[test]
+    fn download_error_returns_correct_status() {
+        let (status, headers, json) = download_error(StatusCode::NOT_FOUND, "Share not found");
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(headers.is_empty());
+        assert!(!json.success);
+        assert_eq!(json.message.as_deref(), Some("Share not found"));
+        assert!(json.data.is_none());
+    }
+
+    #[test]
+    fn download_error_bad_request() {
+        let (status, _, json) = download_error(StatusCode::BAD_REQUEST, "Invalid share ID format");
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(json.message.as_deref(), Some("Invalid share ID format"));
+    }
+
+    #[test]
+    fn stream_guard_acquire_and_drop() {
+        let before = ACTIVE_STREAMS.load(Ordering::SeqCst);
+
+        let guard = StreamGuard::acquire("192.168.1.1".to_string());
+        assert!(guard.is_ok());
+        assert_eq!(ACTIVE_STREAMS.load(Ordering::SeqCst), before + 1);
+
+        // Drop the guard
+        drop(guard);
+        assert_eq!(ACTIVE_STREAMS.load(Ordering::SeqCst), before);
+    }
+
+    #[test]
+    fn stream_guard_per_ip_limit() {
+        ACTIVE_STREAMS.store(0, Ordering::SeqCst);
+        // Clear per-IP map
+        if let Ok(mut map) = PER_IP_STREAMS.lock() {
+            map.clear();
+        }
+
+        let mut guards = Vec::new();
+        for _ in 0..MAX_CONCURRENT_PER_IP {
+            let guard = StreamGuard::acquire("10.0.0.1".to_string());
+            assert!(guard.is_ok());
+            guards.push(guard);
+        }
+
+        // Next one should fail (per-IP limit)
+        let result = StreamGuard::acquire("10.0.0.1".to_string());
+        assert!(result.is_err());
+
+        // Different IP should succeed
+        let other = StreamGuard::acquire("10.0.0.2".to_string());
+        assert!(other.is_ok());
+
+        // Drop all
+        drop(guards);
+        drop(other);
+    }
+
+    #[test]
+    fn bandwidth_tracker_allows_within_limit() {
+        let tracker = BandwidthTracker {
+            entries: std::sync::RwLock::new(HashMap::new()),
+            max_bytes_per_minute: 1000,
+        };
+        assert!(tracker.check_and_record("1.2.3.4", 500));
+        assert!(tracker.check_and_record("1.2.3.4", 400));
+    }
+
+    #[test]
+    fn bandwidth_tracker_rejects_over_limit() {
+        let tracker = BandwidthTracker {
+            entries: std::sync::RwLock::new(HashMap::new()),
+            max_bytes_per_minute: 1000,
+        };
+        assert!(tracker.check_and_record("1.2.3.4", 800));
+        assert!(!tracker.check_and_record("1.2.3.4", 300));
+    }
+
+    #[test]
+    fn bandwidth_tracker_different_ips_independent() {
+        let tracker = BandwidthTracker {
+            entries: std::sync::RwLock::new(HashMap::new()),
+            max_bytes_per_minute: 500,
+        };
+        assert!(tracker.check_and_record("1.2.3.4", 400));
+        assert!(tracker.check_and_record("5.6.7.8", 400));
+    }
+
+    #[test]
+    fn create_share_request_deserialize() {
+        let json = r#"{"fileId":"f1","expiresInDays":7,"password":"secret"}"#;
+        let req: CreateShareRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.file_id, "f1");
+        assert_eq!(req.expires_in_days, Some(7));
+        assert_eq!(req.password, Some("secret".to_string()));
+    }
+
+    #[test]
+    fn create_share_request_defaults() {
+        let json = r#"{"fileId":"f1"}"#;
+        let req: CreateShareRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.file_id, "f1");
+        assert!(req.expires_in_days.is_none());
+        assert!(req.password.is_none());
+    }
+
+    #[test]
+    fn list_shares_query_deserialize() {
+        let json = r#"{"userId":"u1","status":"active","limit":10,"offset":5}"#;
+        let q: ListSharesQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.user_id, Some("u1".to_string()));
+        assert_eq!(q.status, Some("active".to_string()));
+        assert_eq!(q.limit, Some(10));
+        assert_eq!(q.offset, Some(5));
+    }
+
+    #[test]
+    fn download_query_deserialize() {
+        let json = r#"{"password":"mypass"}"#;
+        let q: DownloadQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.password, Some("mypass".to_string()));
+    }
+
+    #[test]
+    fn download_query_no_password() {
+        let json = r#"{}"#;
+        let q: DownloadQuery = serde_json::from_str(json).unwrap();
+        assert!(q.password.is_none());
+    }
+
+    #[test]
+    fn api_response_serialization() {
+        let resp = ApiResponse {
+            success: true,
+            message: Some("ok".to_string()),
+            data: Some(42u32),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("\"message\":\"ok\""));
+        assert!(json.contains("\"data\":42"));
+    }
+
+    #[test]
+    fn api_response_skip_none() {
+        let resp = ApiResponse::<String> {
+            success: false,
+            message: None,
+            data: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(!json.contains("message"));
+        assert!(!json.contains("data"));
+    }
+
+    #[test]
+    fn create_share_response_serialization() {
+        let resp = CreateShareResponse {
+            share_id: "abc12345".to_string(),
+            file_id: "f1".to_string(),
+            created_by: "user1".to_string(),
+            url: "https://example.com/s/abc12345".to_string(),
+            password: Some("secret123".to_string()),
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            expires_at: "2024-01-08T00:00:00Z".to_string(),
+            has_password: true,
+            access_count: 0,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"shareId\":\"abc12345\""));
+        assert!(json.contains("\"hasPassword\":true"));
+        assert!(json.contains("\"accessCount\":0"));
+    }
+
+    #[test]
+    fn create_share_response_no_password() {
+        let resp = CreateShareResponse {
+            share_id: "abc12345".to_string(),
+            file_id: "f1".to_string(),
+            created_by: "user1".to_string(),
+            url: "https://example.com/s/abc12345".to_string(),
+            password: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            expires_at: "2024-01-08T00:00:00Z".to_string(),
+            has_password: false,
+            access_count: 5,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"hasPassword\":false"));
+        assert!(json.contains("\"accessCount\":5"));
+    }
+
+    #[test]
+    fn share_list_item_serialization() {
+        let item = ShareListItem {
+            share_id: "abc12345".to_string(),
+            original_filename: "photo.jpg".to_string(),
+            file_size: 1024,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            expires_at: "2024-01-08T00:00:00Z".to_string(),
+            status: "active".to_string(),
+            access_count: 3,
+            has_password: true,
+            url: "https://example.com/s/abc12345".to_string(),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"shareId\":\"abc12345\""));
+        assert!(json.contains("\"originalFilename\":\"photo.jpg\""));
+        assert!(json.contains("\"fileSize\":1024"));
+        assert!(json.contains("\"status\":\"active\""));
+    }
+
+    #[test]
+    fn share_list_response_serialization() {
+        let resp = ShareListResponse {
+            shares: vec![],
+            total: 0,
+            limit: 50,
+            offset: 0,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"shares\":[]"));
+        assert!(json.contains("\"total\":0"));
+        assert!(json.contains("\"limit\":50"));
+        assert!(json.contains("\"offset\":0"));
+    }
+
+    #[test]
+    fn share_list_response_with_items() {
+        let item = ShareListItem {
+            share_id: "abc12345".to_string(),
+            original_filename: "doc.pdf".to_string(),
+            file_size: 2048,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            expires_at: "2024-01-08T00:00:00Z".to_string(),
+            status: "expired".to_string(),
+            access_count: 10,
+            has_password: false,
+            url: "https://example.com/s/abc12345".to_string(),
+        };
+        let resp = ShareListResponse {
+            shares: vec![item],
+            total: 1,
+            limit: 50,
+            offset: 0,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"total\":1"));
+        assert!(json.contains("\"originalFilename\":\"doc.pdf\""));
+    }
+
+    #[test]
+    fn access_logs_response_serialization() {
+        let resp = AccessLogsResponse {
+            logs: vec![],
+            total: 0,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"logs\":[]"));
+        assert!(json.contains("\"total\":0"));
+    }
+
+    #[test]
+    fn permanent_delete_request_deserialize() {
+        let json = r#"{"userId":"user1"}"#;
+        let req: PermanentDeleteRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.user_id, Some("user1".to_string()));
+    }
+
+    #[test]
+    fn permanent_delete_request_no_user_id() {
+        let json = r#"{}"#;
+        let req: PermanentDeleteRequest = serde_json::from_str(json).unwrap();
+        assert!(req.user_id.is_none());
+    }
+
+    #[test]
+    fn list_shares_query_defaults() {
+        let json = r#"{}"#;
+        let q: ListSharesQuery = serde_json::from_str(json).unwrap();
+        assert!(q.user_id.is_none());
+        assert!(q.status.is_none());
+        assert!(q.limit.is_none());
+        assert!(q.offset.is_none());
+    }
+
+    #[test]
+    fn bandwidth_tracker_window_reset() {
+        let tracker = BandwidthTracker {
+            entries: std::sync::RwLock::new(HashMap::new()),
+            max_bytes_per_minute: 1000,
+        };
+        // First request uses 800 bytes
+        assert!(tracker.check_and_record("1.2.3.4", 800));
+        // Second request would exceed (800 + 300 > 1000)
+        assert!(!tracker.check_and_record("1.2.3.4", 300));
+        // But a different IP is independent
+        assert!(tracker.check_and_record("5.6.7.8", 300));
+    }
+
+    #[test]
+    fn stream_guard_acquire_release_cycle() {
+        let before = ACTIVE_STREAMS.load(Ordering::SeqCst);
+        if let Ok(mut map) = PER_IP_STREAMS.lock() {
+            map.clear();
+        }
+
+        // Acquire and release a few guards
+        let g1 = StreamGuard::acquire("192.168.1.1".to_string());
+        assert!(g1.is_ok());
+        assert_eq!(ACTIVE_STREAMS.load(Ordering::SeqCst), before + 1);
+
+        let g2 = StreamGuard::acquire("192.168.1.2".to_string());
+        assert!(g2.is_ok());
+        assert_eq!(ACTIVE_STREAMS.load(Ordering::SeqCst), before + 2);
+
+        drop(g1);
+        assert_eq!(ACTIVE_STREAMS.load(Ordering::SeqCst), before + 1);
+
+        drop(g2);
+        assert_eq!(ACTIVE_STREAMS.load(Ordering::SeqCst), before);
+    }
+
+    #[test]
+    fn extract_basic_auth_password_with_spaces() {
+        let mut headers = HeaderMap::new();
+        // base64("user:pass word") - password with space
+        let encoded = general_purpose::STANDARD.encode("user:pass word");
+        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        assert_eq!(
+            extract_basic_auth_password(&headers),
+            Some("pass word".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_basic_auth_password_non_utf8() {
+        let mut headers = HeaderMap::new();
+        // Invalid UTF-8 bytes
+        let invalid_bytes = vec![0xFF, 0xFE, 0x00, 0x01];
+        let encoded = general_purpose::STANDARD.encode(&invalid_bytes);
+        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        assert_eq!(extract_basic_auth_password(&headers), None);
+    }
+
+    #[test]
+    fn download_error_forbidden() {
+        let (status, _, json) = download_error(StatusCode::FORBIDDEN, "Access denied");
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(!json.success);
+        assert_eq!(json.message.as_deref(), Some("Access denied"));
+    }
+
+    #[test]
+    fn download_error_unauthorized() {
+        let (status, _, json) = download_error(StatusCode::UNAUTHORIZED, "Password required");
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(json.message.as_deref(), Some("Password required"));
+    }
+}
+
 /// GET /public/file/:shareId
 pub async fn public_download(
     State(state): State<AppState>,

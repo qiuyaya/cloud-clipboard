@@ -7,14 +7,30 @@ pub mod routes;
 pub mod services;
 pub mod utils;
 
-use crate::services::{FileManager, RoomService, ShareService};
+use crate::services::traits::{FileManagerTrait, RoomServiceTrait, ShareServiceTrait};
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Application state shared across all handlers
 #[derive(Clone)]
 pub struct AppState {
-    pub room_service: Arc<RoomService>,
-    pub file_manager: Arc<FileManager>,
-    pub share_service: Arc<ShareService>,
-    pub start_time: std::time::Instant,
+    pub room_service: Arc<dyn RoomServiceTrait>,
+    pub file_manager: Arc<dyn FileManagerTrait>,
+    pub share_service: Arc<dyn ShareServiceTrait>,
+    pub start_time: Instant,
+}
+
+impl AppState {
+    pub fn new(
+        room_service: Arc<dyn RoomServiceTrait>,
+        file_manager: Arc<dyn FileManagerTrait>,
+        share_service: Arc<dyn ShareServiceTrait>,
+    ) -> Self {
+        Self {
+            room_service,
+            file_manager,
+            share_service,
+            start_time: Instant::now(),
+        }
+    }
 }

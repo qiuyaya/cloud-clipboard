@@ -500,3 +500,308 @@ async fn delete_file(
         data: None,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::header::HeaderValue;
+
+    // ============= is_valid_filename tests =============
+
+    #[test]
+    fn valid_filename_normal() {
+        assert!(is_valid_filename("photo.jpg"));
+        assert!(is_valid_filename("document.pdf"));
+        assert!(is_valid_filename("my file.txt"));
+    }
+
+    #[test]
+    fn valid_filename_rejects_path_traversal() {
+        assert!(!is_valid_filename("../etc/passwd"));
+        assert!(!is_valid_filename("foo/../../bar"));
+        assert!(!is_valid_filename(".."));
+    }
+
+    #[test]
+    fn valid_filename_rejects_slashes() {
+        assert!(!is_valid_filename("foo/bar.txt"));
+        assert!(!is_valid_filename("foo\\bar.txt"));
+    }
+
+    #[test]
+    fn valid_filename_rejects_special_chars() {
+        assert!(!is_valid_filename("file:name"));
+        assert!(!is_valid_filename("file*name"));
+        assert!(!is_valid_filename("file?name"));
+        assert!(!is_valid_filename("file\"name"));
+        assert!(!is_valid_filename("file<name"));
+        assert!(!is_valid_filename("file>name"));
+        assert!(!is_valid_filename("file|name"));
+    }
+
+    // ============= is_dangerous_extension tests =============
+
+    #[test]
+    fn dangerous_extension_exe() {
+        assert!(is_dangerous_extension("program.exe"));
+        assert!(is_dangerous_extension("script.bat"));
+        assert!(is_dangerous_extension("command.cmd"));
+        assert!(is_dangerous_extension("shell.sh"));
+        assert!(is_dangerous_extension("app.dll"));
+        assert!(is_dangerous_extension("lib.so"));
+        assert!(is_dangerous_extension("app.dmg"));
+    }
+
+    #[test]
+    fn safe_extension_txt() {
+        assert!(!is_dangerous_extension("document.txt"));
+        assert!(!is_dangerous_extension("photo.jpg"));
+        assert!(!is_dangerous_extension("archive.zip"));
+        assert!(!is_dangerous_extension("data.json"));
+    }
+
+    #[test]
+    fn no_extension_is_safe() {
+        assert!(!is_dangerous_extension("README"));
+        assert!(!is_dangerous_extension("Makefile"));
+    }
+
+    #[test]
+    fn dangerous_extension_case_insensitive() {
+        assert!(is_dangerous_extension("program.EXE"));
+        assert!(is_dangerous_extension("script.Bat"));
+        assert!(is_dangerous_extension("app.DLL"));
+    }
+
+    // ============= validate_file_id tests =============
+
+    #[test]
+    fn validate_file_id_normal() {
+        assert!(validate_file_id("abc123.jpg").is_ok());
+        assert!(validate_file_id("uuid_timestamp.png").is_ok());
+    }
+
+    #[test]
+    fn validate_file_id_rejects_path_traversal() {
+        assert!(validate_file_id("../etc/passwd").is_err());
+        assert!(validate_file_id("foo/../../bar").is_err());
+        assert!(validate_file_id("foo\\bar").is_err());
+    }
+
+    #[test]
+    fn validate_file_id_rejects_empty() {
+        assert!(validate_file_id("").is_err());
+    }
+
+    #[test]
+    fn validate_file_id_rejects_too_long() {
+        let long_id = "a".repeat(256);
+        assert!(validate_file_id(&long_id).is_err());
+    }
+
+    #[test]
+    fn validate_file_id_accepts_max_length() {
+        let max_id = "a".repeat(255);
+        assert!(validate_file_id(&max_id).is_ok());
+    }
+
+    // ============= extract_room_key tests =============
+
+    #[test]
+    fn extract_room_key_from_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-room-key", HeaderValue::from_static("my-room"));
+        assert_eq!(extract_room_key(&headers), Some("my-room".to_string()));
+    }
+
+    #[test]
+    fn extract_room_key_missing_header() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_room_key(&headers), None);
+    }
+
+    // ============= require_room_key tests =============
+
+    #[test]
+    fn require_room_key_returns_key_when_present() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-room-key", HeaderValue::from_static("room1"));
+        let result = require_room_key(&headers);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "room1");
+    }
+
+    #[test]
+    fn require_room_key_returns_error_when_missing() {
+        let headers = HeaderMap::new();
+        let result = require_room_key(&headers);
+        assert!(result.is_err());
+        let (status, _) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    // ============= UploadResponse serialization =============
+
+    #[test]
+    fn upload_response_serialization() {
+        let resp = UploadResponse {
+            file_id: "f1".to_string(),
+            download_url: "http://example.com/f1".to_string(),
+            name: "photo.jpg".to_string(),
+            size: 1024,
+            file_type: "image/jpeg".to_string(),
+            last_modified: Some(1700000000000),
+            is_duplicate: false,
+            original_file_id: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"fileId\":\"f1\""));
+        assert!(json.contains("\"name\":\"photo.jpg\""));
+        assert!(json.contains("\"type\":\"image/jpeg\""));
+        assert!(json.contains("\"isDuplicate\":false"));
+        assert!(!json.contains("originalFileId"));
+    }
+
+    #[test]
+    fn upload_response_with_original_file_id() {
+        let resp = UploadResponse {
+            file_id: "f2".to_string(),
+            download_url: "http://example.com/f2".to_string(),
+            name: "doc.pdf".to_string(),
+            size: 2048,
+            file_type: "application/pdf".to_string(),
+            last_modified: None,
+            is_duplicate: true,
+            original_file_id: Some("f1".to_string()),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"originalFileId\":\"f1\""));
+        assert!(json.contains("\"isDuplicate\":true"));
+        assert!(!json.contains("lastModified"));
+    }
+
+    // ============= Additional tests =============
+
+    #[test]
+    fn valid_filename_empty() {
+        assert!(is_valid_filename(""));
+    }
+
+    #[test]
+    fn valid_filename_with_spaces() {
+        assert!(is_valid_filename("my document file.pdf"));
+    }
+
+    #[test]
+    fn valid_filename_unicode() {
+        assert!(is_valid_filename("文档.pdf"));
+        assert!(is_valid_filename("写真.jpg"));
+    }
+
+    #[test]
+    fn dangerous_extension_all_types() {
+        assert!(is_dangerous_extension("app.msi"));
+        assert!(is_dangerous_extension("app.jar"));
+        assert!(is_dangerous_extension("script.bash"));
+        assert!(is_dangerous_extension("script.ps1"));
+        assert!(is_dangerous_extension("script.vbs"));
+        assert!(is_dangerous_extension("page.php"));
+        assert!(is_dangerous_extension("page.asp"));
+        assert!(is_dangerous_extension("page.aspx"));
+        assert!(is_dangerous_extension("page.jsp"));
+        assert!(is_dangerous_extension("script.py"));
+        assert!(is_dangerous_extension("script.rb"));
+        assert!(is_dangerous_extension("script.pl"));
+        assert!(is_dangerous_extension("app.com"));
+        assert!(is_dangerous_extension("app.scr"));
+        assert!(is_dangerous_extension("app.pif"));
+    }
+
+    #[test]
+    fn dangerous_extension_source_code() {
+        assert!(is_dangerous_extension("main.c"));
+        assert!(is_dangerous_extension("main.cpp"));
+        assert!(is_dangerous_extension("main.cs"));
+        assert!(is_dangerous_extension("Main.java"));
+        assert!(is_dangerous_extension("main.go"));
+        assert!(is_dangerous_extension("main.rs"));
+        assert!(is_dangerous_extension("main.swift"));
+    }
+
+    #[test]
+    fn dangerous_extension_package_formats() {
+        assert!(is_dangerous_extension("app.app"));
+        assert!(is_dangerous_extension("app.deb"));
+        assert!(is_dangerous_extension("app.rpm"));
+    }
+
+    #[test]
+    fn safe_extension_common_files() {
+        assert!(!is_dangerous_extension("data.csv"));
+        assert!(!is_dangerous_extension("style.css"));
+        assert!(!is_dangerous_extension("script.js"));
+        assert!(!is_dangerous_extension("page.html"));
+        assert!(!is_dangerous_extension("doc.md"));
+        assert!(!is_dangerous_extension("image.png"));
+        assert!(!is_dangerous_extension("image.gif"));
+        assert!(!is_dangerous_extension("image.webp"));
+        assert!(!is_dangerous_extension("audio.mp3"));
+        assert!(!is_dangerous_extension("video.mp4"));
+    }
+
+    #[test]
+    fn validate_file_id_with_dots() {
+        assert!(validate_file_id("abc.def.jpg").is_ok());
+    }
+
+    #[test]
+    fn validate_file_id_error_status() {
+        let result = validate_file_id("../etc/passwd");
+        assert!(result.is_err());
+        let (status, json) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json.success);
+    }
+
+    #[test]
+    fn validate_file_id_empty_error_status() {
+        let result = validate_file_id("");
+        assert!(result.is_err());
+        let (status, json) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(!json.success);
+    }
+
+    #[test]
+    fn require_room_key_error_message() {
+        let headers = HeaderMap::new();
+        let result = require_room_key(&headers);
+        assert!(result.is_err());
+        let (_, json) = result.unwrap_err();
+        assert_eq!(json.message.as_deref(), Some("Missing x-room-key header"));
+    }
+
+    #[test]
+    fn extract_room_key_invalid_utf8() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-room-key", HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap());
+        // Invalid UTF-8 should return None
+        assert_eq!(extract_room_key(&headers), None);
+    }
+
+    #[test]
+    fn upload_response_size_zero() {
+        let resp = UploadResponse {
+            file_id: "f1".to_string(),
+            download_url: "http://example.com/f1".to_string(),
+            name: "empty.txt".to_string(),
+            size: 0,
+            file_type: "text/plain".to_string(),
+            last_modified: None,
+            is_duplicate: false,
+            original_file_id: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"size\":0"));
+    }
+}

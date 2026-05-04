@@ -10,6 +10,10 @@ import {
   generateBrowserFingerprint,
   generateUserIdFromFingerprint,
   simpleHash,
+  formatExpiryTime,
+  validatePassword,
+  base62Encode,
+  generateShareId,
 } from "../utils";
 
 describe("Utility Functions Tests", () => {
@@ -379,6 +383,109 @@ describe("Utility Functions Tests", () => {
       const userId2 = generateUserIdFromFingerprint(fingerprint2);
 
       expect(userId1).not.toBe(userId2);
+    });
+  });
+
+  describe("formatExpiryTime", () => {
+    it("shows expired for past dates (zh)", () => {
+      const past = new Date(Date.now() - 10000);
+      expect(formatExpiryTime(past)).toBe("已过期");
+    });
+
+    it("shows expired for past dates (en)", () => {
+      const past = new Date(Date.now() - 10000);
+      expect(formatExpiryTime(past, "en")).toBe("Expired");
+    });
+
+    it("shows hours for expiry within 24h (zh)", () => {
+      const future = new Date(Date.now() + 2 * 3600000);
+      expect(formatExpiryTime(future)).toBe("2小时后过期");
+    });
+
+    it("shows hours for expiry within 24h (en)", () => {
+      const future = new Date(Date.now() + 2 * 3600000);
+      expect(formatExpiryTime(future, "en")).toBe("Expires in 2h");
+    });
+
+    it("shows days for expiry beyond 24h (zh)", () => {
+      const future = new Date(Date.now() + 3 * 86400000);
+      expect(formatExpiryTime(future)).toBe("3天后过期");
+    });
+
+    it("shows days for expiry beyond 24h (en)", () => {
+      const future = new Date(Date.now() + 3 * 86400000);
+      expect(formatExpiryTime(future, "en")).toBe("Expires in 3d");
+    });
+
+    it("handles string dates", () => {
+      const future = new Date(Date.now() + 2 * 3600000).toISOString();
+      expect(formatExpiryTime(future)).toMatch(/小时后过期/);
+    });
+
+    it("handles invalid dates", () => {
+      expect(formatExpiryTime("invalid")).toBe("Invalid Date");
+    });
+  });
+
+  describe("validatePassword", () => {
+    it("accepts valid passwords (6-100 chars)", () => {
+      expect(validatePassword("abcdef").isValid).toBe(true);
+      expect(validatePassword("a".repeat(100)).isValid).toBe(true);
+    });
+
+    it("rejects passwords shorter than 6 chars", () => {
+      const result = validatePassword("abc");
+      expect(result.isValid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("rejects passwords longer than 100 chars", () => {
+      const result = validatePassword("a".repeat(101));
+      expect(result.isValid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("rejects empty password", () => {
+      const result = validatePassword("");
+      expect(result.isValid).toBe(false);
+    });
+  });
+
+  describe("base62Encode", () => {
+    it("encodes zero", () => {
+      expect(base62Encode("0")).toBe("0");
+    });
+
+    it("encodes hex string", () => {
+      const result = base62Encode("ff");
+      expect(result.length).toBeGreaterThan(0);
+      expect(result).toMatch(/^[0-9A-Za-z]+$/);
+    });
+
+    it("produces consistent results", () => {
+      expect(base62Encode("abc123")).toBe(base62Encode("abc123"));
+    });
+
+    it("produces different results for different inputs", () => {
+      expect(base62Encode("abc")).not.toBe(base62Encode("def"));
+    });
+  });
+
+  describe("generateShareId", () => {
+    it("generates 10-char share ID", () => {
+      const id = generateShareId();
+      expect(id.length).toBe(10);
+    });
+
+    it("generates unique IDs", () => {
+      const id1 = generateShareId();
+      const id2 = generateShareId();
+      expect(id1).not.toBe(id2);
+    });
+
+    it("contains only base62 characters", () => {
+      const id = generateShareId();
+      expect(id).toMatch(/^[0-9A-Za-z]+$/);
     });
   });
 

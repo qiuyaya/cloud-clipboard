@@ -169,6 +169,20 @@ pub struct RoomLinkGeneratedEvent {
     pub share_link: String,
 }
 
+/// Result of join_room business logic, independent of Socket I/O
+#[derive(Debug)]
+pub enum JoinRoomCoreResult {
+    NeedPassword { room_key: String },
+    Success {
+        user_info: UserInfo,
+        user_list: Vec<UserInfo>,
+        messages: Vec<Message>,
+        has_password: bool,
+        is_pinned: bool,
+    },
+    Error(String),
+}
+
 /// Socket-level rate limiter
 struct SocketRateLimiter {
     /// socket_id -> (event_key -> RateLimitEntry)
@@ -268,6 +282,85 @@ fn get_rate_limit_config(event: &str) -> SocketRateLimitConfig {
             max_requests: 30,
             window_ms: 60_000,
         },
+    }
+}
+
+/// 根据 fingerprint 决定 user_id：有 fingerprint 则生成确定性 ID，否则随机
+pub fn resolve_user_id(fingerprint: Option<&FingerprintData>) -> String {
+    fingerprint
+        .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
+        .unwrap_or_else(crate::utils::generate_user_id)
+}
+
+/// 根据 user data 决定 username：有 name 则使用，否则生成随机名
+pub fn resolve_username(user_data: Option<&UserData>) -> String {
+    user_data
+        .and_then(|u| u.name.clone())
+        .unwrap_or_else(|| {
+            use rand::Rng;
+            let suffix: String = rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
+                .take(6)
+                .map(|b| (b as char).to_ascii_lowercase())
+                .collect();
+            format!("用户{}", suffix)
+        })
+}
+
+/// 根据 user data 和 user-agent 决定 device type
+pub fn resolve_device_type(user_data: Option<&UserData>, user_agent: Option<&str>) -> String {
+    user_data
+        .and_then(|u| u.device_type.clone())
+        .unwrap_or_else(|| {
+            let ua = user_agent.unwrap_or("");
+            detect_device_type(ua)
+        })
+}
+
+/// join_room 业务逻辑核心，不依赖 Socket I/O
+pub fn join_room_core(
+    room_service: &RoomService,
+    room_key: &str,
+    user_id: &str,
+    username: &str,
+    socket_id: &str,
+    password: Option<&str>,
+    device_type: &str,
+    fingerprint: Option<&str>,
+) -> JoinRoomCoreResult {
+    // 如果没有提供密码且房间需要密码，返回 NeedPassword
+    if password.is_none() && room_service.room_has_password(room_key) {
+        return JoinRoomCoreResult::NeedPassword {
+            room_key: room_key.to_string(),
+        };
+    }
+
+    let join_req = JoinRoomRequest {
+        room_key: room_key.to_string(),
+        user_id: user_id.to_string(),
+        username: username.to_string(),
+        socket_id: socket_id.to_string(),
+        password: password.map(|p| p.to_string()),
+        device_type: device_type.to_string(),
+        fingerprint: fingerprint.map(|f| f.to_string()),
+    };
+
+    match room_service.join_room(join_req) {
+        Ok((user, users)) => {
+            let user_info = UserInfo::from(&user);
+            let user_list: Vec<UserInfo> = users.iter().map(UserInfo::from).collect();
+            let messages = room_service.get_messages(room_key);
+            let has_password = room_service.room_has_password(room_key);
+            let is_pinned = room_service.is_room_pinned(room_key);
+            JoinRoomCoreResult::Success {
+                user_info,
+                user_list,
+                messages,
+                has_password,
+                is_pinned,
+            }
+        }
+        Err(error) => JoinRoomCoreResult::Error(error),
     }
 }
 
@@ -598,123 +691,40 @@ async fn handle_join_room(
 ) {
     tracing::info!("joinRoom event received: room_key={}", data.room_key);
 
-    // Check if room requires password
-    if room_service.room_has_password(&data.room_key) {
-        tracing::info!("Room {} requires password", data.room_key);
-        let _ = socket.emit(
-            "passwordRequired",
-            &PasswordRequiredEvent {
-                room_key: data.room_key,
-            },
-        );
-        return;
-    }
-
-    // Generate user ID from fingerprint or random (UUID format to match shared schema)
-    let user_id = data
-        .fingerprint
-        .as_ref()
-        .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
-        .unwrap_or_else(crate::utils::generate_user_id);
-
-    let username = data
-        .user
-        .as_ref()
-        .and_then(|u| u.name.clone())
-        .unwrap_or_else(|| {
-            use rand::Rng;
-            let suffix: String = rand::rng()
-                .sample_iter(&rand::distr::Alphanumeric)
-                .take(6)
-                .map(|b| (b as char).to_ascii_lowercase())
-                .collect();
-            format!("用户{}", suffix)
-        });
-
-    // Detect device type: prefer client-provided value, fallback to User-Agent detection
-    let device_type = data
-        .user
-        .as_ref()
-        .and_then(|u| u.device_type.clone())
-        .unwrap_or_else(|| {
-            let req_parts = socket.req_parts();
-            let ua = req_parts
-                .headers
-                .get("user-agent")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
-            detect_device_type(ua)
-        });
-
-    let fingerprint_hash = data.fingerprint.as_ref().map(|f| f.hash.as_str());
-
+    let user_id = resolve_user_id(data.fingerprint.as_ref());
+    let username = resolve_username(data.user.as_ref());
+    let user_agent = socket.req_parts().headers.get("user-agent").and_then(|v| v.to_str().ok());
+    let device_type = resolve_device_type(data.user.as_ref(), user_agent);
+    let fingerprint_hash = data.fingerprint.as_ref().map(|f| f.hash.clone());
     let socket_id = socket.id.to_string();
 
-    let join_req = JoinRoomRequest {
-        room_key: &data.room_key,
-        user_id: &user_id,
-        username: &username,
-        socket_id: &socket_id,
-        password: None,
-        device_type: &device_type,
-        fingerprint: fingerprint_hash,
-    };
-
-    match room_service.join_room(join_req) {
-        Ok((user, users)) => {
-            // Join socket.io room
+    match join_room_core(
+        &room_service,
+        &data.room_key,
+        &user_id,
+        &username,
+        &socket_id,
+        None,
+        &device_type,
+        fingerprint_hash.as_deref(),
+    ) {
+        JoinRoomCoreResult::NeedPassword { room_key } => {
+            let _ = socket.emit("passwordRequired", &PasswordRequiredEvent { room_key });
+        }
+        JoinRoomCoreResult::Success { user_info, user_list, messages, has_password, is_pinned } => {
             let _ = socket.join(data.room_key.clone());
-
-            // Convert to client format
-            let user_info = UserInfo::from(&user);
-            let user_list: Vec<UserInfo> = users.iter().map(UserInfo::from).collect();
-
-            // Send userJoined event to the joining user
-            tracing::info!(
-                "Sending userJoined to socket {}: {:?}",
-                socket.id,
-                user_info
-            );
             let _ = socket.emit("userJoined", &user_info);
-
-            // Send user list
             let _ = socket.emit("userList", &user_list);
-
-            // Send message history to joining user
-            let messages = room_service.get_messages(&data.room_key);
             if !messages.is_empty() {
                 let _ = socket.emit("messageHistory", &messages);
             }
-
-            // Send room password status to joining user
-            let has_password = room_service.room_has_password(&data.room_key);
-            let _ = socket.emit(
-                "roomPasswordSet",
-                &RoomPasswordSetEvent {
-                    room_key: data.room_key.clone(),
-                    has_password,
-                },
-            );
-
-            // Send room pinned status to joining user
-            let is_pinned = room_service.is_room_pinned(&data.room_key);
-            let _ = socket.emit(
-                "roomPinned",
-                &RoomPinnedEvent {
-                    room_key: data.room_key.clone(),
-                    is_pinned,
-                },
-            );
-
-            // Broadcast to others in the room
-            let _ = socket
-                .to(data.room_key.clone())
-                .emit("userJoined", &user_info);
+            let _ = socket.emit("roomPasswordSet", &RoomPasswordSetEvent { room_key: data.room_key.clone(), has_password });
+            let _ = socket.emit("roomPinned", &RoomPinnedEvent { room_key: data.room_key.clone(), is_pinned });
+            let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
-
-            tracing::info!("User {} joined room successfully", user.username);
+            tracing::info!("User {} joined room successfully", user_info.name);
         }
-        Err(error) => {
+        JoinRoomCoreResult::Error(error) => {
             tracing::error!("Failed to join room: {}", error);
             let _ = socket.emit("error", &error);
         }
@@ -731,107 +741,44 @@ async fn handle_join_room_with_password(
         data.room_key
     );
 
-    // Generate user ID from fingerprint or random (UUID format to match shared schema)
-    let user_id = data
-        .fingerprint
-        .as_ref()
-        .map(|f| crate::utils::generate_user_id_from_fingerprint(&f.hash))
-        .unwrap_or_else(crate::utils::generate_user_id);
-
-    let username = data
-        .user
-        .as_ref()
-        .and_then(|u| u.name.clone())
-        .unwrap_or_else(|| {
-            use rand::Rng;
-            let suffix: String = rand::rng()
-                .sample_iter(&rand::distr::Alphanumeric)
-                .take(6)
-                .map(|b| (b as char).to_ascii_lowercase())
-                .collect();
-            format!("用户{}", suffix)
-        });
-
-    // Detect device type: prefer client-provided value, fallback to User-Agent detection
-    let device_type = data
-        .user
-        .as_ref()
-        .and_then(|u| u.device_type.clone())
-        .unwrap_or_else(|| {
-            let req_parts = socket.req_parts();
-            let ua = req_parts
-                .headers
-                .get("user-agent")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("");
-            detect_device_type(ua)
-        });
-
-    let fingerprint_hash = data.fingerprint.as_ref().map(|f| f.hash.as_str());
-
+    let user_id = resolve_user_id(data.fingerprint.as_ref());
+    let username = resolve_username(data.user.as_ref());
+    let user_agent = socket.req_parts().headers.get("user-agent").and_then(|v| v.to_str().ok());
+    let device_type = resolve_device_type(data.user.as_ref(), user_agent);
+    let fingerprint_hash = data.fingerprint.as_ref().map(|f| f.hash.clone());
     let socket_id = socket.id.to_string();
 
-    let join_req = JoinRoomRequest {
-        room_key: &data.room_key,
-        user_id: &user_id,
-        username: &username,
-        socket_id: &socket_id,
-        password: Some(&data.password),
-        device_type: &device_type,
-        fingerprint: fingerprint_hash,
-    };
-
-    match room_service.join_room(join_req) {
-        Ok((user, users)) => {
-            // Join socket.io room
+    match join_room_core(
+        &room_service,
+        &data.room_key,
+        &user_id,
+        &username,
+        &socket_id,
+        Some(&data.password),
+        &device_type,
+        fingerprint_hash.as_deref(),
+    ) {
+        JoinRoomCoreResult::NeedPassword { .. } => {
+            // 不应该到达这里，因为已经提供了密码
+            let _ = socket.emit("error", &"Password required but already provided");
+        }
+        JoinRoomCoreResult::Success { user_info, user_list, messages, has_password, is_pinned } => {
             let _ = socket.join(data.room_key.clone());
-
-            // Convert to client format
-            let user_info = UserInfo::from(&user);
-            let user_list: Vec<UserInfo> = users.iter().map(UserInfo::from).collect();
-
-            // Send userJoined event to the joining user
             let _ = socket.emit("userJoined", &user_info);
             let _ = socket.emit("userList", &user_list);
-
-            // Send message history to joining user
-            let messages = room_service.get_messages(&data.room_key);
             if !messages.is_empty() {
                 let _ = socket.emit("messageHistory", &messages);
             }
-
-            // Send room password status to joining user
-            let has_password = room_service.room_has_password(&data.room_key);
-            let _ = socket.emit(
-                "roomPasswordSet",
-                &RoomPasswordSetEvent {
-                    room_key: data.room_key.clone(),
-                    has_password,
-                },
-            );
-
-            // Send room pinned status to joining user
-            let is_pinned = room_service.is_room_pinned(&data.room_key);
-            let _ = socket.emit(
-                "roomPinned",
-                &RoomPinnedEvent {
-                    room_key: data.room_key.clone(),
-                    is_pinned,
-                },
-            );
-
-            // Broadcast to others in the room
-            let _ = socket
-                .to(data.room_key.clone())
-                .emit("userJoined", &user_info);
+            let _ = socket.emit("roomPasswordSet", &RoomPasswordSetEvent { room_key: data.room_key.clone(), has_password });
+            let _ = socket.emit("roomPinned", &RoomPinnedEvent { room_key: data.room_key.clone(), is_pinned });
+            let _ = socket.to(data.room_key.clone()).emit("userJoined", &user_info);
             let _ = socket.to(data.room_key).emit("userList", &user_list);
-
             tracing::info!(
                 "User {} joined password-protected room successfully",
-                user.username
+                user_info.name
             );
         }
-        Err(error) => {
+        JoinRoomCoreResult::Error(error) => {
             tracing::error!("Failed to join room with password: {}", error);
             let _ = socket.emit("error", &error);
         }
@@ -1261,6 +1208,511 @@ async fn handle_recall_message(
         }
         Err(error) => {
             let _ = socket.emit("error", &error);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rate_limit_join_room() {
+        let config = get_rate_limit_config("joinRoom");
+        assert_eq!(config.max_requests, 15);
+        assert_eq!(config.window_ms, 60_000);
+    }
+
+    #[test]
+    fn rate_limit_join_room_with_password() {
+        let config = get_rate_limit_config("joinRoomWithPassword");
+        assert_eq!(config.max_requests, 15);
+    }
+
+    #[test]
+    fn rate_limit_leave_room() {
+        let config = get_rate_limit_config("leaveRoom");
+        assert_eq!(config.max_requests, 20);
+    }
+
+    #[test]
+    fn rate_limit_send_message() {
+        let config = get_rate_limit_config("sendMessage");
+        assert_eq!(config.max_requests, 30);
+    }
+
+    #[test]
+    fn rate_limit_request_user_list() {
+        let config = get_rate_limit_config("requestUserList");
+        assert_eq!(config.max_requests, 20);
+    }
+
+    #[test]
+    fn rate_limit_set_room_password() {
+        let config = get_rate_limit_config("setRoomPassword");
+        assert_eq!(config.max_requests, 10);
+    }
+
+    #[test]
+    fn rate_limit_pin_room() {
+        let config = get_rate_limit_config("pinRoom");
+        assert_eq!(config.max_requests, 10);
+    }
+
+    #[test]
+    fn rate_limit_recall_message() {
+        let config = get_rate_limit_config("recallMessage");
+        assert_eq!(config.max_requests, 30);
+    }
+
+    #[test]
+    fn rate_limit_share_room_link() {
+        let config = get_rate_limit_config("shareRoomLink");
+        assert_eq!(config.max_requests, 20);
+    }
+
+    #[test]
+    fn rate_limit_unknown_event() {
+        let config = get_rate_limit_config("unknownEvent");
+        assert_eq!(config.max_requests, 30);
+        assert_eq!(config.window_ms, 60_000);
+    }
+
+    #[test]
+    fn user_info_from_user() {
+        let now = chrono::Utc::now();
+        let user = crate::models::User {
+            id: "u1".to_string(),
+            username: "Alice".to_string(),
+            room_key: "room1".to_string(),
+            is_online: true,
+            last_seen: now,
+            device_type: "mobile".to_string(),
+            fingerprint: Some("fp1".to_string()),
+        };
+        let info = UserInfo::from(&user);
+        assert_eq!(info.id, "u1");
+        assert_eq!(info.name, "Alice");
+        assert_eq!(info.device_type, "mobile");
+        assert!(info.is_online);
+        assert_eq!(info.fingerprint, Some("fp1".to_string()));
+    }
+
+    #[test]
+    fn user_info_serialization() {
+        let now = chrono::Utc::now();
+        let info = UserInfo {
+            id: "u1".to_string(),
+            name: "Alice".to_string(),
+            device_type: "desktop".to_string(),
+            is_online: true,
+            last_seen: now,
+            fingerprint: None,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"name\":\"Alice\""));
+        assert!(json.contains("\"isOnline\":true"));
+        assert!(json.contains("\"deviceType\":\"desktop\""));
+        assert!(!json.contains("fingerprint"));
+    }
+
+    #[test]
+    fn socket_rate_limiter_new() {
+        let limiter = SocketRateLimiter::new();
+        assert!(limiter.limits.is_empty());
+    }
+
+    #[test]
+    fn socket_rate_limiter_check_and_increment() {
+        let mut limiter = SocketRateLimiter::new();
+        let socket_id = "socket123";
+        let event = "sendMessage";
+        let config = get_rate_limit_config(event);
+
+        for _ in 0..config.max_requests {
+            assert!(limiter.check_rate_limit(socket_id, event, config.max_requests, config.window_ms));
+        }
+        // Next request should be rate limited
+        assert!(!limiter.check_rate_limit(socket_id, event, config.max_requests, config.window_ms));
+    }
+
+    #[test]
+    fn socket_rate_limiter_different_events_independent() {
+        let mut limiter = SocketRateLimiter::new();
+        let socket_id = "socket456";
+
+        let msg_config = get_rate_limit_config("sendMessage");
+        let join_config = get_rate_limit_config("joinRoom");
+
+        // Exhaust sendMessage limit
+        for _ in 0..msg_config.max_requests {
+            limiter.check_rate_limit(socket_id, "sendMessage", msg_config.max_requests, msg_config.window_ms);
+        }
+        assert!(!limiter.check_rate_limit(socket_id, "sendMessage", msg_config.max_requests, msg_config.window_ms));
+
+        // joinRoom should still work
+        assert!(limiter.check_rate_limit(socket_id, "joinRoom", join_config.max_requests, join_config.window_ms));
+    }
+
+    #[test]
+    fn socket_rate_limiter_remove_socket() {
+        let mut limiter = SocketRateLimiter::new();
+        let socket_id = "socket789";
+        let config = get_rate_limit_config("sendMessage");
+
+        limiter.check_rate_limit(socket_id, "sendMessage", config.max_requests, config.window_ms);
+        assert!(!limiter.limits.is_empty());
+
+        limiter.remove_socket(socket_id);
+        assert!(limiter.limits.is_empty());
+    }
+
+    #[test]
+    fn user_info_from_user_no_fingerprint() {
+        let now = chrono::Utc::now();
+        let user = crate::models::User {
+            id: "u2".to_string(),
+            username: "Bob".to_string(),
+            room_key: "room1".to_string(),
+            is_online: false,
+            last_seen: now,
+            device_type: "desktop".to_string(),
+            fingerprint: None,
+        };
+        let info = UserInfo::from(&user);
+        assert_eq!(info.name, "Bob");
+        assert!(!info.is_online);
+        assert!(info.fingerprint.is_none());
+    }
+
+    #[test]
+    fn user_info_with_fingerprint_serialization() {
+        let now = chrono::Utc::now();
+        let info = UserInfo {
+            id: "u1".to_string(),
+            name: "Alice".to_string(),
+            device_type: "mobile".to_string(),
+            is_online: true,
+            last_seen: now,
+            fingerprint: Some("fp123".to_string()),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"fingerprint\":\"fp123\""));
+    }
+
+    #[test]
+    fn join_room_payload_deserialize() {
+        let json = r#"{"roomKey":"room1","user":{"name":"Alice","deviceType":"mobile"}}"#;
+        let payload: JoinRoomPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.room_key, "room1");
+        assert!(payload.user.is_some());
+        assert_eq!(payload.user.unwrap().name, Some("Alice".to_string()));
+    }
+
+    #[test]
+    fn join_room_payload_with_fingerprint() {
+        let json = r#"{"roomKey":"room1","fingerprint":{"hash":"fp123"}}"#;
+        let payload: JoinRoomPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.room_key, "room1");
+        assert!(payload.fingerprint.is_some());
+        assert_eq!(payload.fingerprint.unwrap().hash, "fp123");
+    }
+
+    #[test]
+    fn join_room_with_password_payload_deserialize() {
+        let json = r#"{"roomKey":"room1","password":"secret","user":{"name":"Alice"}}"#;
+        let payload: JoinRoomWithPasswordPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.room_key, "room1");
+        assert_eq!(payload.password, "secret");
+    }
+
+    #[test]
+    fn send_message_request_deserialize() {
+        let json = r#"{"roomKey":"room1","type":"text","content":"Hello"}"#;
+        let req: SendMessageRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.room_key, "room1");
+        assert_eq!(req.msg_type, "text");
+        assert_eq!(req.content, Some("Hello".to_string()));
+    }
+
+    #[test]
+    fn send_message_request_with_file() {
+        let json = r#"{"roomKey":"room1","type":"file","fileInfo":{"name":"photo.jpg","size":1024,"type":"image/jpeg"},"downloadUrl":"http://example.com/f1","fileId":"f1"}"#;
+        let req: SendMessageRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.msg_type, "file");
+        assert!(req.file_info.is_some());
+        let fi = req.file_info.unwrap();
+        assert_eq!(fi.name, "photo.jpg");
+        assert_eq!(fi.size, 1024);
+    }
+
+    #[test]
+    fn set_room_password_request_deserialize() {
+        let json = r#"{"roomKey":"room1","password":"newpass"}"#;
+        let req: SetRoomPasswordRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.room_key, "room1");
+        assert_eq!(req.password, Some("newpass".to_string()));
+    }
+
+    #[test]
+    fn set_room_password_request_remove() {
+        let json = r#"{"roomKey":"room1"}"#;
+        let req: SetRoomPasswordRequest = serde_json::from_str(json).unwrap();
+        assert!(req.password.is_none());
+    }
+
+    #[test]
+    fn pin_room_payload_deserialize() {
+        let json = r#"{"roomKey":"room1","pinned":true}"#;
+        let payload: PinRoomPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.room_key, "room1");
+        assert!(payload.pinned);
+    }
+
+    #[test]
+    fn room_pinned_event_serialization() {
+        let event = RoomPinnedEvent {
+            room_key: "room1".to_string(),
+            is_pinned: true,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"roomKey\":\"room1\""));
+        assert!(json.contains("\"isPinned\":true"));
+    }
+
+    #[test]
+    fn password_required_event_serialization() {
+        let event = PasswordRequiredEvent {
+            room_key: "room1".to_string(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"roomKey\":\"room1\""));
+    }
+
+    #[test]
+    fn room_password_set_event_serialization() {
+        let event = RoomPasswordSetEvent {
+            room_key: "room1".to_string(),
+            has_password: true,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"hasPassword\":true"));
+    }
+
+    #[test]
+    fn room_link_generated_event_serialization() {
+        let event = RoomLinkGeneratedEvent {
+            room_key: "room1".to_string(),
+            share_link: "https://example.com/s/abc".to_string(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("\"shareLink\":\"https://example.com/s/abc\""));
+    }
+
+    #[test]
+    fn socket_rate_limiter_cleanup() {
+        let mut limiter = SocketRateLimiter::new();
+        let socket_id = "socket_cleanup";
+        let config = get_rate_limit_config("sendMessage");
+
+        limiter.check_rate_limit(socket_id, "sendMessage", config.max_requests, config.window_ms);
+        assert!(!limiter.limits.is_empty());
+
+        // Cleanup removes expired entries (but since we just added, they won't be expired yet)
+        limiter.cleanup();
+        // Entries should still be present since they haven't expired
+        assert!(!limiter.limits.is_empty());
+    }
+
+    #[test]
+    fn socket_rate_limiter_different_sockets_independent() {
+        let mut limiter = SocketRateLimiter::new();
+        let config = get_rate_limit_config("sendMessage");
+
+        // Exhaust limit for socket1
+        for _ in 0..config.max_requests {
+            limiter.check_rate_limit("socket1", "sendMessage", config.max_requests, config.window_ms);
+        }
+        assert!(!limiter.check_rate_limit("socket1", "sendMessage", config.max_requests, config.window_ms));
+
+        // socket2 should still work
+        assert!(limiter.check_rate_limit("socket2", "sendMessage", config.max_requests, config.window_ms));
+    }
+
+    #[test]
+    fn leave_room_request_deserialize() {
+        let json = r#"{"roomKey":"room1","userId":"user1"}"#;
+        let req: LeaveRoomRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.room_key, "room1");
+        assert_eq!(req.user_id, "user1");
+    }
+
+    #[test]
+    fn share_room_link_request_deserialize() {
+        let json = r#"{"roomKey":"room1"}"#;
+        let req: ShareRoomLinkRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.room_key, "room1");
+    }
+
+    #[test]
+    fn socket_rate_limiter_window_reset() {
+        let mut limiter = SocketRateLimiter::new();
+        // Use a very short window (1ms) so it expires quickly
+        assert!(limiter.check_rate_limit("s1", "evt", 2, 1));
+        assert!(limiter.check_rate_limit("s1", "evt", 2, 1));
+        assert!(!limiter.check_rate_limit("s1", "evt", 2, 1)); // rate limited
+        // Wait for window to expire
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        // Should succeed again after window reset
+        assert!(limiter.check_rate_limit("s1", "evt", 2, 1));
+    }
+
+    #[test]
+    fn socket_rate_limiter_cleanup_removes_expired() {
+        let mut limiter = SocketRateLimiter::new();
+        // Use 1ms window so entries expire immediately
+        limiter.check_rate_limit("s1", "evt", 10, 1);
+        // Wait for expiry
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        limiter.cleanup();
+        // After cleanup, entries should be removed
+        assert!(limiter.limits.is_empty());
+    }
+
+    // --- 纯逻辑函数测试 ---
+
+    #[test]
+    fn resolve_user_id_with_fingerprint() {
+        let fp = FingerprintData { hash: "abc123".to_string() };
+        let id = resolve_user_id(Some(&fp));
+        let id2 = resolve_user_id(Some(&fp));
+        assert_eq!(id, id2);
+        // UUID v5 format: deterministic for same fingerprint
+        assert!(id.contains('-')); // UUID format has dashes
+    }
+
+    #[test]
+    fn resolve_user_id_without_fingerprint() {
+        let id = resolve_user_id(None);
+        assert!(!id.is_empty());
+        let id2 = resolve_user_id(None);
+        assert_ne!(id, id2);
+    }
+
+    #[test]
+    fn resolve_username_with_name() {
+        let user_data = UserData { name: Some("Alice".to_string()), device_type: None };
+        let name = resolve_username(Some(&user_data));
+        assert_eq!(name, "Alice");
+    }
+
+    #[test]
+    fn resolve_username_without_name() {
+        let user_data = UserData { name: None, device_type: None };
+        let name = resolve_username(Some(&user_data));
+        assert!(name.starts_with("用户"));
+        assert!(name.len() > "用户".len());
+    }
+
+    #[test]
+    fn resolve_username_without_user_data() {
+        let name = resolve_username(None);
+        assert!(name.starts_with("用户"));
+    }
+
+    #[test]
+    fn resolve_device_type_with_client_value() {
+        let user_data = UserData { name: None, device_type: Some("mobile".to_string()) };
+        let dt = resolve_device_type(Some(&user_data), Some("Mozilla/5.0"));
+        assert_eq!(dt, "mobile");
+    }
+
+    #[test]
+    fn resolve_device_type_fallback_to_user_agent() {
+        let user_data = UserData { name: None, device_type: None };
+        let dt = resolve_device_type(Some(&user_data), Some("Mozilla/5.0 (iPhone)"));
+        assert_eq!(dt, "mobile");
+    }
+
+    #[test]
+    fn resolve_device_type_no_user_agent() {
+        let user_data = UserData { name: None, device_type: None };
+        let dt = resolve_device_type(Some(&user_data), None);
+        assert_eq!(dt, "unknown");
+    }
+
+    #[test]
+    fn resolve_device_type_no_user_data_with_user_agent() {
+        let dt = resolve_device_type(None, Some("Mozilla/5.0 (Linux; Android 10)"));
+        assert_eq!(dt, "mobile");
+    }
+
+    #[test]
+    fn resolve_device_type_no_user_data_no_user_agent() {
+        let dt = resolve_device_type(None, None);
+        assert_eq!(dt, "unknown");
+    }
+
+    #[test]
+    fn join_room_core_password_required() {
+        let room_service = RoomService::new();
+        room_service.create_room("room1", Some("secret"), None).unwrap();
+        let result = join_room_core(&room_service, "room1", "u1", "Alice", "s1", None, "desktop", None);
+        match result {
+            JoinRoomCoreResult::NeedPassword { room_key } => assert_eq!(room_key, "room1"),
+            _ => panic!("Expected NeedPassword, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn join_room_core_success() {
+        let room_service = RoomService::new();
+        room_service.create_room("room1", None, None).unwrap();
+        let result = join_room_core(&room_service, "room1", "u1", "Alice", "s1", None, "desktop", None);
+        match result {
+            JoinRoomCoreResult::Success { user_info, user_list, messages, has_password, is_pinned } => {
+                assert_eq!(user_info.name, "Alice");
+                assert_eq!(user_list.len(), 1);
+                assert!(messages.is_empty());
+                assert!(!has_password);
+                assert!(!is_pinned);
+            }
+            _ => panic!("Expected Success, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn join_room_core_with_password_success() {
+        let room_service = RoomService::new();
+        room_service.create_room("room1", Some("secret"), None).unwrap();
+        let result = join_room_core(&room_service, "room1", "u1", "Alice", "s1", Some("secret"), "desktop", None);
+        match result {
+            JoinRoomCoreResult::Success { user_info, has_password, .. } => {
+                assert_eq!(user_info.name, "Alice");
+                assert!(has_password);
+            }
+            _ => panic!("Expected Success, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn join_room_core_wrong_password() {
+        let room_service = RoomService::new();
+        room_service.create_room("room1", Some("secret"), None).unwrap();
+        let result = join_room_core(&room_service, "room1", "u1", "Alice", "s1", Some("wrong"), "desktop", None);
+        match result {
+            JoinRoomCoreResult::Error(_) => {}
+            _ => panic!("Expected Error, got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn join_room_core_nonexistent_room_creates_it() {
+        let room_service = RoomService::new();
+        let result = join_room_core(&room_service, "newroom", "u1", "Alice", "s1", None, "desktop", None);
+        match result {
+            JoinRoomCoreResult::Success { .. } => {}
+            _ => panic!("Expected Success, got {:?}", result),
         }
     }
 }

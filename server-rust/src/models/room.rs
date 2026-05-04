@@ -294,4 +294,158 @@ mod tests {
         assert_eq!(suffix.len(), 5);
         assert!(suffix.chars().all(|c| c.is_ascii_alphanumeric()));
     }
+
+    #[test]
+    fn test_add_remove_user() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let user = User::new("u1".to_string(), "Alice".to_string(), "room1".to_string());
+        room.add_user(user);
+        assert_eq!(room.user_count(), 1);
+        assert!(!room.is_empty());
+
+        let removed = room.remove_user("u1");
+        assert!(removed.is_some());
+        assert_eq!(room.user_count(), 0);
+        assert!(room.is_empty());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_user() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let result = room.remove_user("ghost");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_online_user_count() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let u1 = User::new("u1".to_string(), "Alice".to_string(), "room1".to_string());
+        let mut u2 = User::new("u2".to_string(), "Bob".to_string(), "room1".to_string());
+        u2.set_offline();
+        room.add_user(u1);
+        room.add_user(u2);
+        assert_eq!(room.online_user_count(), 1);
+    }
+
+    #[test]
+    fn test_all_users_offline() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let mut u1 = User::new("u1".to_string(), "Alice".to_string(), "room1".to_string());
+        u1.set_offline();
+        room.add_user(u1);
+        assert!(room.all_users_offline());
+    }
+
+    #[test]
+    fn test_not_all_users_offline_when_some_online() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        room.add_user(User::new("u1".to_string(), "Alice".to_string(), "room1".to_string()));
+        assert!(!room.all_users_offline());
+    }
+
+    #[test]
+    fn test_add_and_remove_message() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let msg = Message::new_system("m1".to_string(), "room1".to_string(), "hello".to_string());
+        room.add_message(msg);
+        assert_eq!(room.get_messages().len(), 1);
+
+        let removed = room.remove_message("m1");
+        assert!(removed);
+        assert_eq!(room.get_messages().len(), 0);
+    }
+
+    #[test]
+    fn test_remove_nonexistent_message() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let msg = Message::new_system("m1".to_string(), "room1".to_string(), "hello".to_string());
+        room.add_message(msg);
+        let removed = room.remove_message("ghost");
+        assert!(!removed);
+        assert_eq!(room.get_messages().len(), 1);
+    }
+
+    #[test]
+    fn test_has_password() {
+        let room_no_pw = Room::new("room1".to_string(), None, None);
+        assert!(!room_no_pw.has_password());
+
+        let room_with_pw = Room::new("room2".to_string(), None, Some("hash".to_string()));
+        assert!(room_with_pw.has_password());
+    }
+
+    #[test]
+    fn test_pin_unpin() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        assert!(!room.is_pinned);
+        room.pin();
+        assert!(room.is_pinned);
+        room.unpin();
+        assert!(!room.is_pinned);
+    }
+
+    #[test]
+    fn test_set_creator() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        room.set_creator("fp123");
+        assert_eq!(room.created_by.as_deref(), Some("fp123"));
+        // Second call does not override
+        room.set_creator("fp456");
+        assert_eq!(room.created_by.as_deref(), Some("fp123"));
+    }
+
+    #[test]
+    fn test_to_info() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        room.add_user(User::new("u1".to_string(), "Alice".to_string(), "room1".to_string()));
+        let info = room.to_info();
+        assert_eq!(info.room_key, "room1");
+        assert_eq!(info.user_count, 1);
+        assert!(!info.has_password);
+        assert!(!info.is_pinned);
+    }
+
+    #[test]
+    fn test_find_user_by_fingerprint() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        let mut user = User::new("u1".to_string(), "Alice".to_string(), "room1".to_string());
+        user.fingerprint = Some("fp123".to_string());
+        room.add_user(user);
+
+        let found = room.find_user_by_fingerprint("fp123");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "u1");
+
+        let not_found = room.find_user_by_fingerprint("fp456");
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn test_get_user_mut() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        room.add_user(User::new("u1".to_string(), "Alice".to_string(), "room1".to_string()));
+        let user = room.get_user_mut("u1");
+        assert!(user.is_some());
+        let user = room.get_user_mut("ghost");
+        assert!(user.is_none());
+    }
+
+    #[test]
+    fn test_verify_password_no_password_accepts_anything() {
+        let room = Room::new("room1".to_string(), None, None);
+        assert!(room.verify_password("anything"));
+        assert!(room.verify_password(""));
+    }
+
+    #[test]
+    fn test_message_overflow_drops_oldest() {
+        let mut room = Room::new("room1".to_string(), None, None);
+        // Add more than max_messages (1000)
+        for i in 0..1005 {
+            let msg = Message::new_system(format!("m{}", i), "room1".to_string(), "msg".to_string());
+            room.add_message(msg);
+        }
+        // Should have dropped ~200 messages (20% of 1000)
+        assert!(room.get_messages().len() <= 1000);
+    }
 }

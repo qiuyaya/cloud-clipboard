@@ -38,24 +38,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 代码格式化检查：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base sh -c "rustup component add rustfmt && cargo fmt -- --check"`
 - Clippy 代码质量检查：`docker run --rm -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-base sh -c "rustup component add clippy && cargo clippy --all-targets --all-features -- -D warnings"`
 - Dockerfile 位于 `server-rust/Dockerfile`，基于 `rust:1.93-alpine`
-- 测试覆盖：16 个测试模块，包含单元测试、集成测试、安全测试等
+- **覆盖率镜像**（首次使用需构建一次，后续复用）：
+  - `docker build -t cloud-clipboard-rust-coverage -f- server-rust/ <<'EOF'\nFROM rust:1.93-bookworm\nRUN apt-get update && apt-get install -y pkg-config openssl-dev libssl-dev && rm -rf /var/lib/apt/lists/*\nRUN cargo install cargo-tarpaulin\nEOF` - 构建预装 cargo-tarpaulin 的覆盖率镜像
+- 覆盖率报告：`docker run --rm --security-opt seccomp=unconfined -v cargo-registry:/usr/local/cargo/registry -v $(pwd)/server-rust:/app -w /app cloud-clipboard-rust-coverage cargo tarpaulin --all-features --out Stdout --out Html --out Lcov --output-dir /app/coverage`
+- 测试覆盖：15 个测试模块，包含单元测试、集成测试、安全测试等
 - 测试模块包括：
   - `auth_middleware_tests.rs` - 认证中间件测试
   - `concurrency_tests.rs` - 并发安全测试
-  - `file_routes_tests.rs` - 文件路由测试
+  - `files_handler_tests.rs` - 文件路由 handler 集成测试
   - `integration_tests.rs` - 集成测试
   - `logger_tests.rs` - 日志系统测试
   - `rate_limit_tests.rs` - 速率限制测试
   - `room_model_tests.rs` - 房间模型测试
   - `room_service_tests.rs` - 房间服务测试
-  - `rooms_routes_tests.rs` - 房间路由测试
-  - `share_routes_tests.rs` - 分享路由测试
+  - `rooms_handler_tests.rs` - 房间路由 handler 集成测试
+  - `share_handler_tests.rs` - 分享路由 handler 集成测试
   - `share_security_tests.rs` - 分享安全测试
   - `share_service_tests.rs` - 分享服务测试
-  - `socket_service_tests.rs` - Socket 服务测试
+  - `socket_integration_tests.rs` - Socket.IO 集成测试（\_\_test_harness）
   - `validation_middleware_tests.rs` - 验证中间件测试
   - `xss_security_tests.rs` - XSS 安全测试
-  - `common/mod.rs` - 测试通用工具模块
+  - `common/mod.rs` - 测试通用工具模块（含 Mock 服务实现）
 
 ### Code Quality
 
@@ -106,6 +109,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run test:integration` - Run integration tests
 - `bun run test:e2e` - Run end-to-end tests
 
+### Coverage
+
+- `bun run test:coverage` - Run frontend test coverage report
+- `bun run rust:coverage` - Run Rust backend test coverage report (requires Docker coverage image)
+- `bun run test:coverage:all` - Run coverage for both frontend and backend
+
 ### Icon Management
 
 - `bun run icons:generate` - Generate web icons from source
@@ -143,9 +152,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **测试架构**: 采用模块化测试设计，包含 15 个测试模块：
 
 - **单元测试**: 各个服务和模型的独立测试
-- **集成测试**: API 端点和路由的完整流程测试
+- **集成测试**: API 端点和路由的完整流程测试（使用 Mock 服务 + axum::test）
 - **安全测试**: XSS 防护、分享安全、认证等安全特性测试
 - **中间件测试**: 速率限制、验证、认证中间件测试
+- **Socket.IO 测试**: 使用 \_\_test_harness feature 进行端到端 Socket handler 测试
 - **通用测试工具**: `tests/common/mod.rs` 提供测试辅助函数
 
 **核心依赖**:
@@ -157,13 +167,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Serde**: 序列化/反序列化
 - **bcrypt**: 密码加密
 - **Governor**: 速率限制
-- **async-trait**: 异步 trait 支持（存储后端抽象）
+- **async-trait**: 异步 trait 支持（FileManagerTrait 等服务抽象）
 - **thiserror**: 错误类型派生宏
 
 **模块结构**:
 
 - `config.rs` - 集中配置管理（OnceLock 单例，统一读取环境变量）
 - `error.rs` - 统一错误类型（AppError，实现 IntoResponse）
+- `services/traits.rs` - 服务 trait 定义（RoomServiceTrait、FileManagerTrait、ShareServiceTrait）
 - `services/storage.rs` - 存储后端抽象（StorageBackend trait，LocalStorage 实现）
 
 **库导出**: `src/lib.rs` 导出所有模块供测试使用，确保测试可以访问内部实现。
@@ -424,9 +435,14 @@ const userWithDate = {
 - **Architecture Improvements** (2026-05):
   - 前端：useReducer 替换多个 useState 修复 stale closure bug，提取 MessageCard/MessageList 组件，添加虚拟列表渲染，useTemporaryState 统一临时状态管理
   - 后端：集中配置管理（config.rs）、统一错误处理（error.rs/AppError）、存储后端抽象（storage.rs/StorageBackend trait）
+  - 后端：服务层 trait 抽象（RoomServiceTrait/FileManagerTrait/ShareServiceTrait），AppState 改为 Arc<dyn Trait> 支持依赖注入和测试
+  - 后端：JoinRoomRequest 从借用改为 owning 版本，消除生命周期参数
+  - 后端：Socket handler 纯逻辑函数提取（resolve_user_id/resolve_username/resolve_device_type/join_room_core）
   - 安全：P2P 信令跨房间校验、分享链接不再存储明文密码、CORS 生产模式收紧
   - 文件管理：新增存储配额追踪（MAX_TOTAL_STORAGE_SIZE）、RwLock poisoned 降级为 warn 日志
   - 测试：新增并发安全测试模块（concurrency_tests.rs），修复 rand 0.9 API 兼容性
+  - 测试：后端关键模块覆盖率提升至 80%+（error.rs 72%、message.rs 100%、rate_limit.rs 98%、rooms.rs 100%、files.rs 83%、share.rs 95%、socket.rs 83%）
+  - 测试：新增 Mock 服务实现（MockRoomService/MockFileManager/MockShareService）和 Socket.IO \_\_test_harness 集成测试
   - i18n：补全缺失的中文单数形式、所有硬编码字符串国际化
   - 无障碍：添加 aria-label/aria-hidden/role=status 等辅助属性
 - **Mobile UI Optimization** (2026-05):

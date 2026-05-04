@@ -2,6 +2,10 @@
 ///
 /// 提供测试中常用的工厂函数、断言辅助和性能测量工具
 
+pub mod mocks;
+pub mod socket_helpers;
+pub mod test_app;
+
 use cloud_clipboard_server::models::{User, Message, message::{MessageType, MessageSender}};
 use cloud_clipboard_server::services::{RoomService, room_service::JoinRoomRequest};
 use std::sync::Arc;

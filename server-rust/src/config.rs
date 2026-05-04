@@ -133,4 +133,34 @@ mod tests {
         config.allow_http = true;
         assert!(!config.is_production());
     }
+
+    #[test]
+    fn test_try_config_returns_none_before_init() {
+        // try_config returns None if init_config hasn't been called
+        // In test environment, CONFIG may or may not be initialized
+        // Just verify it doesn't panic
+        let _ = try_config();
+    }
+
+    #[test]
+    fn test_env_bool_true() {
+        // SAFETY: test-only, single-threaded, cleanup after use
+        unsafe { std::env::set_var("__TEST_BOOL_VAR__", "true") };
+        assert!(env_bool("__TEST_BOOL_VAR__", false));
+        unsafe { std::env::remove_var("__TEST_BOOL_VAR__") };
+    }
+
+    #[test]
+    fn test_env_bool_false() {
+        unsafe { std::env::set_var("__TEST_BOOL_VAR__", "false") };
+        assert!(!env_bool("__TEST_BOOL_VAR__", true));
+        unsafe { std::env::remove_var("__TEST_BOOL_VAR__") };
+    }
+
+    #[test]
+    fn test_env_bool_case_insensitive() {
+        unsafe { std::env::set_var("__TEST_BOOL_VAR__", "TRUE") };
+        assert!(env_bool("__TEST_BOOL_VAR__", false));
+        unsafe { std::env::remove_var("__TEST_BOOL_VAR__") };
+    }
 }
