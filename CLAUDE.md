@@ -113,6 +113,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `bun run test:coverage` - Run frontend test coverage report
 - `bun run rust:coverage` - Run Rust backend test coverage report (requires Docker coverage image)
+- `bun run rust:coverage:ci` - Run Rust backend test coverage for CI (XML + Lcov output)
 - `bun run test:coverage:all` - Run coverage for both frontend and backend
 
 ### Icon Management

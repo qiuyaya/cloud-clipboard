@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface KeyboardState {
   isKeyboardOpen: boolean;
@@ -14,18 +14,34 @@ export function useKeyboard(): KeyboardState {
     viewportOffsetTop: 0,
     viewportWidth: window.innerWidth,
   });
+  const prevStateRef = useRef<KeyboardState>(state);
 
   useEffect(() => {
     if (!window.visualViewport) return;
 
+    let rafId = 0;
+
     const updateState = () => {
-      const vv = window.visualViewport!;
-      const isKeyboardOpen = vv.height < window.innerHeight - 50;
-      setState({
-        isKeyboardOpen,
-        keyboardHeight: isKeyboardOpen ? window.innerHeight - vv.height : 0,
-        viewportOffsetTop: vv.offsetTop,
-        viewportWidth: vv.width,
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const vv = window.visualViewport!;
+        const isKeyboardOpen = vv.height < window.innerHeight - 50;
+        const newState: KeyboardState = {
+          isKeyboardOpen,
+          keyboardHeight: isKeyboardOpen ? window.innerHeight - vv.height : 0,
+          viewportOffsetTop: vv.offsetTop,
+          viewportWidth: vv.width,
+        };
+        // Only update if something actually changed
+        if (
+          prevStateRef.current.isKeyboardOpen !== newState.isKeyboardOpen ||
+          prevStateRef.current.keyboardHeight !== newState.keyboardHeight ||
+          prevStateRef.current.viewportOffsetTop !== newState.viewportOffsetTop ||
+          prevStateRef.current.viewportWidth !== newState.viewportWidth
+        ) {
+          prevStateRef.current = newState;
+          setState(newState);
+        }
       });
     };
 
@@ -34,6 +50,7 @@ export function useKeyboard(): KeyboardState {
     window.visualViewport.addEventListener("scroll", updateState);
 
     return () => {
+      cancelAnimationFrame(rafId);
       window.visualViewport?.removeEventListener("resize", updateState);
       window.visualViewport?.removeEventListener("scroll", updateState);
     };

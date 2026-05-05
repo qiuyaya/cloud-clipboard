@@ -56,7 +56,7 @@ export const MessageCard = React.memo(function MessageCard({
             </span>
           </div>
           {recallConfirmId === message.id ? (
-            <div className="flex items-center gap-2 animate-in fade-in-0 duration-150">
+            <div className="flex items-center gap-1 animate-in fade-in-0 duration-150">
               <span className="text-xs text-destructive mr-1">{t("message.recallConfirm")}</span>
               <button
                 onClick={() => {

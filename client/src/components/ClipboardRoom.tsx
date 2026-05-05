@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useTemporaryState } from "@/hooks/useTemporaryState";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,16 @@ export function ClipboardRoom(): JSX.Element {
     setShareModalOpen(true);
   };
 
+  const handleRecallConfirm = useCallback((messageId: string) => setRecallConfirmId(messageId), []);
+  const handleRecallCancel = useCallback(() => setRecallConfirmId(null), []);
+  const handleRecall = useCallback(
+    (messageId: string) => {
+      onRecallMessage(messageId);
+      setRecallConfirmId(null);
+    },
+    [onRecallMessage],
+  );
+
   return (
     <div className="flex h-dvh bg-gray-50 dark:bg-gray-900">
       {/* 桌面端侧边栏 */}
@@ -218,14 +228,12 @@ export function ClipboardRoom(): JSX.Element {
           copiedMessageId={copiedMessageId}
           recallConfirmId={recallConfirmId}
           onCopy={copyToClipboard}
-          onRecallConfirm={(messageId) => setRecallConfirmId(messageId)}
-          onRecallCancel={() => setRecallConfirmId(null)}
-          onRecall={(messageId) => {
-            onRecallMessage(messageId);
-            setRecallConfirmId(null);
-          }}
+          onRecallConfirm={handleRecallConfirm}
+          onRecallCancel={handleRecallCancel}
+          onRecall={handleRecall}
           onDownload={downloadFile}
           onShare={handleShareClick}
+          keyboardHeight={keyboard.isKeyboardOpen ? keyboard.keyboardHeight : 0}
         />
 
         {/* 输入区域 */}

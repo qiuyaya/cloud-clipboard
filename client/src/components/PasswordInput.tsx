@@ -76,7 +76,7 @@ export function PasswordInput({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isConnecting}
-                className="w-full h-12 min-h-[44px]"
+                className="w-full h-12"
                 autoFocus
               />
             </div>

@@ -249,24 +249,6 @@ export function RoomJoin({
     }
   };
 
-  const detectDeviceType = (): "mobile" | "desktop" | "tablet" | "unknown" => {
-    const userAgent = navigator.userAgent.toLowerCase();
-
-    if (/mobile|android|iphone|phone/.test(userAgent)) {
-      return "mobile";
-    }
-
-    if (/tablet|ipad/.test(userAgent)) {
-      return "tablet";
-    }
-
-    if (/desktop|windows|mac|linux/.test(userAgent)) {
-      return "desktop";
-    }
-
-    return "unknown";
-  };
-
   const isValidRoomKey = (key: string): boolean => {
     const trimmed = key.trim();
     if (trimmed.length < 6) return false;

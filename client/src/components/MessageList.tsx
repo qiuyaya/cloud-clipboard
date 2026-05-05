@@ -15,6 +15,7 @@ interface MessageListProps {
   onRecall: (messageId: string) => void;
   onDownload: (message: FileMessage) => void;
   onShare: (message: FileMessage) => void;
+  keyboardHeight?: number;
 }
 
 export const MessageList = React.memo(function MessageList({
@@ -28,17 +29,20 @@ export const MessageList = React.memo(function MessageList({
   onRecall,
   onDownload,
   onShare,
+  keyboardHeight = 0,
 }: MessageListProps) {
   const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => parentRef.current,
     estimateSize: (index) => {
-      const message = messages[index];
+      const message = messagesRef.current[index];
       return message?.type === "file" ? 140 : 120;
     },
     overscan: 5,
@@ -64,10 +68,10 @@ export const MessageList = React.memo(function MessageList({
   }, [messages.length, virtualizer]);
 
   return (
-    <div className="relative flex-1">
+    <div className="relative flex-1 min-h-0">
       <div
         ref={parentRef}
-        className="flex-1 overflow-y-auto p-4 mobile-scroll"
+        className="h-full overflow-y-auto p-4 mobile-scroll"
         onScroll={handleScroll}
       >
         {messages.length === 0 ? (
@@ -117,6 +121,8 @@ export const MessageList = React.memo(function MessageList({
           </div>
         )}
       </div>
+      {/* Spacer for keyboard so last messages aren't hidden */}
+      {keyboardHeight > 0 && <div style={{ height: keyboardHeight }} />}
       {hasNewMessages && (
         <button
           onClick={() => {
