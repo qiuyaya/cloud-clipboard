@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { formatFileSize, formatTimestamp } from "@cloud-clipboard/shared";
 import type { TextMessage, FileMessage } from "@cloud-clipboard/shared";
 import { Copy, File, Download, Share2, Undo2, Check, X } from "lucide-react";
+import { LinkifiedText } from "./LinkifiedText";
 
 export interface MessageCardProps {
   message: TextMessage | FileMessage;
@@ -133,7 +134,9 @@ export const MessageCard = React.memo(function MessageCard({
           <div
             className={`${isOwnMessage ? "bg-blue-50 dark:bg-blue-900/30" : "bg-gray-50 dark:bg-gray-800"} p-3 rounded-lg`}
           >
-            <pre className="whitespace-pre-wrap text-sm font-mono">{message.content}</pre>
+            <pre className="whitespace-pre-wrap text-sm font-mono">
+              <LinkifiedText text={message.content} />
+            </pre>
           </div>
         ) : (
           <div

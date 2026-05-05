@@ -358,6 +358,16 @@ const userWithDate = {
 - Manifest configuration for app installation
 - Support for both development and production modes
 
+**Message Link Detection**: Auto-detect URLs in chat messages and render them as clickable links:
+
+- **URL Detection**: Recognizes `https?://` and `www.` prefixed URLs in message text
+- **Safe Rendering**: Pure React component approach (no `dangerouslySetInnerHTML`), JSX auto-escapes plain text
+- **New Tab**: Links open in new tab with `rel="noopener noreferrer"` for security
+- **www Prefix**: `www.` URLs use `https://` prefix in href, display original text
+- **Trailing Punctuation**: Automatically strips trailing `.` `,` `!` `?` `)` `]` `;` `:` from URLs
+- **Overflow Protection**: `break-all` on links prevents long URL layout overflow
+- **Theme Support**: Blue links with hover states for both light and dark themes
+
 ## 文档维护指南
 
 ### 需要更新文档的场景
