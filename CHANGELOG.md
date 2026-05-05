@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2026-05-05
+
+- feat: 消息链接自动识别与快捷打开
+- test: 前端测试覆盖率基础设施与移动端优化
+- test: 后端关键模块测试覆盖率提升至 80%+
+- docs: 添加 Node.js 后端移除实施计划文档
+- refactor: RateLimitConfig 添加 from_app_config 构建方法
+- feat: 移动端 UI 全面优化
+- refactor: 前端架构优化与后端集中化改造
+- refactor: 删除 Node.js 后端，Rust 后端成为唯一后端
+
 ## [2.3.2] - 2026-02-23
 
 - fix: 修复刷新页面后密码保护房间的重连和密码状态恢复问题
