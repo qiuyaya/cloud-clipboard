@@ -106,7 +106,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `bun run test` - Run all tests across all packages
 - `bun run test:watch` - Run tests in watch mode
-- `bun run test:integration` - Run integration tests
 - `bun run test:e2e` - Run end-to-end tests
 
 ### Coverage
@@ -131,12 +130,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `bun run version:report` - Generate version consistency report
 - `bun run version:outdated` - Check for outdated package versions
 
-### Documentation Management
-
-- `bun run docs:sync` - Check documentation consistency with code (if available)
-- `bun run docs:setup` - Setup Git hooks for automatic documentation checking (if available)
-
-## Architecture
+### Release Management
 
 ### Monorepo Structure
 
@@ -148,7 +142,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Rust Backend Architecture
 
-**框架选择**: 使用 Axum 0.8 作为 web 框架，SocketiOxide 0.15 用于 WebSocket 通信。
+**框架选择**: 使用 Axum 0.8 作为 web 框架，SocketiOxide 0.15 用于 WebSocket 通信。Rust edition 2024，MSRV 1.87。
 
 **测试架构**: 采用模块化测试设计，包含 15 个测试模块：
 
@@ -368,6 +362,25 @@ const userWithDate = {
 - **Overflow Protection**: `break-all` on links prevents long URL layout overflow
 - **Theme Support**: Blue links with hover states for both light and dark themes
 
+**Message Recall**: Users can recall their own sent messages:
+
+- **Recall Request**: Client sends `RecallMessageRequest` with message ID → Server validates ownership → Broadcasts `messageRecalled` to room
+- **i18n Support**: Full Chinese and English translations for recall confirmation and cancellation
+
+**Room Pinning**: Users can pin frequently used rooms for quick access:
+
+- **Pin/Unpin**: Socket events `pinRoom`/`roomPinned` with configurable `MAX_PINNED_ROOMS` limit
+- **Creator Restriction**: Only room creator can pin/unpin rooms
+
+**Room Share Links**: Generate invitation links for rooms:
+
+- **Link Generation**: Socket events `shareRoomLink`/`roomLinkGenerated` for creating shareable room links
+
+**Browser Fingerprint**: User identification across browser refreshes:
+
+- **Fingerprint Schema**: `BrowserFingerprintSchema` in shared types, optional `fingerprint` field on `User`
+- **User Validation**: `/api/rooms/validate-user` endpoint for fingerprint-based user recognition
+
 ## 文档维护指南
 
 ### 需要更新文档的场景
@@ -435,9 +448,9 @@ const userWithDate = {
 ## Active Technologies
 
 - **TypeScript 5.9.3 + Bun 1.x**: 前端运行时和包管理器
-- **Rust 1.93 + Axum 0.8 + SocketiOxide 0.15**: 后端实现
-- **Zod**: 前端类型验证和 schema 定义
-- **React + Vite**: 前端框架和构建工具
+- **Rust (edition 2024, MSRV 1.87) + Axum 0.8 + SocketiOxide 0.15**: 后端实现
+- **Zod 4**: 前端类型验证和 schema 定义
+- **React 19 + Vite 7**: 前端框架和构建工具
 - **@tanstack/react-virtual**: 消息列表虚拟化渲染
 - In-memory Map-based storage (server-rust), Multipart for file uploads
 
@@ -451,6 +464,7 @@ const userWithDate = {
   - 后端：Socket handler 纯逻辑函数提取（resolve_user_id/resolve_username/resolve_device_type/join_room_core）
   - 安全：P2P 信令跨房间校验、分享链接不再存储明文密码、CORS 生产模式收紧
   - 文件管理：新增存储配额追踪（MAX_TOTAL_STORAGE_SIZE）、RwLock poisoned 降级为 warn 日志
+- 配置：新增 CLEANUP_ORPHANED_FILES_AT_STARTUP、STRICT_RATE_LIMIT_MAX_REQUESTS、DOWNLOAD_TIMEOUT、MAX_DOWNLOAD_BYTES_PER_MINUTE 环境变量
   - 测试：新增并发安全测试模块（concurrency_tests.rs），修复 rand 0.9 API 兼容性
   - 测试：后端关键模块覆盖率提升至 80%+（error.rs 72%、message.rs 100%、rate_limit.rs 98%、rooms.rs 100%、files.rs 83%、share.rs 95%、socket.rs 83%）
   - 测试：新增 Mock 服务实现（MockRoomService/MockFileManager/MockShareService）和 Socket.IO \_\_test_harness 集成测试
