@@ -522,7 +522,11 @@ async fn test_get_room_by_path_with_users_and_messages() {
     mock.add_room("test1234", make_room_info("test1234"));
     mock.set_room_users(
         "test1234",
-        vec![User::new("u1".to_string(), "Alice".to_string(), "test1234".to_string())],
+        vec![User::new(
+            "u1".to_string(),
+            "Alice".to_string(),
+            "test1234".to_string(),
+        )],
     );
     mock.set_messages(
         "test1234",
@@ -761,7 +765,11 @@ async fn test_get_room_info_with_users_and_messages() {
     mock.set_room_users(
         "test1234",
         vec![
-            User::new("u1".to_string(), "Alice".to_string(), "test1234".to_string()),
+            User::new(
+                "u1".to_string(),
+                "Alice".to_string(),
+                "test1234".to_string(),
+            ),
             User::new("u2".to_string(), "Bob".to_string(), "test1234".to_string()),
         ],
     );
@@ -812,7 +820,11 @@ async fn test_get_room_info_with_users_and_messages() {
 async fn test_get_room_users_with_users() {
     let (app, mock) = create_app_with_mock();
     mock.add_room("test1234", make_room_info("test1234"));
-    let user1 = User::new("u1".to_string(), "Alice".to_string(), "test1234".to_string());
+    let user1 = User::new(
+        "u1".to_string(),
+        "Alice".to_string(),
+        "test1234".to_string(),
+    );
     let user2 = User::new("u2".to_string(), "Bob".to_string(), "test1234".to_string());
     mock.set_room_users("test1234", vec![user1, user2]);
 
@@ -872,7 +884,9 @@ async fn test_validate_user_room_not_found() {
                 .method("POST")
                 .uri("/validate-user")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"roomKey":"nonexist1","userFingerprint":"fp123"}"#))
+                .body(Body::from(
+                    r#"{"roomKey":"nonexist1","userFingerprint":"fp123"}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -902,7 +916,9 @@ async fn test_validate_user_room_exists_user_not_found() {
                 .method("POST")
                 .uri("/validate-user")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"roomKey":"test1234","userFingerprint":"fp_unknown"}"#))
+                .body(Body::from(
+                    r#"{"roomKey":"test1234","userFingerprint":"fp_unknown"}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -925,7 +941,11 @@ async fn test_validate_user_room_exists_user_not_found() {
 async fn test_validate_user_room_exists_user_found() {
     let (app, mock) = create_app_with_mock();
     mock.add_room("test1234", make_room_info("test1234"));
-    let user = User::new("u1".to_string(), "Alice".to_string(), "test1234".to_string());
+    let user = User::new(
+        "u1".to_string(),
+        "Alice".to_string(),
+        "test1234".to_string(),
+    );
     mock.set_find_user("fp123", user);
 
     let response = app
@@ -934,7 +954,9 @@ async fn test_validate_user_room_exists_user_found() {
                 .method("POST")
                 .uri("/validate-user")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"roomKey":"test1234","userFingerprint":"fp123"}"#))
+                .body(Body::from(
+                    r#"{"roomKey":"test1234","userFingerprint":"fp123"}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -1055,7 +1077,9 @@ async fn test_create_room_with_password() {
                 .method("POST")
                 .uri("/create")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"roomKey":"test1234","password":"secret123"}"#))
+                .body(Body::from(
+                    r#"{"roomKey":"test1234","password":"secret123"}"#,
+                ))
                 .unwrap(),
         )
         .await

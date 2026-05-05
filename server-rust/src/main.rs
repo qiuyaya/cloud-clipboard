@@ -20,8 +20,8 @@ use crate::middleware::rate_limit::{
     RateLimitConfig, RateLimitMiddleware, public_download_rate_limiter, strict_rate_limiter,
 };
 use crate::routes::{api_info, files, health, rooms, share};
-use crate::services::{FileManager, RoomEvent, RoomService, ShareService};
 use crate::services::traits::{FileManagerTrait, RoomServiceTrait, ShareServiceTrait};
+use crate::services::{FileManager, RoomEvent, RoomService, ShareService};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

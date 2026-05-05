@@ -67,7 +67,10 @@ impl MockShareService {
 }
 
 impl ShareServiceTrait for MockShareService {
-    fn create_share(&self, _req: CreateShareRequest) -> Result<(ShareInfo, Option<String>), String> {
+    fn create_share(
+        &self,
+        _req: CreateShareRequest,
+    ) -> Result<(ShareInfo, Option<String>), String> {
         if let Some(result) = self.create_share_result.lock().unwrap().take() {
             return result;
         }

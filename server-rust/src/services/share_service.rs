@@ -322,8 +322,18 @@ impl ShareServiceTrait for ShareService {
     fn verify_password(&self, share_id: &str, password: &str) -> Result<bool, String> {
         Self::verify_password(self, share_id, password)
     }
-    fn record_access(&self, share_id: &str, ip_address: String, success: bool, bytes: Option<u64>, error: Option<String>, user_agent: Option<String>) -> Result<(), String> {
-        Self::record_access(self, share_id, ip_address, success, bytes, error, user_agent)
+    fn record_access(
+        &self,
+        share_id: &str,
+        ip_address: String,
+        success: bool,
+        bytes: Option<u64>,
+        error: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), String> {
+        Self::record_access(
+            self, share_id, ip_address, success, bytes, error, user_agent,
+        )
     }
     fn get_access_logs(&self, share_id: &str) -> Vec<ShareAccessLog> {
         Self::get_access_logs(self, share_id)
@@ -763,7 +773,10 @@ mod tests {
     fn test_create_share_with_metadata() {
         let service = ShareService::new();
         let mut meta = HashMap::new();
-        meta.insert("key".to_string(), serde_json::Value::String("value".to_string()));
+        meta.insert(
+            "key".to_string(),
+            serde_json::Value::String("value".to_string()),
+        );
         let result = service.create_share(
             CreateShareRequest::new("test.txt", "test.txt", 100, "room1", "user1")
                 .with_metadata(meta),
@@ -778,12 +791,20 @@ mod tests {
         let service = ShareService::new();
         service
             .create_share(CreateShareRequest::new(
-                "file1.txt", "file1.txt", 100, "room1", "user1",
+                "file1.txt",
+                "file1.txt",
+                100,
+                "room1",
+                "user1",
             ))
             .unwrap();
         service
             .create_share(CreateShareRequest::new(
-                "file2.txt", "file2.txt", 200, "room1", "user1",
+                "file2.txt",
+                "file2.txt",
+                200,
+                "room1",
+                "user1",
             ))
             .unwrap();
 

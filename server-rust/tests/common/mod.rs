@@ -1,15 +1,17 @@
 /// 公共测试工具模块
 ///
 /// 提供测试中常用的工厂函数、断言辅助和性能测量工具
-
 pub mod mocks;
 pub mod socket_helpers;
 pub mod test_app;
 
-use cloud_clipboard_server::models::{User, Message, message::{MessageType, MessageSender}};
+use chrono::Utc;
+use cloud_clipboard_server::models::{
+    Message, User,
+    message::{MessageSender, MessageType},
+};
 use cloud_clipboard_server::services::{RoomService, room_service::JoinRoomRequest};
 use std::sync::Arc;
-use chrono::Utc;
 
 // ============================================================================
 // 测试数据工厂
@@ -279,10 +281,7 @@ pub mod concurrent {
             handles.push(handle);
         }
 
-        handles
-            .into_iter()
-            .map(|h| h.join().unwrap())
-            .collect()
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
     }
 
     /// 计数成功的并发操作
@@ -314,10 +313,7 @@ pub mod concurrent {
             handles.push(handle);
         }
 
-        handles
-            .into_iter()
-            .map(|h| h.join().unwrap())
-            .collect()
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
     }
 }
 

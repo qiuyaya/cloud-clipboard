@@ -239,11 +239,7 @@ impl RoomServiceTrait for MockRoomService {
         None
     }
 
-    fn set_room_password(
-        &self,
-        _room_key: &str,
-        _password: Option<&str>,
-    ) -> Result<bool, String> {
+    fn set_room_password(&self, _room_key: &str, _password: Option<&str>) -> Result<bool, String> {
         Ok(true)
     }
 

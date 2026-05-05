@@ -8,7 +8,12 @@ use tokio::sync::broadcast;
 
 // RoomServiceTrait: 全部方法为同步，不需要 #[async_trait]
 pub trait RoomServiceTrait: Send + Sync {
-    fn create_room(&self, room_key: &str, password: Option<&str>, creator_fingerprint: Option<&str>) -> Result<RoomInfo, String>;
+    fn create_room(
+        &self,
+        room_key: &str,
+        password: Option<&str>,
+        creator_fingerprint: Option<&str>,
+    ) -> Result<RoomInfo, String>;
     fn get_room_info(&self, room_key: &str) -> Option<RoomInfo>;
     fn room_exists(&self, room_key: &str) -> bool;
     fn room_has_password(&self, room_key: &str) -> bool;
@@ -38,7 +43,13 @@ pub trait RoomServiceTrait: Send + Sync {
 // FileManagerTrait: 包含 async 方法，需要 #[async_trait]
 #[async_trait]
 pub trait FileManagerTrait: Send + Sync {
-    async fn save_file(&self, room_key: &str, original_name: &str, mime_type: &str, data: &[u8]) -> anyhow::Result<FileInfo>;
+    async fn save_file(
+        &self,
+        room_key: &str,
+        original_name: &str,
+        mime_type: &str,
+        data: &[u8],
+    ) -> anyhow::Result<FileInfo>;
     fn get_file(&self, filename: &str) -> Option<FileInfo>;
     fn get_file_path(&self, filename: &str) -> Option<PathBuf>;
     async fn delete_file(&self, filename: &str) -> anyhow::Result<Option<FileInfo>>;
@@ -60,7 +71,15 @@ pub trait ShareServiceTrait: Send + Sync {
     fn get_user_shares(&self, user_id: &str) -> Vec<ShareInfo>;
     fn get_user_shares_response(&self, user_id: &str) -> Vec<ShareInfoResponse>;
     fn verify_password(&self, share_id: &str, password: &str) -> Result<bool, String>;
-    fn record_access(&self, share_id: &str, ip_address: String, success: bool, bytes: Option<u64>, error: Option<String>, user_agent: Option<String>) -> Result<(), String>;
+    fn record_access(
+        &self,
+        share_id: &str,
+        ip_address: String,
+        success: bool,
+        bytes: Option<u64>,
+        error: Option<String>,
+        user_agent: Option<String>,
+    ) -> Result<(), String>;
     fn get_access_logs(&self, share_id: &str) -> Vec<ShareAccessLog>;
     fn revoke_share(&self, share_id: &str) -> Result<bool, String>;
     fn delete_share(&self, share_id: &str) -> Result<Option<ShareInfo>, String>;

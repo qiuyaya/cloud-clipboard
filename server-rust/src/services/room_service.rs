@@ -39,7 +39,12 @@ pub struct JoinRoomRequest {
 
 impl JoinRoomRequest {
     /// Create a request with common defaults (desktop device, no password, no fingerprint)
-    pub fn new(room_key: impl Into<String>, user_id: impl Into<String>, username: impl Into<String>, socket_id: impl Into<String>) -> Self {
+    pub fn new(
+        room_key: impl Into<String>,
+        user_id: impl Into<String>,
+        username: impl Into<String>,
+        socket_id: impl Into<String>,
+    ) -> Self {
         Self {
             room_key: room_key.into(),
             user_id: user_id.into(),
@@ -232,14 +237,11 @@ impl RoomService {
         }
 
         // Generate unique username
-        let unique_username = room.generate_unique_username(&req.username, req.fingerprint.as_deref());
+        let unique_username =
+            room.generate_unique_username(&req.username, req.fingerprint.as_deref());
 
         // Create user
-        let mut user = User::new(
-            req.user_id,
-            unique_username,
-            req.room_key.clone(),
-        );
+        let mut user = User::new(req.user_id, unique_username, req.room_key.clone());
         user.device_type = req.device_type;
         user.fingerprint = req.fingerprint;
         room.add_user(user.clone());
@@ -417,7 +419,10 @@ impl RoomService {
 
     /// Remove a message from a room
     pub fn remove_message(&self, room_key: &str, message_id: &str) -> Result<bool, String> {
-        let mut rooms = self.rooms.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut rooms = self
+            .rooms
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         match rooms.get_mut(room_key) {
             Some(room) => Ok(room.remove_message(message_id)),
             None => Err("Room not found".to_string()),
@@ -614,7 +619,12 @@ impl Default for RoomService {
 }
 
 impl RoomServiceTrait for RoomService {
-    fn create_room(&self, room_key: &str, password: Option<&str>, creator_fingerprint: Option<&str>) -> Result<RoomInfo, String> {
+    fn create_room(
+        &self,
+        room_key: &str,
+        password: Option<&str>,
+        creator_fingerprint: Option<&str>,
+    ) -> Result<RoomInfo, String> {
         Self::create_room(self, room_key, password, creator_fingerprint)
     }
     fn get_room_info(&self, room_key: &str) -> Option<RoomInfo> {
@@ -1252,7 +1262,11 @@ mod tests {
         let service = RoomService::new();
         service.create_room("testroom", None, None).unwrap();
 
-        let user = User::new("user1".to_string(), "User1".to_string(), "testroom".to_string());
+        let user = User::new(
+            "user1".to_string(),
+            "User1".to_string(),
+            "testroom".to_string(),
+        );
         let message = Message {
             id: "msg1".to_string(),
             message_type: MessageType::Text,
@@ -1284,7 +1298,11 @@ mod tests {
         let service = RoomService::new();
         service.create_room("testroom", None, None).unwrap();
 
-        let user = User::new("user1".to_string(), "User1".to_string(), "testroom".to_string());
+        let user = User::new(
+            "user1".to_string(),
+            "User1".to_string(),
+            "testroom".to_string(),
+        );
         let message = Message {
             id: "msg1".to_string(),
             message_type: MessageType::Text,
@@ -1307,7 +1325,11 @@ mod tests {
     fn test_get_message_sender_not_found() {
         let service = RoomService::new();
         service.create_room("testroom", None, None).unwrap();
-        assert!(service.get_message_sender("testroom", "nonexistent").is_none());
+        assert!(
+            service
+                .get_message_sender("testroom", "nonexistent")
+                .is_none()
+        );
     }
 
     #[test]
@@ -1419,20 +1441,17 @@ mod tests {
         let service = RoomService::new();
         service
             .join_room(
-                JoinRoomRequest::new("room1", "user1", "User1", "socket1")
-                    .with_fingerprint("fp1"),
+                JoinRoomRequest::new("room1", "user1", "User1", "socket1").with_fingerprint("fp1"),
             )
             .unwrap();
         service
             .join_room(
-                JoinRoomRequest::new("room1", "user2", "User2", "socket2")
-                    .with_fingerprint("fp2"),
+                JoinRoomRequest::new("room1", "user2", "User2", "socket2").with_fingerprint("fp2"),
             )
             .unwrap();
         service
             .join_room(
-                JoinRoomRequest::new("room2", "user3", "User3", "socket3")
-                    .with_fingerprint("fp3"),
+                JoinRoomRequest::new("room2", "user3", "User3", "socket3").with_fingerprint("fp3"),
             )
             .unwrap();
 

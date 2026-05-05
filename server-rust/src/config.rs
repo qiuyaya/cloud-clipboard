@@ -65,7 +65,7 @@ impl AppConfig {
 }
 
 pub fn init_config() -> &'static AppConfig {
-    CONFIG.get_or_init(|| AppConfig::from_env())
+    CONFIG.get_or_init(AppConfig::from_env)
 }
 
 /// Get a reference to the global config.

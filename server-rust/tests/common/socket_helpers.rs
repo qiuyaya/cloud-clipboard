@@ -2,10 +2,10 @@
 
 use engineioxide::Packet as EioPacket;
 use serde::Serialize;
-use socketioxide_core::parser::Parse;
-use socketioxide_core::Value;
-use socketioxide_parser_common::CommonParser;
 use socketioxide::packet::Packet;
+use socketioxide_core::Value;
+use socketioxide_core::parser::Parse;
+use socketioxide_parser_common::CommonParser;
 use std::time::Duration;
 
 /// 编码 Socket.IO 事件为 Engine.IO Packet
@@ -70,7 +70,10 @@ pub async fn recv_socket_event(
     let deadline = tokio::time::Instant::now() + Duration::from_millis(timeout_ms);
     while tokio::time::Instant::now() < deadline {
         let remaining = deadline - tokio::time::Instant::now();
-        let packet = tokio::time::timeout(remaining, rx.recv()).await.ok().flatten()?;
+        let packet = tokio::time::timeout(remaining, rx.recv())
+            .await
+            .ok()
+            .flatten()?;
         if let Some((event, data)) = parse_socket_event(&packet) {
             if event == expected_event {
                 return Some(data);

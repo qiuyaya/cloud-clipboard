@@ -88,6 +88,7 @@ export const MessageList = React.memo(function MessageList({
           >
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const message = messages[virtualItem.index];
+              if (!message) return null;
               return (
                 <div
                   key={message.id}

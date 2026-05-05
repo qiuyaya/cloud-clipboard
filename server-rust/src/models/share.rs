@@ -263,7 +263,10 @@ mod tests {
         assert_eq!(share.access_count, 0);
         assert_eq!(share.access_logs.len(), 1);
         assert!(!share.access_logs[0].success);
-        assert_eq!(share.access_logs[0].error_message, Some("wrong_password".to_string()));
+        assert_eq!(
+            share.access_logs[0].error_message,
+            Some("wrong_password".to_string())
+        );
     }
 
     #[test]

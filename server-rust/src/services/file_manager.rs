@@ -9,8 +9,8 @@ use std::sync::{
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-use async_trait::async_trait;
 use crate::services::traits::FileManagerTrait;
+use async_trait::async_trait;
 
 /// File metadata
 #[derive(Debug, Clone, serde::Serialize)]
@@ -357,7 +357,9 @@ impl FileManager {
             let mut room_files = match self.room_files.write() {
                 Ok(rf) => rf,
                 Err(_) => {
-                    tracing::warn!("Failed to acquire room_files lock in delete_room_files: lock poisoned");
+                    tracing::warn!(
+                        "Failed to acquire room_files lock in delete_room_files: lock poisoned"
+                    );
                     return Vec::new();
                 }
             };
@@ -409,7 +411,9 @@ impl FileManager {
             let files = match self.files.read() {
                 Ok(f) => f,
                 Err(_) => {
-                    tracing::warn!("Failed to acquire files lock in cleanup_expired_files: lock poisoned");
+                    tracing::warn!(
+                        "Failed to acquire files lock in cleanup_expired_files: lock poisoned"
+                    );
                     return Vec::new();
                 }
             };
@@ -485,7 +489,9 @@ impl FileManager {
                 let files = match self.files.read() {
                     Ok(f) => f,
                     Err(_) => {
-                        tracing::warn!("Failed to acquire files lock in cleanup_orphaned_files: lock poisoned");
+                        tracing::warn!(
+                            "Failed to acquire files lock in cleanup_orphaned_files: lock poisoned"
+                        );
                         return 0;
                     }
                 };
@@ -585,7 +591,13 @@ impl FileManagerTrait for FileManager {
     fn get_storage_usage(&self) -> StorageUsage {
         Self::get_storage_usage(self)
     }
-    async fn save_file(&self, room_key: &str, original_name: &str, mime_type: &str, data: &[u8]) -> anyhow::Result<FileInfo> {
+    async fn save_file(
+        &self,
+        room_key: &str,
+        original_name: &str,
+        mime_type: &str,
+        data: &[u8],
+    ) -> anyhow::Result<FileInfo> {
         Self::save_file(self, room_key, original_name, mime_type, data).await
     }
     async fn delete_file(&self, filename: &str) -> anyhow::Result<Option<FileInfo>> {
@@ -635,8 +647,13 @@ mod tests {
         fs::write(&marker_file, b"test").await.unwrap();
 
         // Create manager - should not delete existing directory
-        let manager =
-            FileManager::new_with_config(test_dir.clone(), 100 * 1024 * 1024, 1024 * 1024 * 1024, 12).unwrap();
+        let manager = FileManager::new_with_config(
+            test_dir.clone(),
+            100 * 1024 * 1024,
+            1024 * 1024 * 1024,
+            12,
+        )
+        .unwrap();
 
         // Marker file should still exist
         assert!(marker_file.exists());
@@ -947,7 +964,13 @@ mod tests {
     #[tokio::test]
     async fn test_file_size_limit() {
         let tmp_dir = TempDir::new().unwrap();
-        let manager = FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024, 1024 * 1024 * 1024, 12).unwrap(); // 1KB file limit
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            1024,
+            1024 * 1024 * 1024,
+            12,
+        )
+        .unwrap(); // 1KB file limit
 
         // Create data larger than max size
         let large_data = vec![0u8; 1025];
@@ -969,9 +992,13 @@ mod tests {
     #[test]
     fn test_max_file_size_default() {
         let tmp_dir = TempDir::new().unwrap();
-        let manager =
-            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 100 * 1024 * 1024, 1024 * 1024 * 1024, 12)
-                .unwrap();
+        let manager = FileManager::new_with_config(
+            tmp_dir.path().to_path_buf(),
+            100 * 1024 * 1024,
+            1024 * 1024 * 1024,
+            12,
+        )
+        .unwrap();
         assert_eq!(manager.max_file_size(), 100 * 1024 * 1024); // 100MB
     }
 
@@ -980,13 +1007,9 @@ mod tests {
     async fn test_storage_quota_exceeded() {
         let tmp_dir = TempDir::new().unwrap();
         // Set total storage limit to 100 bytes
-        let manager = FileManager::new_with_config(
-            tmp_dir.path().to_path_buf(),
-            1024 * 1024,
-            100,
-            12,
-        )
-        .unwrap();
+        let manager =
+            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024 * 1024, 100, 12)
+                .unwrap();
 
         // First upload: 60 bytes - should succeed
         let data1 = vec![b'a'; 60];
@@ -1001,20 +1024,21 @@ mod tests {
             .save_file("room1", "file2.txt", "text/plain", &data2)
             .await;
         assert!(result2.is_err());
-        assert!(result2.unwrap_err().to_string().contains("Storage quota exceeded"));
+        assert!(
+            result2
+                .unwrap_err()
+                .to_string()
+                .contains("Storage quota exceeded")
+        );
     }
 
     #[tokio::test]
     async fn test_storage_quota_freed_after_delete() {
         let tmp_dir = TempDir::new().unwrap();
         // Set total storage limit to 100 bytes
-        let manager = FileManager::new_with_config(
-            tmp_dir.path().to_path_buf(),
-            1024 * 1024,
-            100,
-            12,
-        )
-        .unwrap();
+        let manager =
+            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024 * 1024, 100, 12)
+                .unwrap();
 
         // Upload 60 bytes
         let data1 = vec![b'a'; 60];
@@ -1037,13 +1061,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_storage_usage() {
         let tmp_dir = TempDir::new().unwrap();
-        let manager = FileManager::new_with_config(
-            tmp_dir.path().to_path_buf(),
-            1024 * 1024,
-            1000,
-            12,
-        )
-        .unwrap();
+        let manager =
+            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024 * 1024, 1000, 12)
+                .unwrap();
 
         let usage = manager.get_storage_usage();
         assert_eq!(usage.used, 0);
@@ -1067,13 +1087,9 @@ mod tests {
     #[tokio::test]
     async fn test_storage_usage_decreases_on_room_delete() {
         let tmp_dir = TempDir::new().unwrap();
-        let manager = FileManager::new_with_config(
-            tmp_dir.path().to_path_buf(),
-            1024 * 1024,
-            10000,
-            12,
-        )
-        .unwrap();
+        let manager =
+            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024 * 1024, 10000, 12)
+                .unwrap();
 
         let data = vec![b'x'; 100];
         manager
@@ -1122,7 +1138,8 @@ mod tests {
     #[test]
     fn test_get_retention_hours() {
         let tmp_dir = TempDir::new().unwrap();
-        let manager = FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024, 1024, 24).unwrap();
+        let manager =
+            FileManager::new_with_config(tmp_dir.path().to_path_buf(), 1024, 1024, 24).unwrap();
         assert_eq!(manager.get_retention_hours(), 24);
     }
 
@@ -1134,9 +1151,15 @@ mod tests {
 
     #[test]
     fn test_storage_usage_is_full() {
-        let usage = StorageUsage { used: 100, limit: 100 };
+        let usage = StorageUsage {
+            used: 100,
+            limit: 100,
+        };
         assert!(usage.is_full());
-        let usage2 = StorageUsage { used: 99, limit: 100 };
+        let usage2 = StorageUsage {
+            used: 99,
+            limit: 100,
+        };
         assert!(!usage2.is_full());
     }
 

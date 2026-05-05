@@ -113,10 +113,7 @@ fn build_multipart_no_room_key(
 }
 
 /// Build a multipart body with only a roomKey field (no file).
-fn build_multipart_no_file(
-    boundary: &str,
-    room_key: &str,
-) -> Vec<u8> {
+fn build_multipart_no_file(boundary: &str, room_key: &str) -> Vec<u8> {
     let mut body = Vec::new();
 
     // roomKey field only
@@ -222,7 +219,10 @@ async fn test_upload_file_success() {
     let body_bytes = read_body(response.into_body()).await;
     let parsed: ApiResponse<UploadData> = serde_json::from_slice(&body_bytes).unwrap();
     assert!(parsed.success);
-    assert_eq!(parsed.message.as_deref(), Some("File uploaded successfully"));
+    assert_eq!(
+        parsed.message.as_deref(),
+        Some("File uploaded successfully")
+    );
 
     let data = parsed.data.unwrap();
     assert!(!data.file_id.is_empty());
@@ -277,12 +277,7 @@ async fn test_upload_file_missing_room_key() {
 
     let boundary = "testboundary789";
     // Multipart with file but no roomKey field and no x-room-key header
-    let body = build_multipart_no_room_key(
-        boundary,
-        "test.txt",
-        "text/plain",
-        b"content",
-    );
+    let body = build_multipart_no_room_key(boundary, "test.txt", "text/plain", b"content");
 
     let response = app
         .oneshot(
@@ -540,7 +535,9 @@ async fn test_download_file_invalid_id_empty() {
 
     // Empty file_id should be rejected - this will likely 404 from router
     // since {file_id} requires a non-empty segment
-    assert!(response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::BAD_REQUEST);
+    assert!(
+        response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::BAD_REQUEST
+    );
 }
 
 #[tokio::test]
@@ -684,7 +681,12 @@ async fn test_delete_file_missing_room_key() {
     let body_bytes = read_body(response.into_body()).await;
     let parsed: ApiResponse<()> = serde_json::from_slice(&body_bytes).unwrap();
     assert!(!parsed.success);
-    assert!(parsed.message.unwrap().contains("Missing x-room-key header"));
+    assert!(
+        parsed
+            .message
+            .unwrap()
+            .contains("Missing x-room-key header")
+    );
 }
 
 #[tokio::test]
