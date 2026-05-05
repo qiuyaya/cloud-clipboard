@@ -306,7 +306,10 @@ mod tests {
     #[test]
     fn client_ip_from_x_forwarded_for() {
         let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4, 5.6.7.8"));
+        headers.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static("1.2.3.4, 5.6.7.8"),
+        );
         assert_eq!(extract_client_ip(&headers), "1.2.3.4");
     }
 
@@ -406,7 +409,10 @@ mod tests {
         assert_eq!(rl_config.general_max, cfg.rate_limit_max);
         assert_eq!(rl_config.strict_max, cfg.strict_limit_max);
         assert_eq!(rl_config.strict_window_secs, 300);
-        assert_eq!(rl_config.public_download_max, cfg.public_download_rate_limit);
+        assert_eq!(
+            rl_config.public_download_max,
+            cfg.public_download_rate_limit
+        );
     }
 
     #[test]
@@ -434,7 +440,10 @@ mod tests {
     #[test]
     fn client_ip_xff_comma_with_spaces() {
         let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-for", HeaderValue::from_static(" 1.2.3.4 , 5.6.7.8 "));
+        headers.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static(" 1.2.3.4 , 5.6.7.8 "),
+        );
         assert_eq!(extract_client_ip(&headers), "1.2.3.4");
     }
 
@@ -505,7 +514,10 @@ mod tests {
     #[test]
     fn client_ip_xff_with_multiple_proxies() {
         let mut headers = HeaderMap::new();
-        headers.insert("x-forwarded-for", HeaderValue::from_static("1.1.1.1, 2.2.2.2, 3.3.3.3"));
+        headers.insert(
+            "x-forwarded-for",
+            HeaderValue::from_static("1.1.1.1, 2.2.2.2, 3.3.3.3"),
+        );
         assert_eq!(extract_client_ip(&headers), "1.1.1.1");
     }
 
@@ -523,9 +535,9 @@ mod tests {
 
     #[tokio::test]
     async fn rate_limit_service_allows_within_quota() {
+        use axum::Router;
         use axum::body::Body;
         use axum::routing::get;
-        use axum::Router;
         use tower::ServiceExt;
 
         let config = RateLimitConfig::default();
@@ -571,9 +583,9 @@ mod tests {
 
     #[tokio::test]
     async fn rate_limit_service_rejects_over_quota() {
+        use axum::Router;
         use axum::body::Body;
         use axum::routing::get;
-        use axum::Router;
         use tower::ServiceExt;
 
         let config = RateLimitConfig::default();
@@ -635,9 +647,9 @@ mod tests {
 
     #[tokio::test]
     async fn rate_limit_service_different_ips_independent() {
+        use axum::Router;
         use axum::body::Body;
         use axum::routing::get;
-        use axum::Router;
         use tower::ServiceExt;
 
         let config = RateLimitConfig::default();
@@ -709,13 +721,17 @@ mod tests {
 
         // Verify JSON body
         let body = response.into_body();
-        let bytes = axum::body::to_bytes(body, 1024).await.expect("body should be collectable");
-        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should be valid JSON");
+        let bytes = axum::body::to_bytes(body, 1024)
+            .await
+            .expect("body should be collectable");
+        let json: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("body should be valid JSON");
 
         assert_eq!(json["success"], false);
         assert_eq!(json["error"], "RATE_LIMIT_EXCEEDED");
         assert_eq!(
-            json["message"], "Too many requests. Please try again later."
+            json["message"],
+            "Too many requests. Please try again later."
         );
         assert_eq!(json["retryAfter"], 30);
     }
@@ -734,19 +750,13 @@ mod tests {
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
 
         // X-RateLimit-Limit should reflect config.general_max
-        assert_eq!(
-            response.headers().get("X-RateLimit-Limit").unwrap(),
-            "1000"
-        );
+        assert_eq!(response.headers().get("X-RateLimit-Limit").unwrap(), "1000");
         // X-RateLimit-Remaining should be 0
         assert_eq!(
             response.headers().get("X-RateLimit-Remaining").unwrap(),
             "0"
         );
         // Retry-After should match retry_after parameter
-        assert_eq!(
-            response.headers().get("Retry-After").unwrap(),
-            "120"
-        );
+        assert_eq!(response.headers().get("Retry-After").unwrap(), "120");
     }
 }

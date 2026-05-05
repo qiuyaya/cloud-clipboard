@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 
 use crate::routes::ApiResponse;
 
@@ -54,11 +54,14 @@ impl IntoResponse for AppError {
             AppError::Io(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
 
-        (status, Json(ApiResponse::<()> {
-            success: false,
-            message: Some(message),
-            data: None,
-        }))
+        (
+            status,
+            Json(ApiResponse::<()> {
+                success: false,
+                message: Some(message),
+                data: None,
+            }),
+        )
             .into_response()
     }
 }
@@ -84,54 +87,81 @@ mod tests {
 
     fn into_status(error: AppError) -> StatusCode {
         let response = error.into_response();
-        response.status().clone()
+        response.status()
     }
 
     #[test]
     fn not_found_returns_404() {
-        assert_eq!(into_status(AppError::NotFound("item".into())), StatusCode::NOT_FOUND);
+        assert_eq!(
+            into_status(AppError::NotFound("item".into())),
+            StatusCode::NOT_FOUND
+        );
     }
 
     #[test]
     fn bad_request_returns_400() {
-        assert_eq!(into_status(AppError::BadRequest("invalid".into())), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            into_status(AppError::BadRequest("invalid".into())),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[test]
     fn unauthorized_returns_401() {
-        assert_eq!(into_status(AppError::Unauthorized("token".into())), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            into_status(AppError::Unauthorized("token".into())),
+            StatusCode::UNAUTHORIZED
+        );
     }
 
     #[test]
     fn forbidden_returns_403() {
-        assert_eq!(into_status(AppError::Forbidden("denied".into())), StatusCode::FORBIDDEN);
+        assert_eq!(
+            into_status(AppError::Forbidden("denied".into())),
+            StatusCode::FORBIDDEN
+        );
     }
 
     #[test]
     fn too_many_requests_returns_429() {
-        assert_eq!(into_status(AppError::TooManyRequests), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            into_status(AppError::TooManyRequests),
+            StatusCode::TOO_MANY_REQUESTS
+        );
     }
 
     #[test]
     fn internal_returns_500() {
-        assert_eq!(into_status(AppError::Internal("oops".into())), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            into_status(AppError::Internal("oops".into())),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]
     fn lock_error_returns_500() {
-        assert_eq!(into_status(AppError::LockError), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            into_status(AppError::LockError),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]
     fn io_error_returns_500() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "disk failure");
-        assert_eq!(into_status(AppError::Io(io_err)), StatusCode::INTERNAL_SERVER_ERROR);
+        let io_err = std::io::Error::other("disk failure");
+        assert_eq!(
+            into_status(AppError::Io(io_err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]
     fn display_format() {
         assert_eq!(AppError::NotFound("x".into()).to_string(), "Not found: x");
-        assert_eq!(AppError::BadRequest("y".into()).to_string(), "Bad request: y");
+        assert_eq!(
+            AppError::BadRequest("y".into()).to_string(),
+            "Bad request: y"
+        );
         assert_eq!(AppError::TooManyRequests.to_string(), "Too many requests");
         assert_eq!(AppError::LockError.to_string(), "Lock error");
     }
@@ -157,7 +187,11 @@ mod tests {
 
     // --- JSON body verification tests ---
 
-    async fn assert_json_body(error: AppError, expected_status: StatusCode, expected_message: &str) {
+    async fn assert_json_body(
+        error: AppError,
+        expected_status: StatusCode,
+        expected_message: &str,
+    ) {
         let response = error.into_response();
         let (parts, body) = response.into_parts();
         assert_eq!(parts.status, expected_status);
@@ -241,7 +275,7 @@ mod tests {
 
     #[tokio::test]
     async fn into_response_json_body_io_error() {
-        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "disk failure");
+        let io_err = std::io::Error::other("disk failure");
         assert_json_body(
             AppError::Io(io_err),
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -254,7 +288,9 @@ mod tests {
     fn from_anyhow_into_internal() {
         let err = anyhow::anyhow!("db connection lost");
         let app_err: AppError = err.into();
-        assert!(matches!(app_err, AppError::Internal(ref msg) if msg.contains("db connection lost")));
+        assert!(
+            matches!(app_err, AppError::Internal(ref msg) if msg.contains("db connection lost"))
+        );
     }
 
     #[test]

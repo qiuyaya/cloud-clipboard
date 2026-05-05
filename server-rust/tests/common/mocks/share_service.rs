@@ -4,6 +4,8 @@ use cloud_clipboard_server::services::share_service::CreateShareRequest;
 use cloud_clipboard_server::services::traits::ShareServiceTrait;
 use std::sync::Mutex;
 
+#[allow(dead_code)]
+#[allow(clippy::type_complexity)]
 pub struct MockShareService {
     shares: Mutex<std::collections::HashMap<String, ShareInfo>>,
     create_share_result: Mutex<Option<Result<(ShareInfo, Option<String>), String>>>,
@@ -14,6 +16,7 @@ pub struct MockShareService {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AccessCall {
     pub share_id: String,
     pub ip_address: String,
@@ -23,6 +26,7 @@ pub struct AccessCall {
     pub user_agent: Option<String>,
 }
 
+#[allow(dead_code)]
 impl MockShareService {
     pub fn new() -> Self {
         Self {
@@ -67,7 +71,10 @@ impl MockShareService {
 }
 
 impl ShareServiceTrait for MockShareService {
-    fn create_share(&self, _req: CreateShareRequest) -> Result<(ShareInfo, Option<String>), String> {
+    fn create_share(
+        &self,
+        _req: CreateShareRequest,
+    ) -> Result<(ShareInfo, Option<String>), String> {
         if let Some(result) = self.create_share_result.lock().unwrap().take() {
             return result;
         }

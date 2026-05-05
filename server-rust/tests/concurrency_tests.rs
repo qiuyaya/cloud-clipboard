@@ -4,8 +4,8 @@
 
 mod common;
 
-use cloud_clipboard_server::models::message::MessageSender;
 use cloud_clipboard_server::models::Message;
+use cloud_clipboard_server::models::message::MessageSender;
 use cloud_clipboard_server::services::share_service::CreateShareRequest;
 use cloud_clipboard_server::services::{FileManager, JoinRoomRequest, RoomService, ShareService};
 use std::sync::Arc;
@@ -23,12 +23,7 @@ fn test_concurrent_room_joins() {
                 let user_id = format!("user_{}", i);
                 let username = format!("User {}", i);
                 let socket_id = format!("socket_{}", i);
-                let req = JoinRoomRequest::new(
-                    "test_room_abc123",
-                    &user_id,
-                    &username,
-                    &socket_id,
-                );
+                let req = JoinRoomRequest::new("test_room_abc123", &user_id, &username, &socket_id);
                 rs.join_room(req)
             }));
         }
@@ -77,12 +72,7 @@ fn test_concurrent_join_and_leave() {
                 let user_id = format!("user_{}", i);
                 let username = format!("User {}", i);
                 let socket_id = format!("socket_{}", i);
-                let req = JoinRoomRequest::new(
-                    "test_room_abc123",
-                    &user_id,
-                    &username,
-                    &socket_id,
-                );
+                let req = JoinRoomRequest::new("test_room_abc123", &user_id, &username, &socket_id);
                 let _ = rs.join_room(req);
             });
         }
@@ -177,14 +167,8 @@ async fn test_concurrent_share_operations() {
         if i % 2 == 0 {
             // Record access for even indices
             handles.push(tokio::spawn(async move {
-                let _ = ss.record_access(
-                    &sid,
-                    "127.0.0.1".to_string(),
-                    true,
-                    Some(100),
-                    None,
-                    None,
-                );
+                let _ =
+                    ss.record_access(&sid, "127.0.0.1".to_string(), true, Some(100), None, None);
             }));
         } else {
             // Delete odd indices
@@ -253,8 +237,7 @@ fn test_concurrent_room_password_changes() {
             let rs = room_service.clone();
             s.spawn(move || {
                 if i % 2 == 0 {
-                    let _ =
-                        rs.set_room_password("pwd_room_abc123", Some(&format!("pass_{}", i)));
+                    let _ = rs.set_room_password("pwd_room_abc123", Some(&format!("pass_{}", i)));
                 } else {
                     let _ = rs.set_room_password("pwd_room_abc123", None);
                 }
@@ -265,7 +248,11 @@ fn test_concurrent_room_password_changes() {
     // Room should be in a consistent state — verify we can query without panic
     // and that the room still exists
     let users = room_service.get_room_users("pwd_room_abc123");
-    assert_eq!(users.len(), 1, "Room should still have 1 user after concurrent password changes");
+    assert_eq!(
+        users.len(),
+        1,
+        "Room should still have 1 user after concurrent password changes"
+    );
     // Verify password state is queryable (no deadlock or corruption)
     let _ = room_service.room_has_password("pwd_room_abc123");
 }
@@ -301,11 +288,11 @@ async fn test_concurrent_uploads_respect_quota() {
     }
 
     let mut success_count = 0u32;
-    let mut fail_count = 0u32;
+    let mut _fail_count = 0u32;
     for handle in handles {
         match handle.await.unwrap() {
             Ok(_) => success_count += 1,
-            Err(_) => fail_count += 1,
+            Err(_) => _fail_count += 1,
         }
     }
 

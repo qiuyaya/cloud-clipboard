@@ -784,7 +784,10 @@ mod tests {
     #[test]
     fn extract_room_key_invalid_utf8() {
         let mut headers = HeaderMap::new();
-        headers.insert("x-room-key", HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap());
+        headers.insert(
+            "x-room-key",
+            HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap(),
+        );
         // Invalid UTF-8 should return None
         assert_eq!(extract_room_key(&headers), None);
     }

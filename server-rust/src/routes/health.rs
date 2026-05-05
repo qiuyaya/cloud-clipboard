@@ -124,7 +124,7 @@ mod tests {
         let rss = get_rss_bytes();
         // On Linux with /proc, should return a positive value
         // On other platforms, returns 0
-        assert!(rss >= 0);
+        let _ = rss;
     }
 
     #[test]
@@ -223,7 +223,9 @@ mod tests {
             online_users: 200,
             total_files: 1000,
             total_size: 1024 * 1024 * 1024, // 1GB
-            memory: MemoryInfo { rss: 512 * 1024 * 1024 }, // 512MB
+            memory: MemoryInfo {
+                rss: 512 * 1024 * 1024,
+            }, // 512MB
         };
         let json = serde_json::to_string(&data).unwrap();
         assert!(json.contains("\"uptime\":86400"));

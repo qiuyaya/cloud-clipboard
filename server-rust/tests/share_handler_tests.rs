@@ -239,8 +239,7 @@ async fn test_create_share_without_password() {
 
     // Pre-set the create_share result
     let share = make_share_info("share001", "document.pdf", "room1", "user1", 7, false);
-    ctx.share_service
-        .set_create_share_result(Ok((share, None)));
+    ctx.share_service.set_create_share_result(Ok((share, None)));
 
     let app = ctx.app();
     let body = serde_json::json!({
@@ -266,7 +265,10 @@ async fn test_create_share_without_password() {
     let body_bytes = read_body(response.into_body()).await;
     let parsed: ApiResponse<CreateShareData> = serde_json::from_slice(&body_bytes).unwrap();
     assert!(parsed.success);
-    assert_eq!(parsed.message.as_deref(), Some("Share link created successfully"));
+    assert_eq!(
+        parsed.message.as_deref(),
+        Some("Share link created successfully")
+    );
 
     let data = parsed.data.unwrap();
     assert_eq!(data.share_id, "share001");
@@ -747,8 +749,7 @@ async fn test_create_share_default_expiration() {
     );
 
     let share = make_share_info("shareDefExp", "doc.pdf", "room1", "user1", 7, false);
-    ctx.share_service
-        .set_create_share_result(Ok((share, None)));
+    ctx.share_service.set_create_share_result(Ok((share, None)));
 
     let app = ctx.app();
     // No expiresInDays field - should default to 7
@@ -782,8 +783,7 @@ async fn test_create_share_no_user_id_header() {
     );
 
     let share = make_share_info("shareAnon", "anon.pdf", "room1", "temp-user-id", 7, false);
-    ctx.share_service
-        .set_create_share_result(Ok((share, None)));
+    ctx.share_service.set_create_share_result(Ok((share, None)));
 
     let app = ctx.app();
     let body = serde_json::json!({
@@ -822,8 +822,7 @@ async fn test_create_share_empty_password() {
 
     // When password is empty string, enable_password should be false
     let share = make_share_info("shareEmptyPwd", "nopwd.pdf", "room1", "user1", 7, false);
-    ctx.share_service
-        .set_create_share_result(Ok((share, None)));
+    ctx.share_service.set_create_share_result(Ok((share, None)));
 
     let app = ctx.app();
     let body = serde_json::json!({
@@ -858,8 +857,7 @@ async fn test_create_share_expiration_1_day() {
     );
 
     let share = make_share_info("share1Day", "oneday.pdf", "room1", "user1", 1, false);
-    ctx.share_service
-        .set_create_share_result(Ok((share, None)));
+    ctx.share_service.set_create_share_result(Ok((share, None)));
 
     let app = ctx.app();
     let body = serde_json::json!({
@@ -893,8 +891,7 @@ async fn test_create_share_expiration_30_days() {
     );
 
     let share = make_share_info("share30Day", "thirty.pdf", "room1", "user1", 30, false);
-    ctx.share_service
-        .set_create_share_result(Ok((share, None)));
+    ctx.share_service.set_create_share_result(Ok((share, None)));
 
     let app = ctx.app();
     let body = serde_json::json!({
@@ -1401,7 +1398,14 @@ async fn test_permanent_delete_error() {
 async fn test_permanent_delete_user_id_from_body() {
     let ctx = TestContext::new();
 
-    let share = make_share_info("sharePermDelBody", "perm.pdf", "room1", "body-user", 7, false);
+    let share = make_share_info(
+        "sharePermDelBody",
+        "perm.pdf",
+        "room1",
+        "body-user",
+        7,
+        false,
+    );
     ctx.share_service.add_share("sharePermDelBody", share);
 
     let app = ctx.app();
@@ -1433,7 +1437,14 @@ async fn test_permanent_delete_no_user_id_fallback() {
     let ctx = TestContext::new();
 
     // Neither header nor body provides user_id -> falls back to "temp-user-id"
-    let share = make_share_info("sharePermNoUser", "perm.pdf", "room1", "temp-user-id", 7, false);
+    let share = make_share_info(
+        "sharePermNoUser",
+        "perm.pdf",
+        "room1",
+        "temp-user-id",
+        7,
+        false,
+    );
     ctx.share_service.add_share("sharePermNoUser", share);
 
     let app = ctx.app();
@@ -1471,7 +1482,8 @@ async fn test_get_access_logs_with_data() {
         bytes_transferred: Some(1024),
         error_message: None,
     };
-    ctx.share_service.add_access_logs("shareWithLogs", vec![log]);
+    ctx.share_service
+        .add_access_logs("shareWithLogs", vec![log]);
 
     let app = ctx.app();
     let response = app
@@ -1569,6 +1581,7 @@ impl DownloadTestContext {
 }
 
 /// Create a valid share ID (8-10 alphanumeric characters)
+#[allow(dead_code)]
 fn valid_share_id(id: &str) -> String {
     // Pad or truncate to 8-10 chars
     if id.len() >= 8 && id.len() <= 10 && id.chars().all(|c| c.is_ascii_alphanumeric()) {
@@ -2124,9 +2137,10 @@ async fn test_public_download_with_original_filename_metadata() {
     // Add share with metadata containing originalFilename
     let mut share = make_share_info("metaShare1", "storageName.pdf", "room1", "user1", 7, false);
     share.file_name = "storageName.pdf".to_string();
-    share.metadata = Some(std::collections::HashMap::from([
-        ("originalFilename".to_string(), serde_json::Value::String("My Document.pdf".to_string())),
-    ]));
+    share.metadata = Some(std::collections::HashMap::from([(
+        "originalFilename".to_string(),
+        serde_json::Value::String("My Document.pdf".to_string()),
+    )]));
     ctx.share_service.add_share("metaShare1", share);
 
     let app = ctx.download_app();

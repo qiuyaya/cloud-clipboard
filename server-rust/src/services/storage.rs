@@ -100,10 +100,7 @@ mod tests {
         let (storage, _tmp) = create_test_storage();
 
         let data = b"hello, cloud clipboard!";
-        storage
-            .write("test.txt", data)
-            .await
-            .expect("write failed");
+        storage.write("test.txt", data).await.expect("write failed");
 
         let read_data = storage.read("test.txt").await.expect("read failed");
         assert_eq!(read_data, data);
@@ -118,7 +115,12 @@ mod tests {
             .write("to_delete.txt", b"delete me")
             .await
             .expect("write failed");
-        assert!(storage.exists("to_delete.txt").await.expect("exists failed"));
+        assert!(
+            storage
+                .exists("to_delete.txt")
+                .await
+                .expect("exists failed")
+        );
 
         // Delete should return true
         let deleted = storage
@@ -128,7 +130,12 @@ mod tests {
         assert!(deleted);
 
         // File should no longer exist
-        assert!(!storage.exists("to_delete.txt").await.expect("exists failed"));
+        assert!(
+            !storage
+                .exists("to_delete.txt")
+                .await
+                .expect("exists failed")
+        );
 
         // Deleting again should return false
         let deleted_again = storage
@@ -155,10 +162,7 @@ mod tests {
         let (storage, _tmp) = create_test_storage();
 
         // File does not exist yet
-        assert!(!storage
-            .exists("check_me.txt")
-            .await
-            .expect("exists failed"));
+        assert!(!storage.exists("check_me.txt").await.expect("exists failed"));
 
         // Write the file
         storage
@@ -167,10 +171,7 @@ mod tests {
             .expect("write failed");
 
         // Now it should exist
-        assert!(storage
-            .exists("check_me.txt")
-            .await
-            .expect("exists failed"));
+        assert!(storage.exists("check_me.txt").await.expect("exists failed"));
 
         // resolve_path should return the correct path
         let resolved = storage.resolve_path("check_me.txt");

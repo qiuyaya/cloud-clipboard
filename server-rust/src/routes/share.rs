@@ -318,7 +318,9 @@ async fn create_share(
     let expires_in_days = payload.expires_in_days.unwrap_or(7);
 
     if !(1..=30).contains(&expires_in_days) {
-        return Err(crate::error::AppError::BadRequest("Expiration must be 1-30 days".to_string()));
+        return Err(crate::error::AppError::BadRequest(
+            "Expiration must be 1-30 days".to_string(),
+        ));
     }
 
     let file_info = state
@@ -491,7 +493,9 @@ async fn get_share(
             message: None,
             data: Some(info),
         })),
-        None => Err(crate::error::AppError::NotFound("Share not found".to_string())),
+        None => Err(crate::error::AppError::NotFound(
+            "Share not found".to_string(),
+        )),
     }
 }
 
@@ -501,14 +505,19 @@ async fn delete_share(
     headers: HeaderMap,
     Path(share_id): Path<String>,
 ) -> Result<Json<ApiResponse<()>>, crate::error::AppError> {
-    let user_id = extract_user_id(&headers)
-        .ok_or_else(|| crate::error::AppError::Unauthorized("User ID required (x-user-id header)".to_string()))?;
+    let user_id = extract_user_id(&headers).ok_or_else(|| {
+        crate::error::AppError::Unauthorized("User ID required (x-user-id header)".to_string())
+    })?;
 
-    let share = state.share_service.get_share(&share_id)
+    let share = state
+        .share_service
+        .get_share(&share_id)
         .ok_or_else(|| crate::error::AppError::NotFound("Share not found".to_string()))?;
 
     if share.created_by != user_id {
-        return Err(crate::error::AppError::Forbidden("You do not have permission to revoke this share".to_string()));
+        return Err(crate::error::AppError::Forbidden(
+            "You do not have permission to revoke this share".to_string(),
+        ));
     }
 
     match state.share_service.revoke_share(&share_id) {
@@ -517,7 +526,9 @@ async fn delete_share(
             message: Some("Share revoked".to_string()),
             data: None,
         })),
-        Ok(false) => Err(crate::error::AppError::NotFound("Share not found".to_string())),
+        Ok(false) => Err(crate::error::AppError::NotFound(
+            "Share not found".to_string(),
+        )),
         Err(e) => Err(crate::error::AppError::Internal(e)),
     }
 }
@@ -535,12 +546,16 @@ async fn permanent_delete(
         .unwrap_or_else(|| "temp-user-id".to_string());
 
     // Check if share exists
-    let share = state.share_service.get_share(&share_id)
+    let share = state
+        .share_service
+        .get_share(&share_id)
         .ok_or_else(|| crate::error::AppError::NotFound("Share not found".to_string()))?;
 
     // Verify ownership
     if share.created_by != user_id {
-        return Err(crate::error::AppError::Forbidden("You do not have permission to delete this share".to_string()));
+        return Err(crate::error::AppError::Forbidden(
+            "You do not have permission to delete this share".to_string(),
+        ));
     }
 
     // Permanently delete
@@ -550,7 +565,9 @@ async fn permanent_delete(
             message: Some("Share permanently deleted".to_string()),
             data: None,
         })),
-        Ok(None) => Err(crate::error::AppError::NotFound("Share not found".to_string())),
+        Ok(None) => Err(crate::error::AppError::NotFound(
+            "Share not found".to_string(),
+        )),
         Err(e) => Err(crate::error::AppError::Internal(e)),
     }
 }
@@ -595,6 +612,7 @@ async fn get_user_shares(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
 
@@ -616,7 +634,10 @@ mod tests {
         let mut headers = HeaderMap::new();
         // base64("user:mypassword") = "dXNlcjpteXBhc3N3b3Jk"
         let encoded = general_purpose::STANDARD.encode("user:mypassword");
-        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Basic {}", encoded).parse().unwrap(),
+        );
         assert_eq!(
             extract_basic_auth_password(&headers),
             Some("mypassword".to_string())
@@ -628,7 +649,10 @@ mod tests {
         let mut headers = HeaderMap::new();
         // base64(":mypassword") - empty username is valid
         let encoded = general_purpose::STANDARD.encode(":mypassword");
-        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Basic {}", encoded).parse().unwrap(),
+        );
         assert_eq!(
             extract_basic_auth_password(&headers),
             Some("mypassword".to_string())
@@ -639,7 +663,10 @@ mod tests {
     fn extract_basic_auth_password_empty_password() {
         let mut headers = HeaderMap::new();
         let encoded = general_purpose::STANDARD.encode("user:");
-        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Basic {}", encoded).parse().unwrap(),
+        );
         assert_eq!(extract_basic_auth_password(&headers), None);
     }
 
@@ -659,7 +686,10 @@ mod tests {
     #[test]
     fn extract_basic_auth_password_invalid_base64() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::AUTHORIZATION, "Basic !!!invalid!!!".parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            "Basic !!!invalid!!!".parse().unwrap(),
+        );
         assert_eq!(extract_basic_auth_password(&headers), None);
     }
 
@@ -667,7 +697,10 @@ mod tests {
     fn extract_basic_auth_password_no_colon() {
         let mut headers = HeaderMap::new();
         let encoded = general_purpose::STANDARD.encode("justastring");
-        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Basic {}", encoded).parse().unwrap(),
+        );
         assert_eq!(extract_basic_auth_password(&headers), None);
     }
 
@@ -999,7 +1032,10 @@ mod tests {
         let mut headers = HeaderMap::new();
         // base64("user:pass word") - password with space
         let encoded = general_purpose::STANDARD.encode("user:pass word");
-        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Basic {}", encoded).parse().unwrap(),
+        );
         assert_eq!(
             extract_basic_auth_password(&headers),
             Some("pass word".to_string())
@@ -1012,7 +1048,10 @@ mod tests {
         // Invalid UTF-8 bytes
         let invalid_bytes = vec![0xFF, 0xFE, 0x00, 0x01];
         let encoded = general_purpose::STANDARD.encode(&invalid_bytes);
-        headers.insert(header::AUTHORIZATION, format!("Basic {}", encoded).parse().unwrap());
+        headers.insert(
+            header::AUTHORIZATION,
+            format!("Basic {}", encoded).parse().unwrap(),
+        );
         assert_eq!(extract_basic_auth_password(&headers), None);
     }
 
@@ -1187,8 +1226,11 @@ pub async fn public_download(
     }
 
     // Open file with timeout protection (matching Node.js DOWNLOAD_TIMEOUT)
-    let file = match tokio::time::timeout(download_timeout(), tokio::fs::File::open(&canonical_path))
-        .await
+    let file = match tokio::time::timeout(
+        download_timeout(),
+        tokio::fs::File::open(&canonical_path),
+    )
+    .await
     {
         Ok(Ok(f)) => f,
         Ok(Err(_)) => {

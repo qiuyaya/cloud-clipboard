@@ -339,7 +339,11 @@ mod tests {
     #[test]
     fn test_not_all_users_offline_when_some_online() {
         let mut room = Room::new("room1".to_string(), None, None);
-        room.add_user(User::new("u1".to_string(), "Alice".to_string(), "room1".to_string()));
+        room.add_user(User::new(
+            "u1".to_string(),
+            "Alice".to_string(),
+            "room1".to_string(),
+        ));
         assert!(!room.all_users_offline());
     }
 
@@ -397,7 +401,11 @@ mod tests {
     #[test]
     fn test_to_info() {
         let mut room = Room::new("room1".to_string(), None, None);
-        room.add_user(User::new("u1".to_string(), "Alice".to_string(), "room1".to_string()));
+        room.add_user(User::new(
+            "u1".to_string(),
+            "Alice".to_string(),
+            "room1".to_string(),
+        ));
         let info = room.to_info();
         assert_eq!(info.room_key, "room1");
         assert_eq!(info.user_count, 1);
@@ -423,7 +431,11 @@ mod tests {
     #[test]
     fn test_get_user_mut() {
         let mut room = Room::new("room1".to_string(), None, None);
-        room.add_user(User::new("u1".to_string(), "Alice".to_string(), "room1".to_string()));
+        room.add_user(User::new(
+            "u1".to_string(),
+            "Alice".to_string(),
+            "room1".to_string(),
+        ));
         let user = room.get_user_mut("u1");
         assert!(user.is_some());
         let user = room.get_user_mut("ghost");
@@ -442,7 +454,8 @@ mod tests {
         let mut room = Room::new("room1".to_string(), None, None);
         // Add more than max_messages (1000)
         for i in 0..1005 {
-            let msg = Message::new_system(format!("m{}", i), "room1".to_string(), "msg".to_string());
+            let msg =
+                Message::new_system(format!("m{}", i), "room1".to_string(), "msg".to_string());
             room.add_message(msg);
         }
         // Should have dropped ~200 messages (20% of 1000)

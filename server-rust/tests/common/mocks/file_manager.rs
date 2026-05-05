@@ -4,12 +4,14 @@ use cloud_clipboard_server::services::traits::FileManagerTrait;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+#[allow(dead_code)]
 pub struct MockFileManager {
     upload_dir_path: PathBuf,
     files: Mutex<std::collections::HashMap<String, FileInfo>>,
     max_file_size_val: u64,
 }
 
+#[allow(dead_code)]
 impl MockFileManager {
     pub fn new() -> Self {
         Self {

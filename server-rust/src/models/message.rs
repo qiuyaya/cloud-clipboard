@@ -154,9 +154,18 @@ mod tests {
 
     #[test]
     fn message_type_serialization() {
-        assert_eq!(serde_json::to_string(&MessageType::Text).unwrap(), "\"text\"");
-        assert_eq!(serde_json::to_string(&MessageType::File).unwrap(), "\"file\"");
-        assert_eq!(serde_json::to_string(&MessageType::System).unwrap(), "\"system\"");
+        assert_eq!(
+            serde_json::to_string(&MessageType::Text).unwrap(),
+            "\"text\""
+        );
+        assert_eq!(
+            serde_json::to_string(&MessageType::File).unwrap(),
+            "\"file\""
+        );
+        assert_eq!(
+            serde_json::to_string(&MessageType::System).unwrap(),
+            "\"system\""
+        );
     }
 
     #[test]
@@ -224,7 +233,10 @@ mod tests {
         assert_eq!(fi.name, "photo.jpg");
         assert_eq!(fi.size, 1024);
         assert_eq!(fi.file_type, "image/jpeg");
-        assert_eq!(msg.download_url.as_deref(), Some("http://example.com/photo.jpg"));
+        assert_eq!(
+            msg.download_url.as_deref(),
+            Some("http://example.com/photo.jpg")
+        );
     }
 
     #[test]

@@ -1,15 +1,17 @@
 /// 公共测试工具模块
 ///
 /// 提供测试中常用的工厂函数、断言辅助和性能测量工具
-
 pub mod mocks;
 pub mod socket_helpers;
 pub mod test_app;
 
-use cloud_clipboard_server::models::{User, Message, message::{MessageType, MessageSender}};
+use chrono::Utc;
+use cloud_clipboard_server::models::{
+    Message, User,
+    message::{MessageSender, MessageType},
+};
 use cloud_clipboard_server::services::{RoomService, room_service::JoinRoomRequest};
 use std::sync::Arc;
-use chrono::Utc;
 
 // ============================================================================
 // 测试数据工厂
@@ -17,6 +19,7 @@ use chrono::Utc;
 
 pub struct TestDataFactory;
 
+#[allow(dead_code)]
 impl TestDataFactory {
     /// 创建测试用户
     pub fn create_user(id: &str, name: &str, room_key: &str) -> User {
@@ -24,6 +27,7 @@ impl TestDataFactory {
     }
 
     /// 创建带有多个用户的房间
+    #[allow(dead_code)]
     pub fn create_room_with_users(
         service: Arc<RoomService>,
         room_key: &str,
@@ -35,11 +39,11 @@ impl TestDataFactory {
                 .join_room(
                     JoinRoomRequest::new(
                         room_key,
-                        &format!("user{}", i),
-                        &format!("User{}", i),
-                        &format!("socket{}", i),
+                        format!("user{}", i),
+                        format!("User{}", i),
+                        format!("socket{}", i),
                     )
-                    .with_fingerprint(&format!("fp{}", i)),
+                    .with_fingerprint(format!("fp{}", i)),
                 )
                 .unwrap();
             users.push(user);
@@ -63,6 +67,7 @@ impl TestDataFactory {
     }
 
     /// 创建文件消息
+    #[allow(dead_code)]
     pub fn create_file_message(
         user: &User,
         room_key: &str,
@@ -88,6 +93,7 @@ impl TestDataFactory {
     }
 
     /// 创建带密码的房间
+    #[allow(dead_code)]
     pub fn create_room_with_password(
         service: Arc<RoomService>,
         room_key: &str,
@@ -102,6 +108,7 @@ impl TestDataFactory {
 // 断言辅助函数
 // ============================================================================
 
+#[allow(dead_code)]
 pub mod assertions {
     use cloud_clipboard_server::models::User;
 
@@ -145,6 +152,7 @@ pub mod assertions {
 // 性能测量工具
 // ============================================================================
 
+#[allow(dead_code)]
 pub mod perf {
     use std::time::{Duration, Instant};
 
@@ -214,6 +222,7 @@ pub mod perf {
 // 测试清理工具
 // ============================================================================
 
+#[allow(dead_code)]
 pub mod cleanup {
     use std::fs;
     use std::path::Path;
@@ -260,6 +269,7 @@ pub mod cleanup {
 // 并发测试工具
 // ============================================================================
 
+#[allow(dead_code)]
 pub mod concurrent {
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -279,10 +289,7 @@ pub mod concurrent {
             handles.push(handle);
         }
 
-        handles
-            .into_iter()
-            .map(|h| h.join().unwrap())
-            .collect()
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
     }
 
     /// 计数成功的并发操作
@@ -314,10 +321,7 @@ pub mod concurrent {
             handles.push(handle);
         }
 
-        handles
-            .into_iter()
-            .map(|h| h.join().unwrap())
-            .collect()
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
     }
 }
 
@@ -325,6 +329,7 @@ pub mod concurrent {
 // 随机数据生成
 // ============================================================================
 
+#[allow(dead_code)]
 pub mod random {
     use rand::Rng;
 

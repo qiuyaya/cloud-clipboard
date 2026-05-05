@@ -7,11 +7,14 @@ use std::sync::Mutex;
 use tokio::sync::broadcast;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RoomServiceCall {
     pub method: String,
     pub room_key: Option<String>,
 }
 
+#[allow(dead_code)]
+#[allow(clippy::type_complexity)]
 pub struct MockRoomService {
     calls: Mutex<Vec<RoomServiceCall>>,
     rooms: Mutex<HashMap<String, RoomInfo>>,
@@ -27,6 +30,7 @@ pub struct MockRoomService {
     room_stats: Mutex<Option<RoomStats>>,
 }
 
+#[allow(dead_code)]
 impl MockRoomService {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(16);
@@ -239,11 +243,7 @@ impl RoomServiceTrait for MockRoomService {
         None
     }
 
-    fn set_room_password(
-        &self,
-        _room_key: &str,
-        _password: Option<&str>,
-    ) -> Result<bool, String> {
+    fn set_room_password(&self, _room_key: &str, _password: Option<&str>) -> Result<bool, String> {
         Ok(true)
     }
 
