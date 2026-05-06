@@ -49,9 +49,9 @@ COPY --from=rust-builder /app/target/release/cloud-clipboard-server /app/cloud-c
 # 复制前端静态文件
 COPY --from=frontend-builder /app/client/dist /app/public
 
-# 创建 uploads 目录并设置权限
+# 创建 uploads 和 data 目录并设置权限
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    mkdir -p /app/uploads && chown -R appuser:appgroup /app/uploads
+    mkdir -p /app/uploads /app/data && chown -R appuser:appgroup /app/uploads /app/data
 
 EXPOSE 3001
 

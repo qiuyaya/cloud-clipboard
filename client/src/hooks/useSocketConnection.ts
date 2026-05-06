@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { socketService } from "@/services/socket";
@@ -30,6 +30,7 @@ interface UseSocketConnectionProps {
   fetchRoomMessages: (roomKey: string) => Promise<void>;
   roomKey: RoomKey | null;
   currentUser: User | null;
+  isConnecting: boolean;
 }
 
 export const useSocketConnection = ({
@@ -44,6 +45,7 @@ export const useSocketConnection = ({
   fetchRoomMessages,
   roomKey,
   currentUser,
+  isConnecting,
 }: UseSocketConnectionProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
@@ -52,6 +54,21 @@ export const useSocketConnection = ({
   // Use refs to store the latest values for event handlers
   const roomKeyRef = useRef(roomKey);
   const currentUserRef = useRef(currentUser);
+  const isConnectingRef = useRef(isConnecting);
+  // Track join-in-progress to prevent handleConnect auto-rejoin interference
+  const joinInProgressRef = useRef(false);
+
+  // Wrap onSetIsConnecting to synchronously set joinInProgressRef
+  const wrappedSetIsConnecting = useCallback(
+    (connecting: boolean) => {
+      if (connecting) {
+        joinInProgressRef.current = true;
+      }
+      onSetIsConnecting(connecting);
+    },
+    [onSetIsConnecting],
+  );
+
   const callbacksRef = useRef({
     onSetCurrentUser,
     onSetUsers,
@@ -68,6 +85,11 @@ export const useSocketConnection = ({
   useEffect(() => {
     roomKeyRef.current = roomKey;
     currentUserRef.current = currentUser;
+    isConnectingRef.current = isConnecting;
+    // When isConnecting becomes true, mark join in progress synchronously
+    if (isConnecting) {
+      joinInProgressRef.current = true;
+    }
     callbacksRef.current = {
       onSetCurrentUser,
       onSetUsers,
@@ -90,6 +112,12 @@ export const useSocketConnection = ({
         socketConnected: socketService.isSocketConnected(),
       });
       setIsConnected(true);
+
+      // Skip auto-rejoin if user is currently in the process of joining a room
+      if (isConnectingRef.current || joinInProgressRef.current) {
+        debug.info("Skipping auto-rejoin: join in progress");
+        return;
+      }
 
       const savedUser = loadFromLocalStorage("cloudClipboard_user");
       const savedRoomKey = loadFromLocalStorage("cloudClipboard_roomKey");
@@ -480,5 +508,5 @@ export const useSocketConnection = ({
     };
   }, []);
 
-  return { isConnected };
+  return { isConnected, joinInProgressRef };
 };

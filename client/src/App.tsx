@@ -50,7 +50,7 @@ export function App(): JSX.Element {
     handlePinRoom,
   } = useRoomManager();
 
-  const { isConnected } = useSocketConnection({
+  const { isConnected, joinInProgressRef } = useSocketConnection({
     onSetCurrentUser: setCurrentUser,
     onSetUsers: setUsers,
     onSetMessages: setMessages,
@@ -62,6 +62,7 @@ export function App(): JSX.Element {
     fetchRoomMessages,
     roomKey,
     currentUser,
+    isConnecting,
   });
 
   useActivityMonitor({

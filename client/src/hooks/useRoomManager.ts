@@ -153,7 +153,7 @@ function getInitialState(): RoomState {
   };
 }
 
-export const useRoomManager = () => {
+export const useRoomManager = (joinInProgressRef?: React.RefObject<boolean>) => {
   const [state, dispatch] = useReducer(roomReducer, undefined, getInitialState);
 
   const { toast } = useToast();
@@ -296,7 +296,11 @@ export const useRoomManager = () => {
       }
 
       debug.info("Starting room join process");
-      dispatch({ type: "SET_CONNECTING", payload: true });
+      // Synchronously mark join in progress to prevent handleConnect auto-rejoin
+      if (joinInProgressRef) {
+        (joinInProgressRef as React.MutableRefObject<boolean>).current = true;
+      }
+      setIsConnecting(true);
       dispatch({ type: "SET_ROOM_KEY", payload: data.roomKey });
 
       dispatch({
@@ -328,7 +332,7 @@ export const useRoomManager = () => {
         joinTimeoutRef.current = null;
       }, 10000);
     },
-    [toast, t],
+    [toast, t, setIsConnecting],
   );
 
   const handleJoinRoomWithPassword = useCallback(
