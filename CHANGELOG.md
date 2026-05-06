@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] - 2026-05-06
+
+- fix: 修复连接状态同步导致的重复加入房间问题
+- feat: 置顶房间消息持久化到 SQLite
+- docs: 同步更新 CLAUDE.md 和 README.md 文档
+
 ## [3.0.0] - 2026-05-05
 
 - feat: 消息链接自动识别与快捷打开
