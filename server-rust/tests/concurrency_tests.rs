@@ -7,13 +7,15 @@ mod common;
 use cloud_clipboard_server::models::Message;
 use cloud_clipboard_server::models::message::MessageSender;
 use cloud_clipboard_server::services::share_service::CreateShareRequest;
-use cloud_clipboard_server::services::{FileManager, JoinRoomRequest, RoomService, ShareService};
+use cloud_clipboard_server::services::{
+    FileManager, JoinRoomRequest, NoOpPersistenceService, RoomService, ShareService,
+};
 use std::sync::Arc;
 
 /// Test: Multiple users joining the same room concurrently
 #[test]
 fn test_concurrent_room_joins() {
-    let room_service = Arc::new(RoomService::new());
+    let room_service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
 
     std::thread::scope(|s| {
         let mut handles = vec![];
@@ -44,7 +46,7 @@ fn test_concurrent_room_joins() {
 /// Test: Users joining and leaving simultaneously
 #[test]
 fn test_concurrent_join_and_leave() {
-    let room_service = Arc::new(RoomService::new());
+    let room_service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
 
     // First, add 10 users
     for i in 0..10 {
@@ -193,7 +195,7 @@ async fn test_concurrent_share_operations() {
 /// Test: Concurrent message operations (add messages from multiple threads)
 #[test]
 fn test_concurrent_message_operations() {
-    let room_service = Arc::new(RoomService::new());
+    let room_service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
 
     // Create room by joining
     let req = JoinRoomRequest::new("msg_room_abc123", "user_1", "User 1", "socket_1");
@@ -225,7 +227,7 @@ fn test_concurrent_message_operations() {
 /// Test: Concurrent room password operations
 #[test]
 fn test_concurrent_room_password_changes() {
-    let room_service = Arc::new(RoomService::new());
+    let room_service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
 
     // Create room
     let req = JoinRoomRequest::new("pwd_room_abc123", "user_1", "User 1", "socket_1");

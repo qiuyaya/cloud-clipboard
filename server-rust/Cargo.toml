@@ -63,6 +63,9 @@ rand = "0.9"
 # URL encoding for RFC 5987 Content-Disposition
 percent-encoding = "2"
 
+# Database
+rusqlite = { version = "0.31", features = ["bundled"] }
+
 # Environment
 dotenvy = "0.15"
 

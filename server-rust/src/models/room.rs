@@ -158,6 +158,59 @@ impl Room {
         self.last_activity = Utc::now();
     }
 
+    /// Get the maximum messages limit for this room
+    pub fn max_messages(&self) -> usize {
+        self.max_messages
+    }
+
+    /// Get the total message count (including dropped messages)
+    pub fn message_count(&self) -> u64 {
+        self.message_count
+    }
+
+    /// Get the count of messages that were dropped due to overflow
+    pub fn message_dropped_count(&self) -> u64 {
+        self.message_dropped_count
+    }
+
+    /// Reconstruct a Room from persisted data and messages
+    pub fn from_persisted(
+        persisted: crate::services::PersistedRoom,
+        messages: Vec<crate::models::Message>,
+    ) -> Self {
+        let max_messages = persisted.max_messages;
+        let message_count = persisted.message_count;
+        let message_dropped_count = persisted.message_dropped_count;
+
+        // Only load the most recent max_messages messages
+        let messages_vec: std::collections::VecDeque<crate::models::Message> =
+            if messages.len() > max_messages {
+                messages
+                    .into_iter()
+                    .rev()
+                    .take(max_messages)
+                    .rev()
+                    .collect()
+            } else {
+                messages.into_iter().collect()
+            };
+
+        Self {
+            room_key: persisted.room_key,
+            password_hash: persisted.password_hash,
+            password: None,        // plaintext password is not persisted
+            users: HashMap::new(), // users are not persisted; they rejoin on reconnect
+            messages: messages_vec,
+            created_at: persisted.created_at,
+            last_activity: persisted.last_activity,
+            is_pinned: persisted.is_pinned,
+            created_by: persisted.created_by,
+            max_messages,
+            message_count,
+            message_dropped_count,
+        }
+    }
+
     /// Check if username already exists in room (case-insensitive, excluding same fingerprint)
     fn username_conflict(&self, username: &str, fingerprint: Option<&str>) -> bool {
         let lower = username.to_lowercase();

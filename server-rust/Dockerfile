@@ -4,7 +4,7 @@ FROM rust:1.93-alpine AS builder
 WORKDIR /app
 
 # 安装构建依赖
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static build-base
 
 # 复制源码
 COPY Cargo.toml Cargo.lock* ./
@@ -28,7 +28,7 @@ COPY --from=builder /app/target/release/cloud-clipboard-server /app/cloud-clipbo
 COPY public /app/public
 
 # 确保上传目录存在
-RUN mkdir -p /app/uploads && chmod 755 /app/uploads
+RUN mkdir -p /app/uploads /app/data && chmod 755 /app/uploads /app/data
 
 EXPOSE 3001
 

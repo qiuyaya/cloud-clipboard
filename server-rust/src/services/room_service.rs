@@ -5,6 +5,7 @@ use tokio::sync::broadcast;
 
 use crate::models::room::RoomInfo;
 use crate::models::{Message, Room, User};
+use crate::services::persistence::{PersistedRoom, PersistenceCommand, PersistenceServiceTrait};
 use crate::services::traits::RoomServiceTrait;
 
 /// Grace period before destroying a room when all users disconnect (in seconds).
@@ -78,16 +79,36 @@ pub struct RoomService {
     socket_users: RwLock<HashMap<String, User>>, // socket_id -> User
     user_sockets: RwLock<HashMap<String, String>>, // user_id -> socket_id
     event_sender: broadcast::Sender<RoomEvent>,
+    persistence: Arc<dyn PersistenceServiceTrait>,
 }
 
 impl RoomService {
-    pub fn new() -> Self {
-        let (event_sender, _) = broadcast::channel(64);
+    pub fn new(persistence: Arc<dyn PersistenceServiceTrait>) -> Self {
         Self {
             rooms: RwLock::new(HashMap::new()),
             socket_users: RwLock::new(HashMap::new()),
             user_sockets: RwLock::new(HashMap::new()),
-            event_sender,
+            event_sender: broadcast::channel(256).0,
+            persistence,
+        }
+    }
+
+    /// Create a new RoomService with pre-loaded pinned rooms from persistence
+    pub fn with_pinned_rooms(
+        pinned_rooms: HashMap<String, (PersistedRoom, Vec<Message>)>,
+        persistence: Arc<dyn PersistenceServiceTrait>,
+    ) -> Self {
+        let mut rooms = HashMap::new();
+        for (room_key, (persisted, messages)) in pinned_rooms {
+            let room = Room::from_persisted(persisted, messages);
+            rooms.insert(room_key, room);
+        }
+        Self {
+            rooms: RwLock::new(rooms),
+            socket_users: RwLock::new(HashMap::new()),
+            user_sockets: RwLock::new(HashMap::new()),
+            event_sender: broadcast::channel(256).0,
+            persistence,
         }
     }
 
@@ -407,26 +428,64 @@ impl RoomService {
 
     /// Add message to room
     pub fn add_message(&self, room_key: &str, message: Message) -> Result<(), String> {
-        let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
-        match rooms.get_mut(room_key) {
-            Some(room) => {
-                room.add_message(message);
-                Ok(())
+        let room_was_pinned = {
+            let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
+            match rooms.get_mut(room_key) {
+                Some(room) => {
+                    let was_pinned = room.is_pinned;
+                    room.add_message(message.clone());
+                    was_pinned
+                }
+                None => return Err("Room not found".to_string()),
             }
-            None => Err("Room not found".to_string()),
+        };
+        // Persist after releasing the write lock
+        if room_was_pinned {
+            if let Err(e) = self
+                .persistence
+                .send_command(PersistenceCommand::AppendMessage {
+                    room_key: room_key.to_string(),
+                    message,
+                })
+            {
+                tracing::warn!("Failed to persist message: {}", e);
+            }
         }
+        Ok(())
     }
 
     /// Remove a message from a room
     pub fn remove_message(&self, room_key: &str, message_id: &str) -> Result<bool, String> {
-        let mut rooms = self
-            .rooms
-            .write()
-            .map_err(|e| format!("Lock error: {}", e))?;
-        match rooms.get_mut(room_key) {
-            Some(room) => Ok(room.remove_message(message_id)),
-            None => Err("Room not found".to_string()),
+        let was_pinned = {
+            let mut rooms = self
+                .rooms
+                .write()
+                .map_err(|e| format!("Lock error: {}", e))?;
+            match rooms.get_mut(room_key) {
+                Some(room) => {
+                    let pinned = room.is_pinned;
+                    let removed = room.remove_message(message_id);
+                    if !removed {
+                        return Ok(false);
+                    }
+                    pinned
+                }
+                None => return Err("Room not found".to_string()),
+            }
+        };
+        // Persist after releasing the write lock
+        if was_pinned {
+            if let Err(e) = self
+                .persistence
+                .send_command(PersistenceCommand::DeleteMessage {
+                    room_key: room_key.to_string(),
+                    message_id: message_id.to_string(),
+                })
+            {
+                tracing::warn!("Failed to persist message deletion: {}", e);
+            }
         }
+        Ok(true)
     }
 
     /// Get the sender ID of a message
@@ -468,23 +527,41 @@ impl RoomService {
         room_key: &str,
         password: Option<&str>,
     ) -> Result<bool, String> {
-        let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
-        match rooms.get_mut(room_key) {
-            Some(room) => {
-                if let Some(pwd) = password {
-                    let hash =
-                        bcrypt::hash(pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
-                    room.password_hash = Some(hash);
-                    room.password = Some(pwd.to_string());
-                    Ok(true)
-                } else {
-                    room.password_hash = None;
-                    room.password = None;
-                    Ok(false)
+        let (result, is_pinned, password_hash, plaintext_password) = {
+            let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
+            match rooms.get_mut(room_key) {
+                Some(room) => {
+                    let is_pinned = room.is_pinned;
+                    if let Some(pwd) = password {
+                        let hash =
+                            bcrypt::hash(pwd, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
+                        room.password_hash = Some(hash.clone());
+                        room.password = Some(pwd.to_string());
+                        (Ok(true), is_pinned, Some(hash), Some(pwd.to_string()))
+                    } else {
+                        room.password_hash = None;
+                        room.password = None;
+                        (Ok(false), is_pinned, None, None)
+                    }
                 }
+                None => (Err("Room not found".to_string()), false, None, None),
             }
-            None => Err("Room not found".to_string()),
+        };
+        result.as_ref()?;
+        // Persist password update for pinned rooms
+        if is_pinned {
+            if let Err(e) = self
+                .persistence
+                .send_command(PersistenceCommand::UpdateRoomPassword {
+                    room_key: room_key.to_string(),
+                    password_hash,
+                    password: plaintext_password,
+                })
+            {
+                tracing::warn!("Failed to persist password update: {}", e);
+            }
         }
+        result
     }
 
     /// Pin a room (any user can pin)
@@ -494,29 +571,51 @@ impl RoomService {
             return Err("Invalid fingerprint".to_string());
         }
 
-        let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
+        let persist_data = {
+            let mut rooms = self.rooms.write().map_err(|_| "Lock error")?;
 
-        // 检查房间是否存在和是否已固定
-        let already_pinned = {
-            let room = rooms.get(room_key).ok_or("Room not found")?;
-            room.is_pinned
+            // 检查房间是否存在和是否已固定
+            let already_pinned = {
+                let room = rooms.get(room_key).ok_or("Room not found")?;
+                room.is_pinned
+            };
+
+            if already_pinned {
+                return Ok(true); // Already pinned
+            }
+
+            // 检查固定房间数量限制
+            let pinned_count = rooms.values().filter(|r| r.is_pinned).count();
+            if pinned_count >= max_pinned_rooms() {
+                return Err("Maximum pinned rooms reached".to_string());
+            }
+
+            // 固定房间
+            let room = rooms.get_mut(room_key).ok_or("Room not found")?;
+            room.pin();
+
+            tracing::info!("Room {} pinned by {}", room_key, fingerprint);
+
+            // Collect data for persistence while still holding the lock
+            let room = rooms.get(room_key).unwrap();
+            let persisted = PersistedRoom::from_room(room);
+            let messages: Vec<Message> = room.messages.iter().cloned().collect();
+            Some((persisted, messages))
         };
 
-        if already_pinned {
-            return Ok(true); // Already pinned
+        // Persist after releasing the write lock
+        if let Some((persisted, messages)) = persist_data {
+            if let Err(e) = self
+                .persistence
+                .send_command(PersistenceCommand::SavePinnedRoom {
+                    room: persisted,
+                    messages,
+                })
+            {
+                tracing::warn!("Failed to persist pinned room: {}", e);
+            }
         }
 
-        // 检查固定房间数量限制
-        let pinned_count = rooms.values().filter(|r| r.is_pinned).count();
-        if pinned_count >= max_pinned_rooms() {
-            return Err("Maximum pinned rooms reached".to_string());
-        }
-
-        // 固定房间
-        let room = rooms.get_mut(room_key).ok_or("Room not found")?;
-        room.pin();
-
-        tracing::info!("Room {} pinned by {}", room_key, fingerprint);
         Ok(true)
     }
 
@@ -536,6 +635,17 @@ impl RoomService {
 
         room.unpin();
         tracing::info!("Room {} unpinned by {}", room_key, fingerprint);
+
+        // Remove persisted data after unpinning
+        if let Err(e) = self
+            .persistence
+            .send_command(PersistenceCommand::RemovePinnedRoom {
+                room_key: room_key.to_string(),
+            })
+        {
+            tracing::warn!("Failed to remove persisted room: {}", e);
+        }
+
         Ok(false)
     }
 
@@ -609,12 +719,6 @@ impl RoomService {
         }
 
         destroyed
-    }
-}
-
-impl Default for RoomService {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -713,9 +817,10 @@ pub struct RoomStats {
 mod tests {
     use super::*;
     use crate::models::message::{MessageSender, MessageType};
+    use crate::services::NoOpPersistenceService;
 
     fn create_service_with_user() -> (Arc<RoomService>, String, String) {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         let room_key = "test1room";
         let socket_id = "socket1";
 
@@ -732,7 +837,7 @@ mod tests {
     // Constructor tests
     #[test]
     fn test_constructor_creates_service() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let stats = service.get_room_stats();
         assert_eq!(stats.total_rooms, 0);
         assert_eq!(stats.total_users, 0);
@@ -742,7 +847,7 @@ mod tests {
     // createRoom tests
     #[test]
     fn test_create_room_new() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.create_room("newroom", None, None);
         assert!(result.is_ok());
         assert!(service.room_exists("newroom"));
@@ -750,7 +855,7 @@ mod tests {
 
     #[test]
     fn test_create_room_existing() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let room1 = service.create_room("testroom", None, None).unwrap();
         let room2 = service.create_room("testroom", None, None).unwrap();
         // Both should return info about the same room
@@ -759,7 +864,7 @@ mod tests {
 
     #[test]
     fn test_create_room_with_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.create_room("secretroom", Some("password123"), None);
         assert!(result.is_ok());
         assert!(service.room_has_password("secretroom"));
@@ -768,7 +873,7 @@ mod tests {
     // getRoom tests
     #[test]
     fn test_get_room_info_exists() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         let info = service.get_room_info("testroom");
         assert!(info.is_some());
@@ -776,7 +881,7 @@ mod tests {
 
     #[test]
     fn test_get_room_info_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let info = service.get_room_info("nonexistent");
         assert!(info.is_none());
     }
@@ -784,7 +889,7 @@ mod tests {
     // joinRoom tests
     #[test]
     fn test_join_room_adds_user() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.join_room(
             JoinRoomRequest::new("testroom", "user1", "TestUser", "socket1")
                 .with_fingerprint("fp1"),
@@ -798,7 +903,7 @@ mod tests {
     // joinRoomWithPassword tests
     #[test]
     fn test_join_room_with_correct_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -812,7 +917,7 @@ mod tests {
 
     #[test]
     fn test_join_room_with_wrong_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -827,7 +932,7 @@ mod tests {
 
     #[test]
     fn test_join_room_password_required() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -842,7 +947,7 @@ mod tests {
     // setRoomPassword tests
     #[test]
     fn test_set_room_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         let result = service.set_room_password("testroom", Some("newpassword"));
         assert!(result.is_ok());
@@ -852,7 +957,7 @@ mod tests {
 
     #[test]
     fn test_set_room_password_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.set_room_password("nonexistent", Some("password"));
         assert!(result.is_err());
     }
@@ -860,7 +965,7 @@ mod tests {
     // isRoomPasswordProtected tests
     #[test]
     fn test_room_has_password_true() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -869,14 +974,14 @@ mod tests {
 
     #[test]
     fn test_room_has_password_false() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         assert!(!service.room_has_password("testroom"));
     }
 
     #[test]
     fn test_room_has_password_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         assert!(!service.room_has_password("nonexistent"));
     }
 
@@ -892,7 +997,7 @@ mod tests {
 
     #[test]
     fn test_leave_room_nonexistent_socket() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.leave_room("nonexistent");
         assert!(result.is_none());
     }
@@ -907,7 +1012,7 @@ mod tests {
     // addMessage tests
     #[test]
     fn test_add_message_to_room() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
 
         let user = User::new(
@@ -933,7 +1038,7 @@ mod tests {
 
     #[test]
     fn test_add_message_to_nonexistent_room() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let user = User::new(
             "user1".to_string(),
             "User1".to_string(),
@@ -965,7 +1070,7 @@ mod tests {
 
     #[test]
     fn test_get_room_users_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let users = service.get_room_users("nonexistent");
         assert_eq!(users.len(), 0);
     }
@@ -973,7 +1078,7 @@ mod tests {
     // getMessagesInRoom tests
     #[test]
     fn test_get_messages_existing_room() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
 
         let user = User::new(
@@ -1000,7 +1105,7 @@ mod tests {
 
     #[test]
     fn test_get_messages_nonexistent_room() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let messages = service.get_messages("nonexistent");
         assert_eq!(messages.len(), 0);
     }
@@ -1031,7 +1136,7 @@ mod tests {
     // getRoomStats tests
     #[test]
     fn test_get_room_stats() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .join_room(
                 JoinRoomRequest::new("room1", "user1", "User1", "socket1").with_fingerprint("fp1"),
@@ -1137,7 +1242,7 @@ mod tests {
 
     #[test]
     fn test_pin_room_success() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         let result = service.pin_room("testroom", "fp123");
         assert!(result.is_ok());
@@ -1147,7 +1252,7 @@ mod tests {
 
     #[test]
     fn test_pin_room_already_pinned() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         service.pin_room("testroom", "fp123").unwrap();
         let result = service.pin_room("testroom", "fp456");
@@ -1157,7 +1262,7 @@ mod tests {
 
     #[test]
     fn test_pin_room_invalid_fingerprint() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         let result = service.pin_room("testroom", "");
         assert!(result.is_err());
@@ -1166,7 +1271,7 @@ mod tests {
 
     #[test]
     fn test_pin_room_whitespace_fingerprint() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         let result = service.pin_room("testroom", "   ");
         assert!(result.is_err());
@@ -1174,14 +1279,14 @@ mod tests {
 
     #[test]
     fn test_pin_room_nonexistent() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         let result = service.pin_room("nonexistent", "fp123");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_unpin_room_success() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         service.pin_room("testroom", "fp123").unwrap();
         let result = service.unpin_room("testroom", "fp456");
@@ -1192,7 +1297,7 @@ mod tests {
 
     #[test]
     fn test_unpin_room_not_pinned() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         let result = service.unpin_room("testroom", "fp123");
         assert!(result.is_ok());
@@ -1201,7 +1306,7 @@ mod tests {
 
     #[test]
     fn test_unpin_room_invalid_fingerprint() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         let result = service.unpin_room("testroom", "");
         assert!(result.is_err());
@@ -1209,14 +1314,14 @@ mod tests {
 
     #[test]
     fn test_unpin_room_nonexistent() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         let result = service.unpin_room("nonexistent", "fp123");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_is_room_pinned() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         assert!(!service.is_room_pinned("testroom"));
         service.pin_room("testroom", "fp123").unwrap();
@@ -1225,7 +1330,7 @@ mod tests {
 
     #[test]
     fn test_is_room_pinned_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         assert!(!service.is_room_pinned("nonexistent"));
     }
 
@@ -1239,7 +1344,7 @@ mod tests {
 
     #[test]
     fn test_get_user_by_socket_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         assert!(service.get_user_by_socket("nonexistent").is_none());
     }
 
@@ -1253,13 +1358,13 @@ mod tests {
 
     #[test]
     fn test_get_socket_by_user_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         assert!(service.get_socket_by_user("nonexistent").is_none());
     }
 
     #[test]
     fn test_remove_message_success() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
 
         let user = User::new(
@@ -1288,14 +1393,14 @@ mod tests {
 
     #[test]
     fn test_remove_message_nonexistent_room() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.remove_message("nonexistent", "msg1");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_get_message_sender() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
 
         let user = User::new(
@@ -1323,7 +1428,7 @@ mod tests {
 
     #[test]
     fn test_get_message_sender_not_found() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         assert!(
             service
@@ -1334,7 +1439,7 @@ mod tests {
 
     #[test]
     fn test_get_room_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("mypassword"), None)
             .unwrap();
@@ -1344,7 +1449,7 @@ mod tests {
 
     #[test]
     fn test_get_room_password_no_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         let pwd = service.get_room_password("testroom");
         assert!(pwd.is_none());
@@ -1352,7 +1457,7 @@ mod tests {
 
     #[test]
     fn test_set_room_password_remove() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -1386,7 +1491,7 @@ mod tests {
 
     #[test]
     fn test_join_room_with_mobile_device() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.join_room(
             JoinRoomRequest::new("testroom", "user1", "TestUser", "socket1")
                 .with_fingerprint("fp1")
@@ -1399,7 +1504,7 @@ mod tests {
 
     #[test]
     fn test_join_room_duplicate_username() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .join_room(
                 JoinRoomRequest::new("testroom", "user1", "TestUser", "socket1")
@@ -1427,7 +1532,7 @@ mod tests {
 
     #[test]
     fn test_cleanup_inactive_rooms_preserves_pinned() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service.create_room("testroom", None, None).unwrap();
         service.pin_room("testroom", "fp123").unwrap();
         // Even with no users, pinned room should not be cleaned up
@@ -1438,7 +1543,7 @@ mod tests {
 
     #[test]
     fn test_room_stats_with_data() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .join_room(
                 JoinRoomRequest::new("room1", "user1", "User1", "socket1").with_fingerprint("fp1"),
@@ -1463,14 +1568,14 @@ mod tests {
 
     #[test]
     fn test_set_user_offline_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.set_user_offline("nonexistent");
         assert!(result.is_none());
     }
 
     #[test]
     fn test_leave_room_multiple_users() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         service
             .join_room(
                 JoinRoomRequest::new("testroom", "user1", "User1", "socket1")
@@ -1497,7 +1602,7 @@ mod tests {
 
     #[test]
     fn test_subscribe() {
-        let service = Arc::new(RoomService::new());
+        let service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
         let receiver = service.subscribe();
         // Just verify subscribe returns a receiver without panicking
         drop(receiver);
@@ -1505,7 +1610,7 @@ mod tests {
 
     #[test]
     fn test_create_room_with_creator_fingerprint() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.create_room("testroom", None, Some("fp_creator"));
         assert!(result.is_ok());
         // Verify creator was set
@@ -1516,7 +1621,7 @@ mod tests {
 
     #[test]
     fn test_create_room_with_empty_creator_fingerprint() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.create_room("testroom", None, Some(""));
         assert!(result.is_ok());
         // Empty fingerprint should not be set as creator
@@ -1527,7 +1632,7 @@ mod tests {
 
     #[test]
     fn test_verify_room_password_correct() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -1538,7 +1643,7 @@ mod tests {
 
     #[test]
     fn test_verify_room_password_wrong() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service
             .create_room("testroom", Some("password123"), None)
             .unwrap();
@@ -1549,7 +1654,7 @@ mod tests {
 
     #[test]
     fn test_verify_room_password_no_password() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         service.create_room("testroom", None, None).unwrap();
         let result = service.verify_room_password("testroom", "anything");
         assert!(result.is_ok());
@@ -1557,15 +1662,15 @@ mod tests {
     }
 
     #[test]
-    fn test_room_service_default() {
-        let service = RoomService::default();
+    fn test_room_service_new() {
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let stats = service.get_room_stats();
         assert_eq!(stats.total_rooms, 0);
     }
 
     #[test]
     fn test_verify_room_password_nonexistent() {
-        let service = RoomService::new();
+        let service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = service.verify_room_password("nonexistent", "password");
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Room not found");

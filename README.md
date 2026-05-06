@@ -16,7 +16,7 @@ _中文 | [English](#english)_
   - 🔍 **访问日志** - 查看文件下载记录和访问统计
   - 🏷️ **状态筛选** - 按活跃/过期状态筛选分享
   - ⚡ **快速操作** - 一键复制链接、直接删除、查看日志
-- 📌 **房间固定** - 置顶常用房间，快速访问
+- 📌 **房间固定** - 置顶常用房间，快速访问，消息持久化保存
 - 🔗 **房间分享链接** - 生成房间邀请链接，方便他人加入
 - 🔄 **实时同步** - 基于WebSocket的即时同步
 - 🌐 **P2P支持** - 局域网连接的直接文件传输
@@ -233,7 +233,7 @@ A real-time cloud clipboard application that allows you to share text and files 
   - 🔍 **Access Logs** - View download records and access statistics
   - 🏷️ **Status Filtering** - Filter shares by active/expired status
   - ⚡ **Quick Actions** - Copy links, direct delete, view logs
-- 📌 **Room Pinning** - Pin frequently used rooms for quick access
+- 📌 **Room Pinning** - Pin frequently used rooms for quick access, messages persisted to SQLite
 - 🔗 **Room Share Links** - Generate room invitation links for easy joining
 - 🔄 **Real-time Sync** - WebSocket-based instant synchronization
 - 🌐 **P2P Support** - Direct file transfer for local network connections

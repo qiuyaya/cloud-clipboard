@@ -24,6 +24,9 @@ pub struct AppConfig {
     pub public_download_rate_limit: u32,
     pub download_timeout_secs: u64,
     pub max_download_bytes_per_minute: u64,
+    pub persistence_enabled: bool,
+    pub persistence_db_path: String,
+    pub persistence_max_messages: usize,
 }
 
 impl AppConfig {
@@ -56,6 +59,10 @@ impl AppConfig {
                 "MAX_DOWNLOAD_BYTES_PER_MINUTE",
                 max_file_size * 10,
             ),
+            persistence_enabled: env_bool("PERSISTENCE_ENABLED", true),
+            persistence_db_path: std::env::var("PERSISTENCE_DB_PATH")
+                .unwrap_or_else(|_| "data/pinned_rooms.db".to_string()),
+            persistence_max_messages: env_parse("PERSISTENCE_MAX_MESSAGES", 1000usize),
         }
     }
 
@@ -93,6 +100,39 @@ fn env_bool(key: &str, default: bool) -> bool {
     std::env::var(key)
         .map(|v| v.to_lowercase() == "true")
         .unwrap_or(default)
+}
+
+/// Get the persistence database path (default: "data/pinned_rooms.db")
+pub fn get_persistence_db_path() -> String {
+    try_config()
+        .map(|c| c.persistence_db_path.clone())
+        .unwrap_or_else(|| {
+            std::env::var("PERSISTENCE_DB_PATH")
+                .unwrap_or_else(|_| "data/pinned_rooms.db".to_string())
+        })
+}
+
+/// Check if persistence is enabled (default: true)
+pub fn is_persistence_enabled() -> bool {
+    try_config()
+        .map(|c| c.persistence_enabled)
+        .unwrap_or_else(|| {
+            std::env::var("PERSISTENCE_ENABLED")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(true)
+        })
+}
+
+/// Get the max messages to load per room from persistence (default: 1000)
+pub fn get_persistence_max_messages() -> usize {
+    try_config()
+        .map(|c| c.persistence_max_messages)
+        .unwrap_or_else(|| {
+            std::env::var("PERSISTENCE_MAX_MESSAGES")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(1000)
+        })
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 mod common;
 
-use cloud_clipboard_server::services::RoomService;
 use cloud_clipboard_server::services::socket::setup_socket_handlers;
+use cloud_clipboard_server::services::{NoOpPersistenceService, RoomService};
 use common::socket_helpers::*;
 use engineioxide::Packet as EioPacket;
 use serde_json::json;
@@ -12,7 +12,7 @@ use std::time::Duration;
 /// 创建测试用的 SocketIo + RoomService 环境
 fn setup_test_env() -> (SocketIo, Arc<RoomService>) {
     let (_, io) = SocketIo::new_svc();
-    let room_service = Arc::new(RoomService::new());
+    let room_service = Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())));
     setup_socket_handlers(&io, room_service.clone());
     (io, room_service)
 }

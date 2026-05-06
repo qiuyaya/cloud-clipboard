@@ -1264,6 +1264,7 @@ async fn handle_recall_message(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::NoOpPersistenceService;
 
     #[test]
     fn rate_limit_join_room() {
@@ -1766,7 +1767,7 @@ mod tests {
 
     #[test]
     fn join_room_core_password_required() {
-        let room_service = RoomService::new();
+        let room_service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         room_service
             .create_room("room1", Some("secret"), None)
             .unwrap();
@@ -1788,7 +1789,7 @@ mod tests {
 
     #[test]
     fn join_room_core_success() {
-        let room_service = RoomService::new();
+        let room_service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         room_service.create_room("room1", None, None).unwrap();
         let result = join_room_core(
             &room_service,
@@ -1820,7 +1821,7 @@ mod tests {
 
     #[test]
     fn join_room_core_with_password_success() {
-        let room_service = RoomService::new();
+        let room_service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         room_service
             .create_room("room1", Some("secret"), None)
             .unwrap();
@@ -1849,7 +1850,7 @@ mod tests {
 
     #[test]
     fn join_room_core_wrong_password() {
-        let room_service = RoomService::new();
+        let room_service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         room_service
             .create_room("room1", Some("secret"), None)
             .unwrap();
@@ -1871,7 +1872,7 @@ mod tests {
 
     #[test]
     fn join_room_core_nonexistent_room_creates_it() {
-        let room_service = RoomService::new();
+        let room_service = RoomService::new(Arc::new(NoOpPersistenceService::new()));
         let result = join_room_core(
             &room_service,
             "newroom",

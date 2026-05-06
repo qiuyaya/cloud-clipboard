@@ -180,7 +180,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **WebSocket Communication**: Real-time features use Socket.IO with strictly typed events defined in `ServerToClientEvents` and `ClientToServerEvents` interfaces.
 
-**Room-Based Architecture**: Users join rooms using room keys. All data (users, messages) is scoped to rooms and stored in-memory only.
+**Room-Based Architecture**: Users join rooms using room keys. All data (users, messages) is scoped to rooms. Non-pinned rooms are stored in-memory only; pinned rooms are persisted to SQLite for survival across server restarts.
 
 **Date Serialization Handling**: WebSocket transmission converts Date objects to strings. The `formatTimestamp` utility function in `shared/src/utils.ts` handles both Date objects and date strings to prevent RangeError exceptions.
 
@@ -452,11 +452,14 @@ const userWithDate = {
 - **Zod 4**: 前端类型验证和 schema 定义
 - **React 19 + Vite 7**: 前端框架和构建工具
 - **@tanstack/react-virtual**: 消息列表虚拟化渲染
-- In-memory Map-based storage (server-rust), Multipart for file uploads
+- In-memory Map-based storage (server-rust), Multipart for file uploads. Pinned rooms persisted to SQLite via PersistenceService.
 
 ## Recent Changes
 
 - **Architecture Improvements** (2026-05):
+  - 持久化：新增 PersistenceServiceTrait 和 SqlitePersistenceService，置顶房间消息持久化到 SQLite，服务重启后自动恢复
+  - 持久化：mpsc channel + writer task 解耦同步/异步写入，fire-and-forget 语义，NoOpPersistenceService 支持禁用
+  - 持久化：文件消息恢复时验证文件存在性，download_url 根据当前 PUBLIC_URL 重新生成
   - 前端：useReducer 替换多个 useState 修复 stale closure bug，提取 MessageCard/MessageList 组件，添加虚拟列表渲染，useTemporaryState 统一临时状态管理
   - 后端：集中配置管理（config.rs）、统一错误处理（error.rs/AppError）、存储后端抽象（storage.rs/StorageBackend trait）
   - 后端：服务层 trait 抽象（RoomServiceTrait/FileManagerTrait/ShareServiceTrait），AppState 改为 Arc<dyn Trait> 支持依赖注入和测试

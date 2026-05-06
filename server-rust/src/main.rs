@@ -4,6 +4,7 @@ use cloud_clipboard_server::{AppState, config, middleware, routes, services};
 use axum::http::{HeaderName, HeaderValue, header};
 use axum::{Json, Router, extract::DefaultBodyLimit, http::Method, http::StatusCode, routing::get};
 use socketioxide::SocketIo;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tower_http::{
@@ -20,8 +21,13 @@ use crate::middleware::rate_limit::{
     RateLimitConfig, RateLimitMiddleware, public_download_rate_limiter, strict_rate_limiter,
 };
 use crate::routes::{api_info, files, health, rooms, share};
+use crate::services::SqlitePersistenceService;
+use crate::services::persistence::PersistenceServiceTrait;
 use crate::services::traits::{FileManagerTrait, RoomServiceTrait, ShareServiceTrait};
-use crate::services::{FileManager, RoomEvent, RoomService, ShareService};
+use crate::services::{
+    FileManager, NoOpPersistenceService, PersistedRoom, RoomEvent, RoomService, ShareService,
+};
+use cloud_clipboard_server::models::Message;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -57,8 +63,39 @@ async fn main() -> anyhow::Result<()> {
     let strict_limiter = strict_rate_limiter(&rate_limit_config);
     let public_download_limiter = public_download_rate_limiter(&rate_limit_config);
 
-    // Initialize services
-    let room_service = Arc::new(RoomService::new());
+    // Initialize persistence service and load pinned rooms
+    let persistence: Arc<dyn PersistenceServiceTrait>;
+    let pinned_rooms: HashMap<String, (PersistedRoom, Vec<Message>)>;
+    if cfg.persistence_enabled {
+        let db_path = std::path::PathBuf::from(&cfg.persistence_db_path);
+        let max_messages = cfg.persistence_max_messages;
+        let svc: SqlitePersistenceService =
+            SqlitePersistenceService::with_writer(db_path, max_messages);
+        svc.initialize()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to initialize persistence: {}", e))?;
+        let loaded = svc
+            .load_pinned_rooms()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to load pinned rooms: {}", e))?;
+        tracing::info!("Loaded {} pinned rooms from persistence", loaded.len());
+        persistence = Arc::new(svc);
+        pinned_rooms = loaded;
+    } else {
+        tracing::info!("Persistence disabled, using NoOpPersistenceService");
+        persistence = Arc::new(NoOpPersistenceService::new());
+        pinned_rooms = HashMap::new();
+    };
+
+    // Create RoomService with or without pre-loaded pinned rooms
+    let room_service: Arc<RoomService> = if pinned_rooms.is_empty() {
+        Arc::new(RoomService::new(persistence.clone()))
+    } else {
+        Arc::new(RoomService::with_pinned_rooms(
+            pinned_rooms,
+            persistence.clone(),
+        ))
+    };
     let file_manager = Arc::new(FileManager::new()?);
     let share_service = Arc::new(ShareService::new());
 
@@ -349,7 +386,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("WebSocket server ready for connections");
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(persistence.clone()))
         .await?;
 
     Ok(())
@@ -436,7 +473,7 @@ async fn api_not_found() -> (StatusCode, Json<routes::ApiResponse<()>>) {
     )
 }
 
-async fn shutdown_signal() {
+async fn shutdown_signal(persistence: Arc<dyn PersistenceServiceTrait>) {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
@@ -461,5 +498,10 @@ async fn shutdown_signal() {
         _ = terminate => {
             tracing::info!("Received SIGTERM, shutting down gracefully...");
         }
+    }
+
+    // Shutdown persistence service
+    if let Err(e) = persistence.shutdown().await {
+        tracing::warn!("Error shutting down persistence service: {}", e);
     }
 }

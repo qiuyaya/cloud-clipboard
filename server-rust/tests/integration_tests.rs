@@ -10,13 +10,14 @@ mod tests {
         message::{FileInfo, MessageSender, MessageType},
     };
     use cloud_clipboard_server::services::{
-        CreateShareRequest, FileManager, JoinRoomRequest, RoomService, ShareService,
+        CreateShareRequest, FileManager, JoinRoomRequest, NoOpPersistenceService, RoomService,
+        ShareService,
     };
     use std::env;
     use std::sync::Arc;
 
     fn create_room_service() -> Arc<RoomService> {
-        Arc::new(RoomService::new())
+        Arc::new(RoomService::new(Arc::new(NoOpPersistenceService::new())))
     }
 
     fn create_file_manager() -> FileManager {
