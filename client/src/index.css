@@ -10,7 +10,8 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    /* Brand primary: indigo-600 feel */
+    --primary: 224 76% 48%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -22,8 +23,8 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --ring: 224 76% 48%;
+    --radius: 0.625rem;
   }
 
   .dark {
@@ -33,7 +34,8 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
+    /* Brand primary in dark: lighter indigo */
+    --primary: 217 91% 60%;
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -43,9 +45,9 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 217.2 32.6% 22%;
+    --input: 217.2 32.6% 22%;
+    --ring: 217 91% 60%;
   }
 }
 
@@ -90,5 +92,54 @@
   .mobile-touch {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+  }
+
+  /* 长消息折叠 */
+  .message-collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .message-collapse-gradient::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3rem;
+    pointer-events: none;
+  }
+
+  /* Bubble backgrounds for messages */
+  .message-bubble-own {
+    background-color: hsl(224 76% 48% / 0.08);
+  }
+  .dark .message-bubble-own {
+    background-color: hsl(217 91% 60% / 0.12);
+  }
+
+  .message-bubble-other {
+    background-color: hsl(210 40% 96%);
+  }
+  .dark .message-bubble-other {
+    background-color: hsl(217.2 32.6% 17.5%);
+  }
+
+  /* Collapse gradients tied to bubble colors */
+  .message-collapse-gradient.message-bubble-own::after {
+    background: linear-gradient(to bottom, transparent, hsl(224 76% 48% / 0.08));
+  }
+  .dark .message-collapse-gradient.message-bubble-own::after {
+    background: linear-gradient(to bottom, transparent, hsl(217 91% 60% / 0.12));
+  }
+
+  .message-collapse-gradient.message-bubble-other::after {
+    background: linear-gradient(to bottom, transparent, hsl(210 40% 96%));
+  }
+  .dark .message-collapse-gradient.message-bubble-other::after {
+    background: linear-gradient(to bottom, transparent, hsl(217.2 32.6% 17.5%));
   }
 }

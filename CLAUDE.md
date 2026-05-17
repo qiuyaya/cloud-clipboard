@@ -330,14 +330,15 @@ const userWithDate = {
 - **Older Dates**: Full date-time format "YYYY/MM/DD HH:MM" for historical messages
 - **Simplified Communication**: Users instantly understand message recency without mental date calculation
 
-**Unified Message UI**: Streamlined message actions for better user experience:
+**Unified Message UI**: Chat-style message layout with avatars, bubbles, and collapsing:
 
-- **Text Messages**: Copy button moved from content area to top-right icon for cleaner interface
-- **File Messages**: Download and Share buttons consolidated to top-right corner as compact icons
-- **Hover Interaction**: Buttons hidden by default, appear on hover (desktop) or always visible (mobile)
-- **Space Optimization**: Eliminated redundant button containers, message cards now more compact
-- **Consistent Design**: Both text and file messages follow the same action button pattern
-- **Mobile-First**: Touch-friendly icon sizes (h-3.5 w-3.5) with proper spacing and accessibility
+- **Avatar**: Deterministic HSL color based on fingerprint/name, initials for CJK and Latin names
+- **Chat Bubbles**: Rounded bubble layout with own/other color variants, corner cut on sender side
+- **Message Collapsing**: Long messages (>6 lines) auto-collapse with gradient overlay and expand/collapse toggle
+- **Action Buttons**: Always-visible compact icons (h-3.5 w-3.5) in header row — copy, download, share, recall
+- **Recall Confirmation**: Inline confirmation UI with confirm/cancel buttons in header
+- **Tooltip for Fingerprint**: Hover username to see full fingerprint via Radix Tooltip
+- **Empty State**: Inbox icon with title/hint instead of plain text when no messages
 
 **PWA Support**: Progressive Web App capabilities for enhanced user experience:
 
@@ -481,6 +482,18 @@ const userWithDate = {
   - 滚底优化：智能滚底逻辑（新消息提示条），estimateSize 按消息类型动态估算
   - 安全区域：viewport-fit=cover，顶栏/输入区域精细化 safe-area，移除笼统 safe-area-inset
   - 代码优化：提取 detectDeviceType 到 utils/device.ts，useMediaQuery 初始值同步获取消除闪烁
+- **UI Design Refresh** (2026-05):
+  - 品牌色：primary 从灰色改为 indigo（light: 224 76% 48%，dark: 217 91% 60%），ring 同步
+  - 圆角：全局 radius 从 0.5rem 提升至 0.625rem
+  - 暗色边框：border/input 从 17.5% 提亮至 22%，增强可读性
+  - 消息卡片：移除 CardHeader/CardContent，改为 Avatar + 气泡布局，自己/他人区分颜色
+  - 消息折叠：超过 6 行自动折叠，带渐变遮罩和展开/收起按钮，CSS 动画过渡
+  - 侧边栏重构：房间密钥一键复制（替代双击），按钮带文字标签，Separator 分隔区域
+  - 分享管理：访问日志改用 Radix Dialog（替代自定义模态），状态徽章和按钮样式统一
+  - 分享模态：点击遮罩关闭，关闭按钮移入 ShareButton 内部
+  - Toast 限制：TOAST_LIMIT 从 1 提升至 3
+  - 新增 UI 组件：Avatar（确定性颜色+首字母）、Dialog（Radix）、Separator（Radix）、Tooltip（Radix）
+  - i18n：新增 expand/collapse/actions/confirm/noMessagesTitle/noMessagesHint/clickToCopy/logs.error 翻译
 - **Remove Node.js Backend** (2026-03):
   - 删除 Node.js 后端 (server/)，Rust 后端成为唯一后端
   - 重写 Dockerfile 为多阶段构建（前端 + Rust 后端）

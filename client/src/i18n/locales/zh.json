@@ -62,9 +62,11 @@
     "online": "在线",
     "lastSeen": "最后见于 {{time}}",
     "noMessages": "暂无消息。发送文本或文件开始使用吧！",
+    "noMessagesTitle": "还没有消息",
+    "noMessagesHint": "发送文本或文件开始协作",
     "newMessages": "新消息",
     "maxLimits": "最大文本：10万字符 • 最大文件：100MB",
-    "doubleClickToCopy": "双击复制房间密钥",
+    "clickToCopy": "点击复制房间密钥",
     "copied": "已复制！",
     "linkCopied": "链接已复制！",
     "passwordSet": "密码已设置！",
@@ -84,7 +86,11 @@
     "recall": "撤回",
     "recallConfirm": "确认撤回？",
     "recallCancel": "取消",
-    "file": "文件"
+    "file": "文件",
+    "expand": "展开",
+    "collapse": "收起",
+    "actions": "消息操作",
+    "confirm": "确认"
   },
   "input": {
     "placeholder": "在此输入您的消息或粘贴文本...",
@@ -263,8 +269,9 @@
       },
       "logs": {
         "title": "访问日志 - {{filename}}",
-        "success": "成功",
-        "failed": "失败",
+        "success": "✓ 成功",
+        "failed": "✗ 失败",
+        "error": "错误：{{code}}",
         "empty": "未找到访问日志",
         "fields": {
           "timestamp": "时间",

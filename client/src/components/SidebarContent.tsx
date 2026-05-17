@@ -5,8 +5,9 @@ import { Version } from "@/components/Version";
 import { useTranslation } from "react-i18next";
 import { useTemporaryState } from "@/hooks/useTemporaryState";
 import { formatTimestamp } from "@cloud-clipboard/shared";
-import { Users, LogOut, Share2, Lock, Unlock, Settings, Pin, PinOff } from "lucide-react";
+import { Users, LogOut, Share2, Lock, Unlock, Settings, Pin, PinOff, Copy } from "lucide-react";
 import { useRoom } from "@/contexts/RoomContext";
+import { Separator } from "@/components/ui/separator";
 
 export function SidebarContent(): JSX.Element {
   const {
@@ -45,7 +46,6 @@ export function SidebarContent(): JSX.Element {
   const handleShareRoom = async (): Promise<void> => {
     try {
       onShareRoomLink();
-      // Give time for the link to be generated and copied
       setTimeout(() => {
         setCopiedShareLink(true);
       }, 500);
@@ -54,7 +54,7 @@ export function SidebarContent(): JSX.Element {
     }
   };
 
-  const handleDoubleClickRoomKey = async (): Promise<void> => {
+  const handleCopyRoomKey = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(roomKey);
       setCopiedRoomKey(true);
@@ -65,151 +65,149 @@ export function SidebarContent(): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="pl-6 pr-2 py-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="pr-3">
-            <div className="relative flex items-center gap-2 group">
-              <h2
-                className="text-lg font-semibold cursor-pointer"
-                onDoubleClick={handleDoubleClickRoomKey}
-                title={t("room.doubleClickToCopy")}
+      {/* Room Header */}
+      <div className="p-4 border-b border-border">
+        <div className="space-y-3">
+          {/* Room Key + Online Count */}
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="text-lg font-semibold">{t("room.label")}</h2>
+              <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded select-all">
+                {roomKey}
+              </code>
+              <button
+                onClick={handleCopyRoomKey}
+                className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
+                title={t("room.clickToCopy")}
+                aria-label={t("room.clickToCopy")}
               >
-                <span className="select-none">{t("room.label")}</span>
-                <span className="select-all hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  {roomKey}
-                </span>
-              </h2>
+                <Copy className="h-3.5 w-3.5" />
+              </button>
               {copiedRoomKey && (
-                <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                  <span className="text-popover-foreground">{t("room.copied")}</span>
-                </div>
+                <span className="text-xs text-primary font-medium animate-in fade-in zoom-in duration-200">
+                  {t("room.copied")}
+                </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {t("room.usersOnline", { count: onlineUsers.length })}
             </p>
           </div>
-          <div className="flex flex-col gap-1.5">
-            {/* Top Row - Room Management */}
-            <div className="flex items-center justify-center gap-0.5">
-              {/* Password Lock */}
-              <div className="min-w-0 flex-shrink-0">
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleToggleRoomPassword}
-                    className="flex items-center gap-2 min-w-fit mobile-touch"
-                    title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
-                  >
-                    {hasRoomPassword ? (
-                      <Unlock className="h-4 w-4" />
-                    ) : (
-                      <Lock className="h-4 w-4" />
-                    )}
-                  </Button>
-                  {passwordChanged !== null && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                      <span className="text-popover-foreground">
-                        {passwordChanged ? t("room.passwordSet") : t("room.passwordRemoved")}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Share Room */}
-              <div className="min-w-0 flex-shrink-0">
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleShareRoom}
-                    className="flex items-center gap-2 min-w-fit mobile-touch"
-                    title={t("room.share")}
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                  {copiedShareLink && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                      <span className="text-popover-foreground">{t("room.linkCopied")}</span>
-                    </div>
-                  )}
+          {/* Room Management Actions */}
+          <div className="flex flex-wrap gap-2">
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleRoomPassword}
+                className="flex items-center gap-1.5 mobile-touch"
+                title={hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
+              >
+                {hasRoomPassword ? (
+                  <Unlock className="h-3.5 w-3.5" />
+                ) : (
+                  <Lock className="h-3.5 w-3.5" />
+                )}
+                <span className="text-xs">
+                  {hasRoomPassword ? t("room.removePassword") : t("room.setPassword")}
+                </span>
+              </Button>
+              {passwordChanged !== null && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                  <span className="text-popover-foreground">
+                    {passwordChanged ? t("room.passwordSet") : t("room.passwordRemoved")}
+                  </span>
                 </div>
-              </div>
-
-              {/* Pin Room */}
-              <div className="min-w-0 flex-shrink-0">
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTogglePin}
-                    className="flex items-center gap-2 min-w-fit mobile-touch"
-                    title={isPinned ? t("room.unpin") : t("room.pin")}
-                  >
-                    {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                  </Button>
-                  {pinChanged !== null && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                      <span className="text-popover-foreground">
-                        {pinChanged ? t("room.pinned") : t("room.unpinned")}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Bottom Row - User Actions */}
-            <div className="flex items-center justify-center gap-0.5">
-              {/* Settings */}
-              <div className="min-w-0 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onNavigateToShare}
-                  className="flex items-center gap-2 min-w-fit mobile-touch"
-                  title={t("share.list.title")}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Leave Room */}
-              <div className="min-w-0 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onLeaveRoom}
-                  className="flex items-center gap-2 min-w-fit mobile-touch"
-                  title={t("room.leave")}
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShareRoom}
+                className="flex items-center gap-1.5 mobile-touch"
+                title={t("room.share")}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                <span className="text-xs">{t("room.share")}</span>
+              </Button>
+              {copiedShareLink && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                  <span className="text-popover-foreground">{t("room.linkCopied")}</span>
+                </div>
+              )}
             </div>
+
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTogglePin}
+                className="flex items-center gap-1.5 mobile-touch"
+                title={isPinned ? t("room.unpin") : t("room.pin")}
+              >
+                {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                <span className="text-xs">{isPinned ? t("room.unpin") : t("room.pin")}</span>
+              </Button>
+              {pinChanged !== null && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
+                  <span className="text-popover-foreground">
+                    {pinChanged ? t("room.pinned") : t("room.unpinned")}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Secondary Actions */}
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onNavigateToShare}
+              className="flex items-center gap-1.5 mobile-touch text-muted-foreground hover:text-foreground"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span className="text-xs">{t("share.list.title")}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onLeaveRoom}
+              className="flex items-center gap-1.5 mobile-touch text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="text-xs">{t("room.leave")}</span>
+            </Button>
           </div>
         </div>
       </div>
 
+      {/* User List */}
       <div className="flex-1 overflow-y-auto p-4 mobile-scroll">
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-3">
-            <Users className="h-4 w-4" />
+            <Users className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium text-sm">{t("room.usersInRoom")}</span>
+            <span className="text-xs text-muted-foreground ml-auto">{users.length}</span>
           </div>
           {users.map((user) => (
             <div
               key={user.id}
-              className={`flex items-center gap-3 p-2 rounded-lg ${
+              className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
                 user.id === currentUser.id
-                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                  : "bg-gray-50 dark:bg-gray-700/50"
+                  ? "bg-primary/5 border border-primary/10"
+                  : "bg-muted/40 hover:bg-muted/60"
               }`}
             >
               <div
-                className={`w-2 h-2 rounded-full ${user.isOnline ? "bg-green-500" : "bg-gray-400"}`}
+                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  user.isOnline ? "bg-green-500" : "bg-gray-400"
+                }`}
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
@@ -229,7 +227,8 @@ export function SidebarContent(): JSX.Element {
         </div>
       </div>
 
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      {/* Footer */}
+      <div className="p-4 border-t border-border">
         <div className="flex items-center justify-between gap-2">
           <Version />
           <div className="flex items-center gap-1">

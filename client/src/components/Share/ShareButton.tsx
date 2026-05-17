@@ -20,7 +20,7 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { getApiPath } from "@/utils/api";
-import { Copy, Link as LinkIcon, Shield, ShieldOff, Calendar } from "lucide-react";
+import { Copy, Link as LinkIcon, Shield, ShieldOff, Calendar, X } from "lucide-react";
 
 interface ShareData {
   url: string;
@@ -131,8 +131,17 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     const diffDays = calculateExpirationDays(shareData.expiresAt);
     return (
       <Card className="w-full border-0 shadow-2xl bg-gradient-to-br from-background to-muted/20">
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2 mb-2">
+        <CardHeader className="pb-4 relative">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          <div className="flex items-center gap-2 mb-2 pr-8">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <LinkIcon className="h-5 w-5 text-primary" />
             </div>
@@ -225,11 +234,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         </CardContent>
 
         <CardFooter className="flex flex-col gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => setShareData(null)}
-            className="w-full text-muted-foreground"
-          >
+          <Button variant="outline" onClick={() => setShareData(null)} className="w-full">
             {t("share.modal.actions.createAnother")}
           </Button>
           {onClose && (

@@ -23,7 +23,7 @@ describe("useToast reducer", () => {
     expect(state.toasts[0].id).toBe("1");
   });
 
-  it("ADD_TOAST respects TOAST_LIMIT of 1", () => {
+  it("ADD_TOAST respects TOAST_LIMIT of 3", () => {
     const state1 = reducer(initialState, {
       type: "ADD_TOAST",
       toast: { id: "1", title: "First" },
@@ -32,8 +32,18 @@ describe("useToast reducer", () => {
       type: "ADD_TOAST",
       toast: { id: "2", title: "Second" },
     });
-    expect(state2.toasts).toHaveLength(1);
-    expect(state2.toasts[0].id).toBe("2");
+    const state3 = reducer(state2, {
+      type: "ADD_TOAST",
+      toast: { id: "3", title: "Third" },
+    });
+    const state4 = reducer(state3, {
+      type: "ADD_TOAST",
+      toast: { id: "4", title: "Fourth" },
+    });
+    expect(state4.toasts).toHaveLength(3);
+    expect(state4.toasts[0].id).toBe("4");
+    expect(state4.toasts[1].id).toBe("3");
+    expect(state4.toasts[2].id).toBe("2");
   });
 
   it("UPDATE_TOAST updates matching toast", () => {

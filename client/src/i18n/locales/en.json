@@ -62,9 +62,11 @@
     "online": "Online",
     "lastSeen": "Last seen {{time}}",
     "noMessages": "No messages yet. Send a text or file to get started!",
+    "noMessagesTitle": "No messages yet",
+    "noMessagesHint": "Send a text or file to start collaborating",
     "newMessages": "New messages",
     "maxLimits": "Max text: 100k chars • Max file: 100MB",
-    "doubleClickToCopy": "Double-click to copy room key",
+    "clickToCopy": "Click to copy room key",
     "copied": "Copied!",
     "linkCopied": "Link copied!",
     "passwordSet": "Password set!",
@@ -84,7 +86,11 @@
     "recall": "Recall",
     "recallConfirm": "Confirm Recall?",
     "recallCancel": "Cancel",
-    "file": "File"
+    "file": "File",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "actions": "Message actions",
+    "confirm": "Confirm"
   },
   "input": {
     "placeholder": "Type your message or paste text here...",
@@ -263,8 +269,9 @@
       },
       "logs": {
         "title": "Access Logs - {{filename}}",
-        "success": "Success",
-        "failed": "Failed",
+        "success": "✓ Success",
+        "failed": "✗ Failed",
+        "error": "Error: {{code}}",
         "empty": "No access logs found",
         "fields": {
           "timestamp": "Time",
