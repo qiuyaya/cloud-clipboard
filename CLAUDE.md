@@ -289,7 +289,7 @@ const userWithDate = {
 **External File Sharing**: Secure file sharing functionality that allows creating shareable links for files with advanced access control:
 
 - **Secure Share Links**: Generate unique 8-10 character share IDs for files
-- **Password Protection**: Optional password protection with auto-generated 6-character secure passwords
+- **Access Code Protection**: Optional access code protection with auto-generated 6-character secure access codes
 - **Expiration Control**: Configurable expiration time from 1-30 days with user-friendly presets
   - **UI Selection**: Users can choose from 1, 3, 7, 15, or 30 days via dropdown selector
   - **Default Setting**: 7 days is the default expiration time
@@ -308,7 +308,7 @@ const userWithDate = {
 - **GitHub-style Tooltips**: All copy operations and key actions now use elegant, non-intrusive tooltips
 - **Automatic Dismissal**: Tooltips disappear after 2 seconds without user interaction
 - **Theme Adaptation**: Full support for light/dark theme with semantic color tokens
-- **Consistent Behavior**: Copy buttons for messages, shares, passwords, and links all use unified feedback
+- **Consistent Behavior**: Copy buttons for messages, shares, access codes, and links all use unified feedback
 - **Reduced Interference**: Eliminates disruptive toast notifications for minor actions
 - **Visual Polish**: Smooth fade-in and zoom animations for professional feel
 
@@ -466,7 +466,7 @@ const userWithDate = {
   - 后端：服务层 trait 抽象（RoomServiceTrait/FileManagerTrait/ShareServiceTrait），AppState 改为 Arc<dyn Trait> 支持依赖注入和测试
   - 后端：JoinRoomRequest 从借用改为 owning 版本，消除生命周期参数
   - 后端：Socket handler 纯逻辑函数提取（resolve_user_id/resolve_username/resolve_device_type/join_room_core）
-  - 安全：P2P 信令跨房间校验、分享链接不再存储明文密码、CORS 生产模式收紧
+  - 安全：P2P 信令跨房间校验、分享链接不再存储明文提取码、CORS 生产模式收紧
   - 文件管理：新增存储配额追踪（MAX_TOTAL_STORAGE_SIZE）、RwLock poisoned 降级为 warn 日志
 - 配置：新增 CLEANUP_ORPHANED_FILES_AT_STARTUP、STRICT_RATE_LIMIT_MAX_REQUESTS、DOWNLOAD_TIMEOUT、MAX_DOWNLOAD_BYTES_PER_MINUTE 环境变量
   - 测试：新增并发安全测试模块（concurrency_tests.rs），修复 rand 0.9 API 兼容性

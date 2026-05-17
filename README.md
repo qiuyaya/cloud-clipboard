@@ -11,7 +11,7 @@ _中文 | [English](#english)_
 - 📁 **文件共享** - 上传和下载最大100MB的文件
 - ↩️ **消息撤回** - 支持撤回已发送的消息
 - 🔗 **消息链接识别** - 自动识别消息中的 URL 并渲染为可点击链接
-- 🔗 **外部文件分享** - 创建安全的外部分享链接，支持密码保护和访问控制
+- 🔗 **外部文件分享** - 创建安全的外部分享链接，支持提取码保护和访问控制
   - ⏰ **自定义过期时间** - 可选择1/3/7/15/30天过期时间，默认7天
   - 🔍 **访问日志** - 查看文件下载记录和访问统计
   - 🏷️ **状态筛选** - 按活跃/过期状态筛选分享
@@ -123,7 +123,7 @@ docker run -p 3001:3001 -v ./uploads:/app/uploads cloud-clipboard
 2. **共享文本**: 输入或粘贴文本并点击发送
 3. **共享文件**: 点击文件按钮上传文件（最大100MB）
 4. **消息撤回**: 点击已发送消息的撤回按钮
-5. **外部分享**: 在文件消息上点击"创建分享"按钮，生成带密码保护的分享链接
+5. **外部分享**: 在文件消息上点击"创建分享"按钮，生成带提取码保护的分享链接
 6. **房间固定**: 置顶常用房间，方便快速访问
 
 ## 🔒 安全特性
@@ -134,7 +134,7 @@ docker run -p 3001:3001 -v ./uploads:/app/uploads cloud-clipboard
 - **安全头部**: Tower-HTTP 提供安全头部（CSP、HSTS、X-Frame-Options 等）
 - **输入验证**: 所有数据都使用 Zod schemas 验证
 - **CORS保护**: 可配置的CORS设置，生产模式收紧
-- **分享安全**: 分享链接不存储明文密码，P2P 信令跨房间校验
+- **分享安全**: 分享链接不存储明文提取码，P2P 信令跨房间校验
 
 ## 🌍 环境变量
 
@@ -228,7 +228,7 @@ A real-time cloud clipboard application that allows you to share text and files 
 - 📁 **File Sharing** - Upload and download files up to 100MB
 - ↩️ **Message Recall** - Recall sent messages
 - 🔗 **Link Detection** - Auto-detect URLs in messages and render as clickable links
-- 🔗 **External File Sharing** - Create secure external share links with password protection and access control
+- 🔗 **External File Sharing** - Create secure external share links with access code protection and access control
   - ⏰ **Expiration Control** - Configurable expiration with presets (1/3/7/15/30 days, default: 7)
   - 🔍 **Access Logs** - View download records and access statistics
   - 🏷️ **Status Filtering** - Filter shares by active/expired status
@@ -340,7 +340,7 @@ docker run -p 3001:3001 -v ./uploads:/app/uploads cloud-clipboard
 2. **Share Text**: Type or paste text and click Send
 3. **Share Files**: Click the File button to upload files (max 100MB)
 4. **Recall Messages**: Click the recall button on sent messages
-5. **External Sharing**: Click "Create Share" on file messages to generate password-protected share links
+5. **External Sharing**: Click "Create Share" on file messages to generate access code-protected share links
 6. **Pin Rooms**: Pin frequently used rooms for quick access
 
 ## 🔒 Security Features
@@ -351,7 +351,7 @@ docker run -p 3001:3001 -v ./uploads:/app/uploads cloud-clipboard
 - **Secure Headers**: Tower-HTTP provides security headers (CSP, HSTS, X-Frame-Options, etc.)
 - **Input Validation**: All data is validated using Zod schemas
 - **CORS Protection**: Configurable CORS settings, tightened in production mode
-- **Share Security**: Share links don't store plaintext passwords, P2P signaling cross-room validation
+- **Share Security**: Share links don't store plaintext access codes, P2P signaling cross-room validation
 
 ## 🌍 Environment Variables
 

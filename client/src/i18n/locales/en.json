@@ -211,14 +211,11 @@
         "protected": "Protected",
         "public": "Public"
       },
-      "password": {
-        "title": "Auto-Generated Password",
-        "description": "A secure 6-character password will be automatically generated for this share",
-        "label": "Password",
-        "copy": "Copy Password",
-        "generatedHint": "This password is generated automatically for security",
-        "enableLabel": "Enable password protection",
-        "autoGenerateHint": "(A 6-character secure password will be auto-generated)"
+      "accessCode": {
+        "title": "Auto-Generated Access Code",
+        "description": "A secure 6-character access code will be automatically generated for this share",
+        "enableLabel": "Enable access code protection",
+        "autoGenerateHint": "(A 6-character secure access code will be auto-generated)"
       },
       "actions": {
         "copy": "Copy Link",
@@ -231,13 +228,13 @@
       "info": {
         "created": "Created: {{time}}",
         "expires": "Expires: {{date}}",
-        "passwordProtected": "Password Protected: {{value}}",
+        "passwordProtected": "Access Code Protected: {{value}}",
         "accessCount": "Access Count: {{count}}"
       },
       "errors": {
         "createFailed": "Failed to create share link",
-        "passwordRequired": "Password is required",
-        "passwordTooShort": "Password must be at least 6 characters"
+        "accessCodeRequired": "Access code is required",
+        "accessCodeTooShort": "Access code must be at least 6 characters"
       }
     },
     "list": {
@@ -292,18 +289,19 @@
         "logsLoadFailed": "Failed to load access logs",
         "retry": "Retry",
         "deleteFailed": "Failed to delete share"
-      }
+      },
+      "accessCodeUnavailable": "Access code is only shown at creation time and cannot be retrieved again"
     },
     "page": {
       "back": "Back"
     },
     "download": {
-      "passwordRequired": "Password Required",
-      "passwordPrompt": "Enter password to access this share",
-      "passwordPlaceholder": "Password",
+      "accessCodeRequired": "Access Code Required",
+      "accessCodePrompt": "Enter access code to download this file",
+      "accessCodePlaceholder": "Access Code",
       "submit": "Submit",
       "cancel": "Cancel",
-      "incorrectPassword": "Incorrect password",
+      "incorrectAccessCode": "Incorrect access code",
       "authFailed": "Authentication failed"
     }
   },

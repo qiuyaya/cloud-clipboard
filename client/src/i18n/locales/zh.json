@@ -211,14 +211,11 @@
         "protected": "受保护",
         "public": "公开"
       },
-      "password": {
-        "title": "自动生成密钥",
-        "description": "系统将为该分享自动生成一个6位安全密钥",
-        "label": "密钥",
-        "copy": "复制密钥",
-        "generatedHint": "此密钥由系统自动生成，确保安全性",
-        "enableLabel": "启用密码保护",
-        "autoGenerateHint": "(将自动生成6位安全密码)"
+      "accessCode": {
+        "title": "自动生成提取码",
+        "description": "系统将为该分享自动生成一个6位安全提取码",
+        "enableLabel": "启用提取码保护",
+        "autoGenerateHint": "(将自动生成6位安全提取码)"
       },
       "actions": {
         "copy": "复制链接",
@@ -231,13 +228,13 @@
       "info": {
         "created": "创建时间：{{time}}",
         "expires": "过期时间：{{date}}",
-        "passwordProtected": "密钥保护：{{value}}",
+        "passwordProtected": "提取码保护：{{value}}",
         "accessCount": "访问次数：{{count}}"
       },
       "errors": {
         "createFailed": "创建分享链接失败",
-        "passwordRequired": "请输入密钥",
-        "passwordTooShort": "密钥至少需要6个字符"
+        "accessCodeRequired": "请输入提取码",
+        "accessCodeTooShort": "提取码至少需要6个字符"
       }
     },
     "list": {
@@ -292,18 +289,19 @@
         "logsLoadFailed": "加载访问日志失败",
         "retry": "重试",
         "deleteFailed": "删除分享失败"
-      }
+      },
+      "accessCodeUnavailable": "提取码仅在创建时显示，无法再次获取"
     },
     "page": {
       "back": "返回"
     },
     "download": {
-      "passwordRequired": "需要密钥",
-      "passwordPrompt": "请输入密钥以访问此分享",
-      "passwordPlaceholder": "密钥",
+      "accessCodeRequired": "需要提取码",
+      "accessCodePrompt": "请输入提取码以访问此分享",
+      "accessCodePlaceholder": "提取码",
       "submit": "提交",
       "cancel": "取消",
-      "incorrectPassword": "密钥不正确",
+      "incorrectAccessCode": "提取码不正确",
       "authFailed": "身份验证失败"
     }
   },

@@ -7,7 +7,7 @@ import { getApiPath } from "@/utils/api";
 
 export interface CreateShareRequest {
   fileId: string;
-  password?: string;
+  password?: string; // API field name stays "password" for backward compat
   expiresInDays?: number;
 }
 
@@ -16,7 +16,7 @@ export interface ShareLinkResponse {
   url: string;
   createdAt: string;
   expiresAt: string;
-  hasPassword: boolean;
+  hasPassword: boolean; // API field name stays for backward compat
   accessCount: number;
 }
 
@@ -28,7 +28,7 @@ export interface ShareLinkSummary {
   expiresAt: string;
   status: "active" | "expired";
   accessCount: number;
-  hasPassword: boolean;
+  hasPassword: boolean; // API field name stays for backward compat
   url: string;
 }
 

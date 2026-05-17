@@ -35,7 +35,7 @@ interface ShareItem {
   expiresAt: string;
   status: "active" | "expired";
   accessCount: number;
-  hasPassword: boolean;
+  hasAccessCode: boolean;
   url: string;
 }
 
@@ -66,7 +66,13 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
         limit: 50,
         offset: 0,
       });
-      setShares(response.shares);
+      // Map API hasPassword to hasAccessCode
+      setShares(
+        response.shares.map((s) => ({
+          ...s,
+          hasAccessCode: s.hasPassword,
+        })),
+      );
     } catch (err: any) {
       setError(err.message || t("share.list.toast.loadFailed"));
     } finally {
@@ -84,6 +90,12 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
 
     try {
       await shareApi.permanentDeleteShare(shareToDelete.shareId);
+      // Clean up stored access code
+      try {
+        localStorage.removeItem(`share_access_code_${shareToDelete.shareId}`);
+      } catch {
+        // non-critical
+      }
       await loadShares();
     } catch (err: any) {
       toast({
@@ -121,6 +133,28 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
       toast({
         title: t("share.list.toast.copySuccess"),
       });
+    }
+  };
+
+  const getShareUrlWithAccessCode = (share: ShareItem): string => {
+    if (!share.hasAccessCode) return share.url;
+    try {
+      const accessCode = localStorage.getItem(`share_access_code_${share.shareId}`);
+      if (accessCode) {
+        return `${share.url}?code=${encodeURIComponent(accessCode)}`;
+      }
+    } catch {
+      // localStorage may be unavailable
+    }
+    return share.url;
+  };
+
+  const isAccessCodeAvailable = (share: ShareItem): boolean => {
+    if (!share.hasAccessCode) return true;
+    try {
+      return !!localStorage.getItem(`share_access_code_${share.shareId}`);
+    } catch {
+      return false;
     }
   };
 
@@ -194,7 +228,7 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
                     <h3 className="font-semibold text-foreground truncate">
                       {share.originalFilename}
                     </h3>
-                    {share.hasPassword ? (
+                    {share.hasAccessCode ? (
                       <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                     ) : (
                       <Unlock className="h-3.5 w-3.5 text-muted-foreground" />
@@ -228,7 +262,7 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 relative"
-                    onClick={() => copyToClipboard(share.url, share.shareId)}
+                    onClick={() => copyToClipboard(getShareUrlWithAccessCode(share), share.shareId)}
                     title={t("share.list.actions.copy")}
                   >
                     <Copy className="h-4 w-4" />
@@ -260,8 +294,13 @@ export const ShareList: React.FC<ShareListProps> = ({ userId }) => {
               </div>
 
               <div className="mt-3 p-2 bg-muted rounded-lg text-xs font-mono break-all text-muted-foreground">
-                {share.url}
+                {getShareUrlWithAccessCode(share)}
               </div>
+              {share.hasAccessCode && !isAccessCodeAvailable(share) && (
+                <p className="mt-1 text-xs text-muted-foreground italic">
+                  {t("share.list.accessCodeUnavailable")}
+                </p>
+              )}
             </div>
           ))}
         </div>

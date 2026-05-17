@@ -3,7 +3,7 @@ use axum::{
     body::Body,
     extract::{Path, Query, State},
     http::{HeaderMap, HeaderName, StatusCode, header},
-    response::IntoResponse,
+    response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
 };
 use base64::{Engine, engine::general_purpose};
@@ -205,7 +205,9 @@ pub struct AccessLogsResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct DownloadQuery {
-    pub password: Option<String>,
+    /// Access code (?code= or legacy ?password=)
+    #[serde(alias = "password")]
+    pub code: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -256,6 +258,158 @@ fn extract_basic_auth_password(headers: &HeaderMap) -> Option<String> {
     } else {
         Some(password.to_string())
     }
+}
+
+/// Check if the request is from a browser by looking for text/html in Accept header
+fn is_browser_request(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.contains("text/html"))
+        .unwrap_or(false)
+}
+
+/// Render a self-contained HTML password prompt page for share downloads
+fn password_page_html(error: bool) -> Html<String> {
+    let error_flag = if error {
+        r#"<script>window.__SHARE_ERROR__ = true;</script>"#
+    } else {
+        ""
+    };
+    Html(format!(
+        r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>提取码验证 - 云剪切板</title>
+<style>
+:root {{
+  --bg-from: #eff6ff;
+  --bg-to: #eef2ff;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --input-border: #e2e8f0;
+  --input-focus: #2563eb;
+  --error: #dc2626;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}}
+@media (prefers-color-scheme: dark) {{
+  :root {{
+    --bg-from: #0f172a;
+    --bg-to: #1e293b;
+    --card-bg: #1e293b;
+    --text: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --input-border: #334155;
+    --input-focus: #3b82f6;
+    --error: #f87171;
+    --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+  }}
+}}
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+body {{
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: linear-gradient(135deg, var(--bg-from), var(--bg-to));
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: var(--text);
+}}
+.card {{
+  background: var(--card-bg);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 400px;
+  padding: 32px;
+  text-align: center;
+}}
+.icon {{ font-size: 48px; margin-bottom: 16px; }}
+h1 {{ font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }}
+p {{ color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5; }}
+form {{ display: flex; flex-direction: column; gap: 16px; }}
+input[type="password"] {{
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: transparent;
+  color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}}
+input[type="password"]:focus {{
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+}}
+button {{
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}}
+button:hover {{ background: var(--primary-hover); }}
+.error {{
+  margin-top: 12px;
+  color: var(--error);
+  font-size: 0.875rem;
+  display: none;
+}}
+.error.show {{ display: block; }}
+.footer {{ margin-top: 20px; font-size: 0.8rem; color: var(--text-secondary); }}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔒</div>
+    <h1 id="title">需要提取码</h1>
+    <p id="desc">此分享受提取码保护，请输入提取码以访问文件。</p>
+    <form method="GET" action="">
+      <input type="password" name="password" id="password" placeholder="输入提取码" required autofocus autocomplete="off">
+      <button type="submit" id="submit">提交</button>
+    </form>
+    <div id="error" class="error">提取码不正确，请重试。</div>
+    <div class="footer">云剪切板</div>
+  </div>
+  {error_flag}
+  <script>
+    (function() {{
+      var lang = navigator.language || 'zh-CN';
+      var isEn = lang.indexOf('en') === 0;
+      document.getElementById('title').textContent = isEn ? 'Access Code Required' : '需要提取码';
+      document.getElementById('desc').textContent = isEn
+        ? 'This share is protected by an access code. Please enter the access code to access the file.'
+        : '此分享受提取码保护，请输入提取码以访问文件。';
+      document.getElementById('password').placeholder = isEn ? 'Enter access code' : '输入提取码';
+      document.getElementById('submit').textContent = isEn ? 'Submit' : '提交';
+      document.querySelector('.footer').textContent = isEn ? 'Cloud Clipboard' : '云剪切板';
+      var params = new URLSearchParams(location.search);
+      if (window.__SHARE_ERROR__ || params.has('code') || params.has('password')) {{
+        var err = document.getElementById('error');
+        err.classList.add('show');
+        err.textContent = isEn ? 'Incorrect access code. Please try again.' : '提取码不正确，请重试。';
+      }}
+    }})();
+  </script>
+</body>
+</html>"#
+    ))
 }
 
 // ============= Router =============
@@ -368,11 +522,11 @@ async fn create_share(
             let base_url = super::build_base_url(&headers);
             let base_path = super::get_base_path();
             let mut share_url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
-            // Append password to URL if available
+            // Append access code to URL if available
             let generated_password_string = generated_password.map(|s| s.to_string());
             if let Some(ref pwd) = generated_password_string {
                 share_url = format!(
-                    "{}?password={}",
+                    "{}?code={}",
                     share_url,
                     utf8_percent_encode(pwd, NON_ALPHANUMERIC)
                 );
@@ -446,8 +600,8 @@ async fn list_shares(
                 "expired"
             };
             let url = format!("{}{}/public/file/{}", base_url, base_path, share.share_id);
-            // Note: passwords are not included in list URLs for security.
-            // Passwords are only returned once at share creation time.
+            // Note: access codes are not included in list URLs for security.
+            // Access codes are only returned once at share creation time.
             // Use originalFilename from metadata if available, fallback to file_name
             let original_filename = share
                 .metadata
@@ -822,16 +976,20 @@ mod tests {
 
     #[test]
     fn download_query_deserialize() {
-        let json = r#"{"password":"mypass"}"#;
+        let json = r#"{"code":"mypass"}"#;
         let q: DownloadQuery = serde_json::from_str(json).unwrap();
-        assert_eq!(q.password, Some("mypass".to_string()));
+        assert_eq!(q.code, Some("mypass".to_string()));
+        // Also verify legacy alias "password" still works
+        let legacy = r#"{"password":"mypass"}"#;
+        let q2: DownloadQuery = serde_json::from_str(legacy).unwrap();
+        assert_eq!(q2.code, Some("mypass".to_string()));
     }
 
     #[test]
     fn download_query_no_password() {
         let json = r#"{}"#;
         let q: DownloadQuery = serde_json::from_str(json).unwrap();
-        assert!(q.password.is_none());
+        assert!(q.code.is_none());
     }
 
     #[test]
@@ -1077,7 +1235,7 @@ pub async fn public_download(
     headers: HeaderMap,
     Path(share_id): Path<String>,
     Query(query): Query<DownloadQuery>,
-) -> Result<impl IntoResponse, (StatusCode, HeaderMap, Json<ApiResponse<()>>)> {
+) -> Result<Response, (StatusCode, HeaderMap, Json<ApiResponse<()>>)> {
     // Validate shareId format (8-10 character base62: [a-zA-Z0-9])
     if share_id.len() < 8
         || share_id.len() > 10
@@ -1124,7 +1282,7 @@ pub async fn public_download(
     // Verify password if required
     if share.has_password() {
         // Prefer Basic Auth, fallback to query parameter
-        let password = extract_basic_auth_password(&headers).or_else(|| query.password.clone());
+        let password = extract_basic_auth_password(&headers).or_else(|| query.code.clone());
 
         match password {
             Some(pwd) if share.verify_password(&pwd) => {}
@@ -1137,16 +1295,12 @@ pub async fn public_download(
                     Some("Invalid password".to_string()),
                     user_agent,
                 );
-                let mut headers = HeaderMap::new();
-                headers.insert(
-                    "WWW-Authenticate",
-                    "Basic realm=\"File Download\", charset=\"UTF-8\""
-                        .parse()
-                        .unwrap(),
-                );
+                if is_browser_request(&headers) {
+                    return Ok(password_page_html(true).into_response());
+                }
                 return Err((
                     StatusCode::UNAUTHORIZED,
-                    headers,
+                    HeaderMap::new(),
                     Json(ApiResponse {
                         success: false,
                         message: Some("Invalid password".to_string()),
@@ -1155,16 +1309,12 @@ pub async fn public_download(
                 ));
             }
             None => {
-                let mut headers = HeaderMap::new();
-                headers.insert(
-                    "WWW-Authenticate",
-                    "Basic realm=\"File Download\", charset=\"UTF-8\""
-                        .parse()
-                        .unwrap(),
-                );
+                if is_browser_request(&headers) {
+                    return Ok(password_page_html(false).into_response());
+                }
                 return Err((
                     StatusCode::UNAUTHORIZED,
-                    headers,
+                    HeaderMap::new(),
                     Json(ApiResponse {
                         success: false,
                         message: Some("Password required".to_string()),
@@ -1281,20 +1431,18 @@ pub async fn public_download(
         filename_encoded
     );
 
-    Ok((
-        [
-            (header::CONTENT_TYPE, file_info.mime_type),
-            (header::CONTENT_DISPOSITION, content_disposition),
-            (header::CONTENT_LENGTH, file_info.size.to_string()),
-            (
-                header::CACHE_CONTROL,
-                "no-store, no-cache, must-revalidate".to_string(),
-            ),
-            (
-                HeaderName::from_static("x-content-type-options"),
-                "nosniff".to_string(),
-            ),
-        ],
-        body,
-    ))
+    Ok(([
+        (header::CONTENT_TYPE, file_info.mime_type),
+        (header::CONTENT_DISPOSITION, content_disposition),
+        (header::CONTENT_LENGTH, file_info.size.to_string()),
+        (
+            header::CACHE_CONTROL,
+            "no-store, no-cache, must-revalidate".to_string(),
+        ),
+        (
+            HeaderName::from_static("x-content-type-options"),
+            "nosniff".to_string(),
+        ),
+    ], body)
+        .into_response())
 }

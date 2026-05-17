@@ -23,9 +23,10 @@ import { getApiPath } from "@/utils/api";
 import { Copy, Link as LinkIcon, Shield, ShieldOff, Calendar, X } from "lucide-react";
 
 interface ShareData {
+  shareId: string;
   url: string;
-  hasPassword: boolean;
-  password?: string;
+  hasAccessCode: boolean;
+  accessCode?: string;
   expiresAt: string;
 }
 
@@ -51,9 +52,9 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   const [isLoading, setIsLoading] = React.useState(false);
   const [shareData, setShareData] = React.useState<ShareData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [enablePassword, setEnablePassword] = React.useState(false);
+  const [enableAccessCode, setEnableAccessCode] = React.useState(true);
   const [expiresInDays, setExpiresInDays] = React.useState<string>("7");
-  const [copiedItem, setCopiedItem] = React.useState<"url" | "password" | null>(null);
+  const [copiedItem, setCopiedItem] = React.useState<"url" | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
 
@@ -74,9 +75,8 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         expiresInDays: parseInt(expiresInDays),
       };
 
-      // Only add password field if user wants to enable it
-      if (enablePassword) {
-        requestBody.password = "auto-generate"; // Let server generate password
+      if (enableAccessCode) {
+        requestBody.password = "auto-generate";
       }
 
       const response = await fetch(getApiPath("/api/share"), {
@@ -94,8 +94,26 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         throw new Error(data.message || "Failed to create share link");
       }
 
-      setShareData(data.data);
-      onShareCreated?.(data.data);
+      // Map API response to our ShareData interface
+      const shareResult: ShareData = {
+        shareId: data.data.shareId,
+        url: data.data.url,
+        hasAccessCode: data.data.hasPassword,
+        accessCode: data.data.password,
+        expiresAt: data.data.expiresAt,
+      };
+
+      setShareData(shareResult);
+      onShareCreated?.(shareResult);
+
+      // Persist access code to localStorage so ShareList can retrieve it later
+      if (shareResult.hasAccessCode && shareResult.accessCode) {
+        try {
+          localStorage.setItem(`share_access_code_${shareResult.shareId}`, shareResult.accessCode);
+        } catch {
+          // localStorage may be unavailable; non-critical
+        }
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);
@@ -109,7 +127,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     }
   };
 
-  const copyToClipboard = async (type: "url" | "password", text?: string) => {
+  const copyToClipboard = async (type: "url", text?: string) => {
     try {
       const content = type === "url" ? shareData?.url : text;
       if (!content) return;
@@ -127,7 +145,6 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   };
 
   if (shareData) {
-    // Calculate expiration days from expiresAt date
     const diffDays = calculateExpirationDays(shareData.expiresAt);
     return (
       <Card className="w-full border-0 shadow-2xl bg-gradient-to-br from-background to-muted/20">
@@ -180,45 +197,13 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
             </div>
           </div>
 
-          {shareData.hasPassword && (
-            <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
-              <Label className="text-xs text-primary mb-2 block font-semibold">
-                {t("share.modal.password.label")}
-              </Label>
-              <div className="flex items-center gap-2">
-                <code className="text-lg font-mono flex-1 break-all bg-background p-2 rounded border border-primary/30">
-                  {shareData.password}
-                </code>
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard("password", shareData.password)}
-                    className="shrink-0"
-                    title={t("share.modal.password.copy")}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  {copiedItem === "password" && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-popover border border-border px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg animate-in fade-in-0 zoom-in-95 duration-200 z-50">
-                      <span className="text-popover-foreground">{t("room.copied")}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {t("share.modal.password.generatedHint")}
-              </p>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
               <span>{t("share.modal.expires.label", { days: diffDays })}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {shareData.hasPassword ? (
+              {shareData.hasAccessCode ? (
                 <>
                   <Shield className="h-4 w-4 text-primary" />
                   <span>{t("share.modal.status.protected")}</span>
@@ -268,18 +253,6 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           </div>
         )}
 
-        <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
-          <div className="flex items-start gap-3">
-            <Shield className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <p className="text-sm font-medium mb-1">{t("share.modal.password.title")}</p>
-              <p className="text-xs text-muted-foreground">
-                {t("share.modal.password.description")}
-              </p>
-            </div>
-          </div>
-        </div>
-
         <div className="space-y-2">
           <Label className="text-sm font-medium flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -302,19 +275,29 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 bg-muted/30 p-4 rounded-lg border">
-          <Checkbox
-            id="enable-password"
-            checked={enablePassword}
-            onCheckedChange={(checked) => setEnablePassword(!!checked)}
-          />
-          <Label htmlFor="enable-password" className="text-sm font-medium cursor-pointer">
-            {t("share.modal.password.enableLabel")}
-          </Label>
-          {enablePassword && (
-            <span className="text-xs text-muted-foreground">
-              {t("share.modal.password.autoGenerateHint")}
-            </span>
+        <div className="space-y-3">
+          <div className="flex items-center space-x-3 bg-muted/30 p-4 rounded-lg border">
+            <Checkbox
+              id="enable-access-code"
+              checked={enableAccessCode}
+              onCheckedChange={(checked) => setEnableAccessCode(!!checked)}
+            />
+            <Label htmlFor="enable-access-code" className="text-sm font-medium cursor-pointer">
+              {t("share.modal.accessCode.enableLabel")}
+            </Label>
+          </div>
+          {enableAccessCode && (
+            <div className="bg-primary/5 p-4 rounded-lg border border-primary/10">
+              <div className="flex items-start gap-3">
+                <Shield className="h-5 w-5 text-primary mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium mb-1">{t("share.modal.accessCode.title")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("share.modal.accessCode.description")}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

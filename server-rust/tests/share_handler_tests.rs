@@ -321,8 +321,8 @@ async fn test_create_share_with_password() {
     assert_eq!(data.share_id, "share002");
     assert!(data.has_password);
     assert_eq!(data.password.as_deref(), Some("abc123"));
-    // URL should contain password query param
-    assert!(data.url.contains("password="));
+    // URL should contain access code query param
+    assert!(data.url.contains("code="));
 }
 
 #[tokio::test]
@@ -1763,17 +1763,95 @@ async fn test_public_download_password_protected_no_password() {
         .await
         .unwrap();
 
-    // Should include WWW-Authenticate header (check before consuming body)
-    let www_auth = response
-        .headers()
-        .get("WWW-Authenticate")
-        .expect("Should have WWW-Authenticate header");
-    assert!(www_auth.to_str().unwrap().contains("Basic"));
+    // Non-browser requests should get 401 JSON without WWW-Authenticate header
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        response.headers().get("WWW-Authenticate").is_none(),
+        "Should not include WWW-Authenticate header for API requests"
+    );
 
     let body_bytes = read_body(response.into_body()).await;
     let parsed: ApiResponse<()> = serde_json::from_slice(&body_bytes).unwrap();
     assert!(!parsed.success);
     assert!(parsed.message.unwrap().contains("Password required"));
+}
+
+#[tokio::test]
+async fn test_public_download_password_protected_browser_no_password() {
+    let ctx = DownloadTestContext::new();
+
+    let share = make_share_info("pwdShare1b", "secret.pdf", "room1", "user1", 7, true);
+    ctx.share_service.add_share("pwdShare1b", share);
+
+    let app = ctx.download_app();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/pwdShare1b")
+                .header("Accept", "text/html")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Browser requests should get HTML password prompt page
+    assert_eq!(response.status(), StatusCode::OK);
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .expect("Should have content-type header")
+        .to_str()
+        .unwrap();
+    assert!(content_type.contains("text/html"));
+
+    let body_bytes = read_body(response.into_body()).await;
+    let body_str = String::from_utf8(body_bytes).unwrap();
+    assert!(body_str.contains("需要提取码") || body_str.contains("Access Code Required"));
+    assert!(body_str.contains("<form"));
+}
+
+#[tokio::test]
+async fn test_public_download_password_protected_browser_wrong_password() {
+    let ctx = DownloadTestContext::new();
+
+    let share = make_share_info("pwdShare1c", "secret.pdf", "room1", "user1", 7, true);
+    ctx.share_service.add_share("pwdShare1c", share);
+
+    let app = ctx.download_app();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/pwdShare1c?password=wrongpass")
+                .header("Accept", "text/html")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Browser requests with wrong password should get HTML page with error
+    assert_eq!(response.status(), StatusCode::OK);
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .expect("Should have content-type header")
+        .to_str()
+        .unwrap();
+    assert!(content_type.contains("text/html"));
+
+    let body_bytes = read_body(response.into_body()).await;
+    let body_str = String::from_utf8(body_bytes).unwrap();
+    assert!(
+        body_str.contains("__SHARE_ERROR__"),
+        "Should include error flag for wrong password"
+    );
+    assert!(
+        body_str.contains("提取码不正确") || body_str.contains("Incorrect access code"),
+        "Should contain error message"
+    );
 }
 
 #[tokio::test]
