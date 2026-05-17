@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.0] - 2026-05-17
+
+- feat: 分享链接"密码"重命名为"提取码"，改用浏览器端下载页面
+- feat: UI 设计刷新 — 品牌色、气泡布局、消息折叠、侧边栏重构
+
 ## [3.1.0] - 2026-05-06
 
 - fix: 修复连接状态同步导致的重复加入房间问题
