@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.1] - 2026-06-06
+
+- feat: PWA 主动检查 Service Worker 更新和静态资源缓存控制
+
 ## [3.2.0] - 2026-05-17
 
 - feat: 分享链接"密码"重命名为"提取码"，改用浏览器端下载页面
