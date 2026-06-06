@@ -1,12 +1,20 @@
 // Use the library modules instead of redefining them
-use cloud_clipboard_server::{AppState, config, middleware, routes, services};
+use cloud_clipboard_server::{AppState, config, routes, services};
 
 use axum::http::{HeaderName, HeaderValue, header};
-use axum::{Json, Router, extract::DefaultBodyLimit, http::Method, http::StatusCode, routing::get};
+use axum::{
+    Json, Router,
+    extract::{DefaultBodyLimit, Request},
+    http::{Method, StatusCode},
+    middleware::{self as axum_middleware, Next},
+    response::Response,
+    routing::get,
+};
 use socketioxide::SocketIo;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
@@ -17,9 +25,6 @@ use tower_http::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::middleware::rate_limit::{
-    RateLimitConfig, RateLimitMiddleware, public_download_rate_limiter, strict_rate_limiter,
-};
 use crate::routes::{api_info, files, health, rooms, share};
 use crate::services::SqlitePersistenceService;
 use crate::services::persistence::PersistenceServiceTrait;
@@ -27,7 +32,13 @@ use crate::services::traits::{FileManagerTrait, RoomServiceTrait, ShareServiceTr
 use crate::services::{
     FileManager, NoOpPersistenceService, PersistedRoom, RoomEvent, RoomService, ShareService,
 };
+use cloud_clipboard_server::middleware::rate_limit::{
+    RateLimitConfig, RateLimitMiddleware, public_download_rate_limiter, strict_rate_limiter,
+};
 use cloud_clipboard_server::models::Message;
+
+const STATIC_ENTRY_CACHE_CONTROL: &str = "no-cache, must-revalidate";
+const STATIC_IMMUTABLE_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -368,9 +379,11 @@ async fn main() -> anyhow::Result<()> {
     let app = if std::path::Path::new(&cfg.static_dir).exists() {
         let index_path = format!("{}/index.html", cfg.static_dir);
         tracing::info!("Serving static files from: {}", cfg.static_dir);
-        app.fallback_service(
-            ServeDir::new(&cfg.static_dir).not_found_service(ServeFile::new(index_path)),
-        )
+        let static_service = ServiceBuilder::new()
+            .layer(axum_middleware::from_fn(set_static_cache_headers))
+            .service(ServeDir::new(&cfg.static_dir).not_found_service(ServeFile::new(index_path)));
+
+        app.fallback_service(static_service)
     } else {
         tracing::info!(
             "Static directory '{}' not found, skipping static file serving",
@@ -390,6 +403,31 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     Ok(())
+}
+
+async fn set_static_cache_headers(request: Request, next: Next) -> Response {
+    let is_asset_request = is_immutable_static_asset(request.uri().path());
+    let mut response = next.run(request).await;
+    let cache_control = static_cache_control_for_response(is_asset_request, response.status());
+
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(cache_control),
+    );
+
+    response
+}
+
+fn static_cache_control_for_response(is_asset_request: bool, status: StatusCode) -> &'static str {
+    if is_asset_request && status.is_success() {
+        STATIC_IMMUTABLE_CACHE_CONTROL
+    } else {
+        STATIC_ENTRY_CACHE_CONTROL
+    }
+}
+
+fn is_immutable_static_asset(path: &str) -> bool {
+    path.contains("/assets/")
 }
 
 /// Run periodic cleanup tasks

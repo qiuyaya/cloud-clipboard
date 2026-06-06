@@ -1431,18 +1431,21 @@ pub async fn public_download(
         filename_encoded
     );
 
-    Ok(([
-        (header::CONTENT_TYPE, file_info.mime_type),
-        (header::CONTENT_DISPOSITION, content_disposition),
-        (header::CONTENT_LENGTH, file_info.size.to_string()),
-        (
-            header::CACHE_CONTROL,
-            "no-store, no-cache, must-revalidate".to_string(),
-        ),
-        (
-            HeaderName::from_static("x-content-type-options"),
-            "nosniff".to_string(),
-        ),
-    ], body)
+    Ok((
+        [
+            (header::CONTENT_TYPE, file_info.mime_type),
+            (header::CONTENT_DISPOSITION, content_disposition),
+            (header::CONTENT_LENGTH, file_info.size.to_string()),
+            (
+                header::CACHE_CONTROL,
+                "no-store, no-cache, must-revalidate".to_string(),
+            ),
+            (
+                HeaderName::from_static("x-content-type-options"),
+                "nosniff".to_string(),
+            ),
+        ],
+        body,
+    )
         .into_response())
 }

@@ -14,12 +14,15 @@ declare global {
 
 // PWA 模块类型声明
 declare module "virtual:pwa-register/react" {
-  export function useRegisterSW(): {
+  interface RegisterSWOptions {
+    onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void;
+    onRegisterError?: (error: Error) => void;
+  }
+
+  export function useRegisterSW(options?: RegisterSWOptions): {
     offlineReady: [boolean, (ready: boolean) => void];
     needRefresh: [boolean, (refresh: boolean) => void];
     updateServiceWorker: (reloadPage?: boolean) => Promise<void>;
-    onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void;
-    onRegisterError?: (error: Error) => void;
   };
 }
 

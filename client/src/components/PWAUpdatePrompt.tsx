@@ -1,14 +1,22 @@
-import React, { useEffect, useState } from "react";
-// @ts-ignore
+import React, { useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+const SW_UPDATE_CHECK_FAILED_MESSAGE = "SW update check failed:";
+
 export function PWAUpdatePrompt(): JSX.Element | null {
   const { t } = useTranslation();
   const [showReload, setShowReload] = useState(false);
+  const swRegistrationRef = useRef<ServiceWorkerRegistration | undefined>(undefined);
+
+  const checkForServiceWorkerUpdate = () => {
+    swRegistrationRef.current?.update().catch((error) => {
+      console.error(SW_UPDATE_CHECK_FAILED_MESSAGE, error);
+    });
+  };
 
   const {
     offlineReady: [offlineReady, setOfflineReady],
@@ -17,11 +25,36 @@ export function PWAUpdatePrompt(): JSX.Element | null {
   } = useRegisterSW({
     onRegistered(r: ServiceWorkerRegistration | undefined) {
       console.log("SW Registered:", r);
+
+      if (!r) return;
+
+      swRegistrationRef.current = r;
+
+      // iOS Safari can keep an old service worker active longer than desktop browsers.
+      checkForServiceWorkerUpdate();
     },
     onRegisterError(error: Error) {
       console.error("SW registration error:", error);
     },
   });
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkForServiceWorkerUpdate();
+      }
+    };
+
+    window.addEventListener("pageshow", checkForServiceWorkerUpdate);
+    window.addEventListener("online", checkForServiceWorkerUpdate);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pageshow", checkForServiceWorkerUpdate);
+      window.removeEventListener("online", checkForServiceWorkerUpdate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!offlineReady) return;
