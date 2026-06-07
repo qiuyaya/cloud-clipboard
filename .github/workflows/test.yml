@@ -134,8 +134,40 @@ jobs:
           bun run copy-client
           cd server-rust
           docker build -t cloud-clipboard-e2e .
-          docker run -d --name e2e-backend -p 3001:3001 -e ALLOW_HTTP=true cloud-clipboard-e2e
-          for i in $(seq 1 30); do curl -sf http://localhost:3001/api/health && break; sleep 1; done
+          docker run -d --name e2e-backend -p 3001:3001 \
+            -e ALLOW_HTTP=true \
+            -e RUST_LOG=cloud_clipboard_server=debug,tower_http=debug \
+            cloud-clipboard-e2e
+
+          for i in $(seq 1 30); do
+            if ! docker ps --filter name=e2e-backend --filter status=running --format '{{.Names}}' | grep -q '^e2e-backend$'; then
+              echo "Rust backend container exited before becoming ready"
+              docker ps -a --filter name=e2e-backend
+              docker logs e2e-backend || true
+              exit 1
+            fi
+
+            if curl -sf http://localhost:3001/api/health; then
+              echo "Rust backend health check passed"
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "Rust backend did not become healthy in time"
+              docker ps -a --filter name=e2e-backend
+              docker logs e2e-backend || true
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          if ! curl -sf "http://localhost:3001/socket.io/?EIO=4&transport=polling" | grep -q '"sid"'; then
+            echo "Socket.IO endpoint is not ready"
+            docker ps -a --filter name=e2e-backend
+            docker logs e2e-backend || true
+            exit 1
+          fi
 
       - name: Install Playwright browsers
         run: cd client && bunx playwright install --with-deps
